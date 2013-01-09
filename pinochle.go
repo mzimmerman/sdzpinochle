@@ -135,42 +135,51 @@ func CreateDeck() (deck Deck) {
 }
 
 const ( // Actions
-	bid = iota
-	card
-	throwin
+	Bid = iota
+	PlayCard
+	Throwin
+	Deal
+	Trump
 )
 
 type Action struct {
-	action   int // bid, card, throwin
-	amount   int
-	playerid int // 0 1 2 3
-	card     Card
+	Action   int // bid, card, throwin
+	Amount   int
+	Playerid int // 0 1 2 3
+	Card     Card
 }
 
 type Player interface {
-	Tell(*Action)
-	Listen() *Action
-	Hand() *Hand
-	SetHand(*Hand)
+	Tell(Action)
+	Listen() Action
+	Hand() Hand
+	SetHand(Hand)
+	Go()
+	Close()
 }
 
-func (g *Game) sendAll(a *Action) {
+func (g *Game) sendAll(a Action) {
 	for x := 0; x < len(g.Players); x++ {
 		g.Players[x].Tell(a)
 	}
 }
 
 type Game struct {
-	Deck    Deck
-	Players []Player
-	Dealer  int
-	Score1  int
-	Score2  int
+	Deck       Deck
+	Players    []Player
+	Dealer     int
+	Score1     int
+	Score2     int
+	HighBid    int
+	HighPlayer int
+	Trump      int
 }
 
-//func (g Game) Deck() *Deck {
-//	return &g.deck
-//}
+func (g Game) TellAll(a Action) {
+	for _, player := range g.Players {
+		player.Tell(a)
+	}
+}
 
 func (h Hand) Count() (cards map[Card]int) {
 	cards = make(map[Card]int)

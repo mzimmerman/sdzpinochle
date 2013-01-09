@@ -29,7 +29,7 @@ func fakeDeal(d *Deck) (h []Hand) {
 }
 
 func TestDeal(t *testing.T) {
-	deck := createDeck()
+	deck := CreateDeck()
 	var h []Hand
 	h = fakeDeal(&deck)
 	//	fmt.Println("Deck Created")
