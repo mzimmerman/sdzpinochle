@@ -4,7 +4,6 @@ package sdzpinochle
 import (
 	"fmt"
 	"math/rand"
-	"sort"
 	"time"
 )
 
@@ -64,7 +63,7 @@ func (c Card) String() string {
 	case hearts:
 		return str + "H"
 	}
-	return "Card does not exist"
+	panic("Card does not exist")
 }
 
 func (c Card) isTrump(trump int) bool {
@@ -120,7 +119,7 @@ func (d Deck) Deal() (hands []Hand) {
 	return
 }
 
-func createDeck() (deck Deck) {
+func CreateDeck() (deck Deck) {
 	cards := [6]int{nine, ten, jack, queen, king, ace}
 	suits := [4]int{spades, hearts, diamonds, clubs}
 	index := 0
@@ -135,29 +134,43 @@ func createDeck() (deck Deck) {
 	return
 }
 
-type Player struct {
-	hand Hand
+const ( // Actions
+	bid = iota
+	card
+	throwin
+)
+
+type Action struct {
+	action   int // bid, card, throwin
+	amount   int
+	playerid int // 0 1 2 3
+	card     Card
 }
 
-type AI struct {
-	Player
+type Player interface {
+	Tell(*Action)
+	Listen() *Action
+	Hand() *Hand
+	SetHand(*Hand)
+}
+
+func (g *Game) sendAll(a *Action) {
+	for x := 0; x < len(g.Players); x++ {
+		g.Players[x].Tell(a)
+	}
 }
 
 type Game struct {
-	deck Deck
-	p    []Player
+	Deck    Deck
+	Players []Player
+	Dealer  int
+	Score1  int
+	Score2  int
 }
 
-func createGame() (game *Game) {
-	game.deck = createDeck()
-	game.deck.Shuffle()
-	hands := game.deck.Deal()
-	for x := 0; x < 4; x++ {
-		game.p[x].hand = hands[x]
-		sort.Sort(game.p[x].hand)
-	}
-	return
-}
+//func (g Game) Deck() *Deck {
+//	return &g.deck
+//}
 
 func (h Hand) Count() (cards map[Card]int) {
 	cards = make(map[Card]int)
