@@ -5,10 +5,10 @@ import (
 	//	"encoding/json"
 	"fmt"
 	sdz "github.com/mzimmerman/sdzpinochle"
-	//	"math/rand"
+	"math/rand"
 	"sort"
 
-//	"time"
+	"time"
 )
 
 const (
@@ -28,15 +28,28 @@ const (
 )
 
 type AI struct {
-	hand      sdz.Hand
-	c         chan sdz.Action
-	playerid  int
-	trump     int
-	bidAmount int
+	hand       sdz.Hand
+	c          chan sdz.Action
+	playerid   int
+	trump      int
+	bidAmount  int
+	highBid    int
+	highBidder int
+	numBidders int
 }
 
 func Log(m string, v ...interface{}) {
 	fmt.Printf(m+"\n", v...)
+}
+
+func (ai AI) isPartner(player int) bool {
+	switch ai.playerid {
+	case player - 2:
+		fallthrough
+	case player + 2:
+		return true
+	}
+	return false
 }
 
 func (ai AI) Close() {
@@ -44,6 +57,7 @@ func (ai AI) Close() {
 }
 
 func (ai AI) powerBid(suit int) (count int) {
+	count += 7 // your partner's good for at least this right?!?
 	suitMap := make([]int, 4)
 	for _, card := range ai.hand {
 		suitMap[card.Suit()]++
@@ -52,9 +66,9 @@ func (ai AI) powerBid(suit int) (count int) {
 			case ace:
 				count += 3
 			case ten:
-				fallthrough
-			case king:
 				count += 2
+			case king:
+				fallthrough
 			case queen:
 				fallthrough
 			case jack:
@@ -85,13 +99,15 @@ func (ai AI) calculateBid() (amount, trump int) {
 		Log("Could bid %d in %d", bids[suit], suit)
 		if bids[trump] < bids[suit] {
 			trump = suit
-		} /* else if bids[trump] == bids[suit] {
+		} else if bids[trump] == bids[suit] {
 			rand.Seed(time.Now().UnixNano())
 			if rand.Intn(2) == 0 { // returns one in the set of [0,2)
 				trump = suit
 			} // else - stay with trump as it was
-		}*/
+		}
 	}
+	rand.Seed(time.Now().UnixNano())
+	bids[trump] += rand.Intn(3) // adds 0, 1, or 2 for a little spontanaeity
 	return bids[trump], trump
 }
 
@@ -105,16 +121,38 @@ func (ai *AI) Go() {
 		switch action.Action {
 		case sdz.Bid:
 			if action.Playerid == ai.playerid {
-				Log("------------------Player %d asked to bid", ai.playerid)
+				Log("------------------Player %d asked to bid against player %d", ai.playerid, ai.highBidder)
 				ai.bidAmount, ai.trump = ai.calculateBid()
+				if ai.numBidders == 1 && ai.isPartner(ai.highBidder) && ai.bidAmount < 21 && ai.bidAmount+5 > 20 {
+					// save our parter
+					Log("Saving our partner with a recommended bid of %d", ai.bidAmount)
+					ai.bidAmount = 21
+				}
+				bidAmountOld := ai.bidAmount
+				switch {
+				case ai.playerid == ai.highBidder: // this should only happen if I was the dealer and I got stuck
+					ai.bidAmount = 20
+				case ai.highBid > ai.bidAmount:
+					ai.bidAmount = 0
+				case ai.highBid == ai.bidAmount && !ai.isPartner(ai.highBidder): // if equal with an opponent, bid one over them for spite!
+					ai.bidAmount++
+				case ai.numBidders == 3: // I'm last to bid, but I want it
+					ai.bidAmount = ai.highBid + 1
+				}
+				Log("------------------Player %d bid %d over %d with recommendation of %d and %d meld", ai.playerid, ai.bidAmount, ai.highBid, bidAmountOld, ai.hand.Meld(ai.trump))
 				ai.c <- sdz.Action{
 					Action:   sdz.Bid,
 					Amount:   ai.bidAmount,
 					Playerid: ai.playerid,
 				}
-				Log("------------------Player %d bid %d for %d", ai.playerid, ai.bidAmount, ai.trump)
 			} else {
+				// TODO: track the amount of bidders to bid low if last
 				// received someone else's bid value'
+				if ai.highBid < action.Amount {
+					ai.highBid = action.Amount
+					ai.highBidder = action.Playerid
+				}
+				ai.numBidders++
 			}
 		case sdz.PlayCard:
 			if action.Playerid == ai.playerid {
@@ -125,13 +163,15 @@ func (ai *AI) Go() {
 				// received someone else's play'
 			}
 		case sdz.Trump:
-			if action.Playerid == ai.playerid && action.Amount == -1 {
+			if action.Playerid == ai.playerid {
 				Log("Player %d being asked to name trump on hand %s and have %d meld", ai.playerid, ai.hand, ai.hand.Meld(ai.trump))
-				if ai.bidAmount < 18 {
+				switch {
+				// TODO add case for the end of the game like if opponents will coast out
+				case ai.bidAmount < 15:
 					ai.c <- sdz.Action{
 						Action: sdz.Throwin,
 					}
-				} else {
+				default:
 					ai.c <- sdz.Action{
 						Action: sdz.Trump,
 						Amount: ai.trump, // set trump
@@ -159,8 +199,11 @@ func (a AI) Hand() sdz.Hand {
 	return a.hand
 }
 
-func (a *AI) SetHand(h sdz.Hand) {
+func (a *AI) SetHand(h sdz.Hand, dealer int) {
 	a.hand = h
+	a.highBid = 20
+	a.highBidder = dealer
+	a.numBidders = 0
 }
 
 type Human struct {
@@ -208,11 +251,12 @@ func main() {
 		// shuffle & deal
 		game.Deck.Shuffle()
 		hands := game.Deck.Deal()
+		next := game.Dealer
 		for x := 0; x < 4; x++ {
-			game.Dealer = (game.Dealer + 1) % 4
+			next = (next + 1) % 4
 			sort.Sort(hands[x])
-			game.Players[game.Dealer].SetHand(hands[x])
-			Log("Dealing player %d hand %s - Player now has %v", game.Dealer, hands[x], game.Players[game.Dealer].Hand())
+			game.Players[next].SetHand(hands[x], game.Dealer)
+			Log("Dealing player %d hand %s", next, game.Players[next].Hand())
 		}
 		// ask players to bid
 		game.HighBid = 20
@@ -235,7 +279,6 @@ func main() {
 		// ask trump
 		game.Players[game.HighPlayer].Tell(sdz.Action{
 			Action:   sdz.Trump,
-			Amount:   -1,
 			Playerid: game.HighPlayer,
 		})
 		response := game.Players[game.HighPlayer].Listen()
@@ -251,11 +294,11 @@ func main() {
 				Playerid: game.HighPlayer,
 			}, game.HighPlayer)
 		}
-		next := game.HighPlayer
+		next = game.HighPlayer
 		for trick := 0; trick < 12; trick++ {
 			for x := 0; x < 4; x++ {
 				// play the hand
-				// handle possible throwin
+				// TODO: handle possible throwin
 				action := sdz.Action{
 					Action:   sdz.PlayCard,
 					Playerid: next,

@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	debug = true
+	debug = false
 	ace   = iota
 	ten
 	king
@@ -162,7 +162,7 @@ type Player interface {
 	Tell(Action)
 	Listen() Action
 	Hand() Hand
-	SetHand(Hand)
+	SetHand(Hand, int)
 	Go()
 	Close()
 }
