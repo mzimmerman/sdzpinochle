@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	ace = iota
+	debug = true
+	ace   = iota
 	ten
 	king
 	queen
@@ -64,6 +65,14 @@ func (c Card) String() string {
 		return str + "H"
 	}
 	panic("Card does not exist")
+}
+
+func (c Card) Suit() int {
+	return c.suit
+}
+
+func (c Card) Card() int {
+	return c.card
 }
 
 func (c Card) isTrump(trump int) bool {
@@ -210,10 +219,6 @@ func min(a, b int) int {
 }
 
 func (h Hand) Meld(trump int) (meld int) {
-	return h.MeldDebug(trump, false)
-}
-
-func (h Hand) MeldDebug(trump int, debug bool) (meld int) {
 	// hand does not have to be sorted
 	count := h.Count()
 	around := [6]int{}

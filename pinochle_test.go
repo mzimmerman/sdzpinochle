@@ -226,7 +226,7 @@ func TestMeld(t *testing.T) {
 			sort.Sort(hands[x])
 			if hands[x].Meld(suit) != results[x][suit] {
 				fmt.Printf("Testing hand #%d %v with %s\n", x, hands[x], trump)
-				_ = hands[x].MeldDebug(suit, true)
+				_ = hands[x].Meld(suit)
 				t.Errorf("Trump is %s, hand %d, %s, should be %d", trump, x, hands[x], results[x][suit])
 			}
 		}
