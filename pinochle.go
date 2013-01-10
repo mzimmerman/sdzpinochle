@@ -175,10 +175,18 @@ type Game struct {
 	Trump      int
 }
 
-func (g Game) TellAll(a Action) {
-	for _, player := range g.Players {
-		player.Tell(a)
+func (g Game) Broadcast(a Action, p int) {
+	for x, player := range g.Players {
+		if p != x {
+			player.Tell(a)
+		}
 	}
+}
+
+func (h *Hand) Play(x int) (card Card) {
+	card = (*h)[x]
+	*h = append((*h)[:x], (*h)[x+1:]...)
+	return
 }
 
 func (h Hand) Count() (cards map[Card]int) {

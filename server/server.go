@@ -48,7 +48,7 @@ func (ai *AI) Go() {
 		}
 		switch action.Action {
 		case sdz.Bid:
-			if action.Amount == -1 {
+			if action.Playerid == ai.playerid {
 				Log("Player %d asked to bid", ai.playerid)
 				ai.c <- sdz.Action{
 					Action:   sdz.Bid,
@@ -60,6 +60,13 @@ func (ai *AI) Go() {
 				// received someone else's bid value'
 			}
 		case sdz.PlayCard:
+			if action.Playerid == ai.playerid {
+				action.Card = ai.hand.Play(0)
+				Log("Player %d played card %s", ai.playerid, action.Card)
+				ai.c <- action
+			} else {
+				// received someone else's play'
+			}
 		case sdz.Trump:
 			if action.Playerid == ai.playerid && action.Amount == -1 {
 				Log("Player %d being asked to name trump on hand %s and have %d meld", ai.playerid, ai.hand, ai.hand.Meld(spades))
@@ -151,7 +158,6 @@ func main() {
 			Log("Dealing player %d hand %s - Player now has %v", game.Dealer, hands[x], game.Players[game.Dealer].Hand())
 		}
 		// ask players to bid
-		Log("----- Player 0 has hand %v", game.Players[0].Hand())
 		game.HighBid = 20
 		game.HighPlayer = game.Dealer
 		for x := 0; x < 4; x++ {
@@ -163,7 +169,7 @@ func main() {
 			})
 			bid := game.Players[game.Dealer].Listen()
 			bid.Playerid = game.Dealer
-			game.TellAll(bid)
+			game.Broadcast(bid, game.Dealer)
 			if bid.Amount > game.HighBid {
 				game.HighBid = bid.Amount
 				game.HighPlayer = game.Dealer
@@ -178,25 +184,38 @@ func main() {
 		response := game.Players[game.HighPlayer].Listen()
 		if response.Action == sdz.Throwin {
 			response.Playerid = game.HighPlayer
-			game.TellAll(response)
+			game.Broadcast(response, response.Playerid)
 		} else {
 			// response.Action = sdz.Trump
 			game.Trump = response.Amount
+			game.Broadcast(sdz.Action{
+				Action:   sdz.Trump,
+				Amount:   game.Trump,
+				Playerid: game.HighPlayer,
+			}, game.HighPlayer)
 		}
-		game.TellAll(sdz.Action{
-			Action:   sdz.Trump,
-			Amount:   game.Trump,
-			Playerid: game.HighBid,
-		})
+		next := game.HighPlayer
+		for trick := 0; trick < 12; trick++ {
+			for x := 0; x < 4; x++ {
+				// play the hand
+				// handle possible throwin
+				action := sdz.Action{
+					Action:   sdz.PlayCard,
+					Playerid: next,
+				}
+				game.Players[next].Tell(action)
+				action = game.Players[next].Listen()
+				game.Broadcast(action, next)
+				next = (next + 1) % 4
+			}
+			// next = winnerOfTheTrick
+			// add counters to winner's points'
+		}
 		for x := 0; x < 4; x++ {
 			game.Dealer = (game.Dealer + 1) % 4
 			game.Players[game.Dealer].Close()
 		}
 		return
-		for {
-			// play the hand
-			// handle possible throwin
-		}
 		// check the score for a winner
 		game.Dealer = (game.Dealer + 1) % 4
 	}

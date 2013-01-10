@@ -60,6 +60,38 @@ func TestMin(t *testing.T) {
 		t.FailNow()
 	}
 }
+func TestPlay(t *testing.T) {
+	hand := Hand{
+		Card{jack, diamonds},
+		Card{queen, diamonds},
+		Card{king, diamonds},
+		Card{ace, diamonds},
+		Card{ten, diamonds},
+		Card{jack, diamonds},
+		Card{queen, spades},
+		Card{queen, spades},
+		Card{king, spades},
+		Card{ace, spades},
+		Card{ten, spades},
+		Card{jack, spades},
+	}
+	card := hand.Play(11)
+	if card.card != jack || card.suit != spades {
+		t.Errorf("Should have gotten a jack of spades - %s", card)
+	}
+	card = hand.Play(0)
+	if card.card != jack || card.suit != diamonds {
+		t.Errorf("Should have gotten a jack of diamonds - %s", card)
+	}
+	card = hand.Play(3)
+	if card.card != ten || card.suit != diamonds {
+		t.Errorf("Should have gotten a ten of diamonds - %s", card)
+	}
+	card = hand.Play(8)
+	if card.card != ten || card.suit != spades {
+		t.Errorf("Should have gotten a ten of spades - %s", card)
+	}
+}
 
 func TestCount(t *testing.T) {
 	hand := Hand{
