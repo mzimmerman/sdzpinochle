@@ -12,26 +12,23 @@ import (
 )
 
 const (
-	ace = iota
-	ten
-	king
-	queen
-	jack
-	nine
-)
-
-const (
-	spades = iota
-	hearts
-	clubs
-	diamonds
+	ace      = "A"
+	ten      = "T"
+	king     = "K"
+	queen    = "Q"
+	jack     = "J"
+	nine     = "9"
+	spades   = "S"
+	hearts   = "H"
+	clubs    = "C"
+	diamonds = "D"
 )
 
 type AI struct {
 	hand       sdz.Hand
 	c          chan sdz.Action
 	playerid   int
-	trump      int
+	trump      sdz.Suit
 	bidAmount  int
 	highBid    int
 	highBidder int
@@ -57,13 +54,13 @@ func (ai AI) Close() {
 	close(ai.c)
 }
 
-func (ai AI) powerBid(suit int) (count int) {
+func (ai AI) powerBid(suit sdz.Suit) (count int) {
 	count += 7 // your partner's good for at least this right?!?
-	suitMap := make([]int, 4)
+	suitMap := make(map[sdz.Suit]int)
 	for _, card := range ai.hand {
 		suitMap[card.Suit()]++
 		if card.Suit() == suit {
-			switch card.Card() {
+			switch card.Face() {
 			case ace:
 				count += 3
 			case ten:
@@ -77,11 +74,11 @@ func (ai AI) powerBid(suit int) (count int) {
 			case nine:
 				count += 1
 			}
-		} else if card.Card() == ace {
+		} else if card.Face() == ace {
 			count += 2
 		}
 	}
-	for x := 0; x < 4; x++ {
+	for _, x := range sdz.Suits() {
 		if x == suit {
 			continue
 		}
@@ -92,12 +89,12 @@ func (ai AI) powerBid(suit int) (count int) {
 	return
 }
 
-func (ai AI) calculateBid() (amount, trump int, show map[sdz.Card]int) {
-	bids := make([]int, 4)
-	for suit := 0; suit < 4; suit++ {
+func (ai AI) calculateBid() (amount int, trump sdz.Suit, show map[sdz.Card]int) {
+	bids := make(map[sdz.Suit]int)
+	for _, suit := range sdz.Suits() {
 		bids[suit], show = ai.hand.Meld(suit)
 		bids[suit] = bids[suit] + ai.powerBid(suit)
-		Log("Could bid %d in %d", bids[suit], suit)
+		Log("Could bid %d in %s", bids[suit], suit)
 		if bids[trump] < bids[suit] {
 			trump = suit
 		} else if bids[trump] == bids[suit] {
@@ -177,12 +174,12 @@ func (ai *AI) Go() {
 				default:
 					ai.c <- sdz.Action{
 						Action: sdz.Trump,
-						Amount: ai.trump, // set trump
+						Trump:  ai.trump, // set trump
 					}
 				}
 			} else {
 				Log("Player %d was told trump", ai.playerid)
-				ai.trump = action.Amount
+				ai.trump = action.Trump
 			}
 		case sdz.Throwin:
 			Log("Player %d saw that player %d threw in", ai.playerid, action.Playerid)
@@ -269,7 +266,6 @@ func main() {
 			game.Players[game.Dealer].Tell(sdz.Action{
 				Action:   sdz.Bid,
 				Playerid: game.Dealer,
-				Amount:   -1,
 			})
 			bid := game.Players[game.Dealer].Listen()
 			bid.Playerid = game.Dealer
@@ -290,10 +286,10 @@ func main() {
 			game.Broadcast(response, response.Playerid)
 		} else {
 			// response.Action = sdz.Trump
-			game.Trump = response.Amount
+			game.Trump = response.Trump
 			game.Broadcast(sdz.Action{
 				Action:   sdz.Trump,
-				Amount:   game.Trump,
+				Trump:    game.Trump,
 				Playerid: game.HighPlayer,
 			}, game.HighPlayer)
 		}
