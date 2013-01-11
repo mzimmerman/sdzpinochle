@@ -36,6 +36,7 @@ type AI struct {
 	highBid    int
 	highBidder int
 	numBidders int
+	show       map[sdz.Card]int
 }
 
 func Log(m string, v ...interface{}) {
@@ -91,10 +92,10 @@ func (ai AI) powerBid(suit int) (count int) {
 	return
 }
 
-func (ai AI) calculateBid() (amount, trump int) {
+func (ai AI) calculateBid() (amount, trump int, show map[sdz.Card]int) {
 	bids := make([]int, 4)
 	for suit := 0; suit < 4; suit++ {
-		bids[suit] = ai.hand.Meld(suit)
+		bids[suit], show = ai.hand.Meld(suit)
 		bids[suit] = bids[suit] + ai.powerBid(suit)
 		Log("Could bid %d in %d", bids[suit], suit)
 		if bids[trump] < bids[suit] {
@@ -108,7 +109,7 @@ func (ai AI) calculateBid() (amount, trump int) {
 	}
 	rand.Seed(time.Now().UnixNano())
 	bids[trump] += rand.Intn(3) // adds 0, 1, or 2 for a little spontanaeity
-	return bids[trump], trump
+	return bids[trump], trump, show
 }
 
 func (ai *AI) Go() {
@@ -122,7 +123,7 @@ func (ai *AI) Go() {
 		case sdz.Bid:
 			if action.Playerid == ai.playerid {
 				Log("------------------Player %d asked to bid against player %d", ai.playerid, ai.highBidder)
-				ai.bidAmount, ai.trump = ai.calculateBid()
+				ai.bidAmount, ai.trump, ai.show = ai.calculateBid()
 				if ai.numBidders == 1 && ai.isPartner(ai.highBidder) && ai.bidAmount < 21 && ai.bidAmount+5 > 20 {
 					// save our parter
 					Log("Saving our partner with a recommended bid of %d", ai.bidAmount)
@@ -139,7 +140,8 @@ func (ai *AI) Go() {
 				case ai.numBidders == 3: // I'm last to bid, but I want it
 					ai.bidAmount = ai.highBid + 1
 				}
-				Log("------------------Player %d bid %d over %d with recommendation of %d and %d meld", ai.playerid, ai.bidAmount, ai.highBid, bidAmountOld, ai.hand.Meld(ai.trump))
+				meld, _ := ai.hand.Meld(ai.trump)
+				Log("------------------Player %d bid %d over %d with recommendation of %d and %d meld", ai.playerid, ai.bidAmount, ai.highBid, bidAmountOld, meld)
 				ai.c <- sdz.Action{
 					Action:   sdz.Bid,
 					Amount:   ai.bidAmount,
@@ -164,7 +166,8 @@ func (ai *AI) Go() {
 			}
 		case sdz.Trump:
 			if action.Playerid == ai.playerid {
-				Log("Player %d being asked to name trump on hand %s and have %d meld", ai.playerid, ai.hand, ai.hand.Meld(ai.trump))
+				meld, _ := ai.hand.Meld(ai.trump)
+				Log("Player %d being asked to name trump on hand %s and have %d meld", ai.playerid, ai.hand, meld)
 				switch {
 				// TODO add case for the end of the game like if opponents will coast out
 				case ai.bidAmount < 15:

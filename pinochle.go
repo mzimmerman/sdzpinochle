@@ -211,6 +211,13 @@ func (h Hand) Count() (cards map[Card]int) {
 	return
 }
 
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a
@@ -218,9 +225,10 @@ func min(a, b int) int {
 	return b
 }
 
-func (h Hand) Meld(trump int) (meld int) {
+func (h Hand) Meld(trump int) (meld int, show map[Card]int) {
 	// hand does not have to be sorted
 	count := h.Count()
+	show = make(map[Card]int)
 	around := [6]int{}
 	for _, value := range []int{ace, king, queen, jack} {
 		around[value] = 2
@@ -234,16 +242,25 @@ func (h Hand) Meld(trump int) (meld int) {
 				fmt.Printf("Scoring %d nine(s) in trump %d\n", count[Card{suit: suit, card: nine}], suit)
 			}
 			meld += count[Card{suit: suit, card: nine}] // 9s in trump
+			show[Card{suit: suit, card: nine}] = count[Card{suit: suit, card: nine}]
 			switch {
 			// double straight
 			case count[Card{suit: suit, card: ace}] == 2 && count[Card{suit: suit, card: ten}] == 2 && count[Card{suit: suit, card: king}] == 2 && count[Card{suit: suit, card: queen}] == 2 && count[Card{suit: suit, card: jack}] == 2:
 				meld += 150
+				for _, c := range []int{ace, ten, king, queen, jack} {
+					show[Card{suit: suit, card: c}] = 2
+				}
 				if debug {
 					fmt.Println("DoubleStraight")
 				}
 			// single straight
 			case count[Card{suit: suit, card: ace}] >= 1 && count[Card{suit: suit, card: ten}] >= 1 && count[Card{suit: suit, card: king}] >= 1 && count[Card{suit: suit, card: queen}] >= 1 && count[Card{suit: suit, card: jack}] >= 1:
+				for _, c := range []int{ace, ten, king, queen, jack} {
+					show[Card{suit: suit, card: c}] = max(show[Card{suit: suit, card: c}], 1)
+				}
 				if count[Card{suit: suit, card: king}] == 2 && count[Card{suit: suit, card: queen}] == 2 {
+					show[Card{suit: suit, card: king}] = 2
+					show[Card{suit: suit, card: queen}] = 2
 					meld += 19
 					if debug {
 						fmt.Println("SingleStraightWithExtraMarriage")
@@ -256,21 +273,29 @@ func (h Hand) Meld(trump int) (meld int) {
 				}
 			case count[Card{suit: suit, card: king}] == 2 && count[Card{suit: suit, card: queen}] == 2:
 				meld += 8
+				show[Card{suit: suit, card: king}] = 2
+				show[Card{suit: suit, card: queen}] = 2
 				if debug {
 					fmt.Println("DoubleMarriageInTrump")
 				}
 			case count[Card{suit: suit, card: king}] >= 1 && count[Card{suit: suit, card: queen}] >= 1:
 				meld += 4
+				show[Card{suit: suit, card: king}] = max(show[Card{suit: suit, card: king}], 1)
+				show[Card{suit: suit, card: queen}] = max(show[Card{suit: suit, card: queen}], 1)
 				if debug {
 					fmt.Println("SingleMarriageInTrump")
 				}
 			}
 		case count[Card{suit: suit, card: king}] == 2 && count[Card{suit: suit, card: queen}] == 2:
+			show[Card{suit: suit, card: king}] = 2
+			show[Card{suit: suit, card: queen}] = 2
 			meld += 4
 			if debug {
 				fmt.Println("DoubleMarriage")
 			}
 		case count[Card{suit: suit, card: king}] >= 1 && count[Card{suit: suit, card: queen}] >= 1:
+			show[Card{suit: suit, card: king}] = max(show[Card{suit: suit, card: king}], 1)
+			show[Card{suit: suit, card: queen}] = max(show[Card{suit: suit, card: queen}], 1)
 			if debug {
 				fmt.Println("SingleMarriage")
 			}
@@ -297,6 +322,10 @@ func (h Hand) Meld(trump int) (meld int) {
 			if around[value] == 2 {
 				worth *= 10
 			}
+			show[Card{suit: spades, card: value}] = max(show[Card{suit: spades, card: value}], around[value])
+			show[Card{suit: hearts, card: value}] = max(show[Card{suit: hearts, card: value}], around[value])
+			show[Card{suit: clubs, card: value}] = max(show[Card{suit: clubs, card: value}], around[value])
+			show[Card{suit: diamonds, card: value}] = max(show[Card{suit: diamonds, card: value}], around[value])
 			meld += worth
 			if debug {
 				fmt.Printf("Around-%d\n", worth)
@@ -306,11 +335,15 @@ func (h Hand) Meld(trump int) (meld int) {
 	switch { // pinochle
 	case count[Card{suit: diamonds, card: jack}] == 2 && count[Card{suit: spades, card: queen}] == 2:
 		meld += 30
+		show[Card{suit: diamonds, card: jack}] = 2
+		show[Card{suit: spades, card: queen}] = 2
 		if debug {
 			fmt.Println("DoubleNochle")
 		}
 	case count[Card{suit: diamonds, card: jack}] >= 1 && count[Card{suit: spades, card: queen}] >= 1:
 		meld += 4
+		show[Card{suit: diamonds, card: jack}] = max(show[Card{suit: diamonds, card: jack}], 1)
+		show[Card{suit: spades, card: queen}] = max(show[Card{suit: spades, card: queen}], 1)
 		if debug {
 			fmt.Println("Nochle")
 		}

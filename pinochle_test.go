@@ -144,6 +144,45 @@ func TestCount(t *testing.T) {
 	}
 }
 
+func TestMeld2(t *testing.T) {
+	// spades, hearts, clubs, diamonds
+	shown := map[Card]int{
+		Card{jack, diamonds}:  2,
+		Card{queen, diamonds}: 1,
+		Card{king, diamonds}:  1,
+		Card{ace, diamonds}:   0,
+		Card{ten, diamonds}:   0,
+		Card{queen, spades}:   2,
+		Card{king, spades}:    1,
+		Card{ace, spades}:     0,
+		Card{ten, spades}:     0,
+		Card{jack, spades}:    0,
+	}
+	hand := Hand{
+		Card{jack, diamonds},
+		Card{queen, diamonds},
+		Card{king, diamonds},
+		Card{ace, diamonds},
+		Card{ten, diamonds},
+		Card{jack, diamonds},
+		Card{queen, spades},
+		Card{queen, spades},
+		Card{king, spades},
+		Card{ace, spades},
+		Card{ten, spades},
+		Card{jack, spades},
+	}
+	_, results := hand.Meld(hearts)
+	for _, card := range []int{ace, ten, king, queen, jack, nine} {
+		for _, suit := range []int{spades, hearts, clubs, diamonds} {
+			realCard := Card{suit: suit, card: card}
+			if shown[realCard] != results[realCard] {
+				t.Errorf("shown[realCard]=%d != results[realCard]=%d for %s", shown[realCard], results[realCard], realCard)
+			}
+		}
+	}
+}
+
 func TestMeld(t *testing.T) {
 	hands := []Hand{
 		Hand{
@@ -210,6 +249,7 @@ func TestMeld(t *testing.T) {
 		[]int{12, 8, 8, 22},
 		[]int{4, 4, 4, 150},
 	}
+
 	for x := 0; x < len(hands); x++ {
 		for _, suit := range []int{spades, hearts, clubs, diamonds} {
 			var trump string
@@ -224,9 +264,9 @@ func TestMeld(t *testing.T) {
 				trump = "clubs"
 			}
 			sort.Sort(hands[x])
-			if hands[x].Meld(suit) != results[x][suit] {
-				fmt.Printf("Testing hand #%d %v with %s\n", x, hands[x], trump)
-				_ = hands[x].Meld(suit)
+			meld, _ := hands[x].Meld(suit)
+			if meld != results[x][suit] {
+				fmt.Printf("Tested hand #%d %v with %s\n", x, hands[x], trump)
 				t.Errorf("Trump is %s, hand %d, %s, should be %d", trump, x, hands[x], results[x][suit])
 			}
 		}
