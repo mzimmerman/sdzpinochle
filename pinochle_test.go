@@ -7,10 +7,10 @@ import (
 )
 
 func checkForDupes(h []Hand, t *testing.T) {
-	check := map[string]int{}
+	check := map[Card]int{}
 	for x := 0; x < 4; x++ {
 		for y := 0; y < len(h[x]); y++ {
-			check[h[x][y].String()]++
+			check[h[x][y]]++
 		}
 	}
 	for key, value := range check {
@@ -60,86 +60,65 @@ func TestMin(t *testing.T) {
 		t.FailNow()
 	}
 }
+
+func C(c string) Card {
+	return Card(c)
+}
+
 func TestPlay(t *testing.T) {
-	hand := Hand{
-		Card{jack, diamonds},
-		Card{queen, diamonds},
-		Card{king, diamonds},
-		Card{ace, diamonds},
-		Card{ten, diamonds},
-		Card{jack, diamonds},
-		Card{queen, spades},
-		Card{queen, spades},
-		Card{king, spades},
-		Card{ace, spades},
-		Card{ten, spades},
-		Card{jack, spades},
-	}
+	hand := Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")}
 	card := hand.Play(11)
-	if card.card != jack || card.suit != spades {
+	if card.Face() != jack || card.Suit() != spades {
 		t.Errorf("Should have gotten a jack of spades - %s", card)
 	}
 	card = hand.Play(0)
-	if card.card != jack || card.suit != diamonds {
+	if card.Face() != jack || card.Suit() != diamonds {
 		t.Errorf("Should have gotten a jack of diamonds - %s", card)
 	}
 	card = hand.Play(3)
-	if card.card != ten || card.suit != diamonds {
+	if card.Face() != ten || card.Suit() != diamonds {
 		t.Errorf("Should have gotten a ten of diamonds - %s", card)
 	}
 	card = hand.Play(8)
-	if card.card != ten || card.suit != spades {
+	if card.Face() != ten || card.Suit() != spades {
 		t.Errorf("Should have gotten a ten of spades - %s", card)
 	}
 }
 
 func TestCount(t *testing.T) {
-	hand := Hand{
-		Card{jack, diamonds},
-		Card{queen, diamonds},
-		Card{king, diamonds},
-		Card{ace, diamonds},
-		Card{ten, diamonds},
-		Card{jack, diamonds},
-		Card{queen, spades},
-		Card{queen, spades},
-		Card{king, spades},
-		Card{ace, spades},
-		Card{ten, spades},
-		Card{jack, spades},
-	}
+	hand := Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("JD"), C("JS"), C("QD"), C("KS"), C("AS"), C("TS"), C("JS"), C("TD")}
 	count := hand.Count()
-	if count[Card{jack, diamonds}] != 2 {
+	if count[C("JS")] != 2 {
 		t.Errorf("There should be two jacks of diamonds")
 	}
-	if count[Card{queen, diamonds}] != 1 {
-		t.Errorf("There should be one jacks of diamonds")
+	if count[C("QD")] != 2 {
+		t.Errorf("There should be two queens of diamonds")
 	}
-	if count[Card{king, diamonds}] != 1 {
-		t.Errorf("There should be one jacks of diamonds")
+	if count[C("KD")] != 1 {
+		t.Errorf("There should be one king of diamonds")
 	}
-	if count[Card{ace, diamonds}] != 1 {
-		t.Errorf("There should be one jacks of diamonds")
+	if count[C("AD")] != 1 {
+		t.Errorf("There should be one ace of diamonds")
 	}
-	if count[Card{ten, diamonds}] != 1 {
-		t.Errorf("There should be one jacks of diamonds")
+	if count[C("TD")] != 1 {
+		t.Errorf("There should be one ten of diamonds")
 	}
-	if count[Card{queen, spades}] != 2 {
-		t.Errorf("There should be two queen of spades")
+	if count[C("QS")] != 0 {
+		t.Errorf("There should be 0 queens of spades")
 	}
-	if count[Card{king, spades}] != 1 {
+	if count[C("KS")] != 1 {
 		t.Errorf("There should be one king of spades")
 	}
-	if count[Card{ace, spades}] != 1 {
+	if count[C("AS")] != 1 {
 		t.Errorf("There should be one ace of spades")
 	}
-	if count[Card{ten, spades}] != 1 {
+	if count[C("TS")] != 1 {
 		t.Errorf("There should be one ten of spades")
 	}
-	if count[Card{jack, spades}] != 1 {
-		t.Errorf("There should be one jack of spades")
+	if count[C("JS")] != 2 {
+		t.Errorf("There should be two jack of spades")
 	}
-	if count[Card{jack, hearts}] != 0 {
+	if count[C("JH")] != 0 {
 		t.Errorf("There should be zero jacks of hearts")
 	}
 }
@@ -147,35 +126,22 @@ func TestCount(t *testing.T) {
 func TestMeld2(t *testing.T) {
 	// spades, hearts, clubs, diamonds
 	shown := map[Card]int{
-		Card{jack, diamonds}:  2,
-		Card{queen, diamonds}: 1,
-		Card{king, diamonds}:  1,
-		Card{ace, diamonds}:   0,
-		Card{ten, diamonds}:   0,
-		Card{queen, spades}:   2,
-		Card{king, spades}:    1,
-		Card{ace, spades}:     0,
-		Card{ten, spades}:     0,
-		Card{jack, spades}:    0,
+		C("JD"): 2,
+		C("QD"): 1,
+		C("KD"): 1,
+		C("AD"): 0,
+		C("TD"): 0,
+		C("QS"): 2,
+		C("KS"): 1,
+		C("AS"): 0,
+		C("TS"): 0,
+		C("JS"): 0,
 	}
-	hand := Hand{
-		Card{jack, diamonds},
-		Card{queen, diamonds},
-		Card{king, diamonds},
-		Card{ace, diamonds},
-		Card{ten, diamonds},
-		Card{jack, diamonds},
-		Card{queen, spades},
-		Card{queen, spades},
-		Card{king, spades},
-		Card{ace, spades},
-		Card{ten, spades},
-		Card{jack, spades},
-	}
+	hand := Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")}
 	_, results := hand.Meld(hearts)
-	for _, card := range []int{ace, ten, king, queen, jack, nine} {
-		for _, suit := range []int{spades, hearts, clubs, diamonds} {
-			realCard := Card{suit: suit, card: card}
+	for _, face := range Faces() {
+		for _, suit := range Suits() {
+			realCard := CreateCard(suit, face)
 			if shown[realCard] != results[realCard] {
 				t.Errorf("shown[realCard]=%d != results[realCard]=%d for %s", shown[realCard], results[realCard], realCard)
 			}
@@ -185,89 +151,25 @@ func TestMeld2(t *testing.T) {
 
 func TestMeld(t *testing.T) {
 	hands := []Hand{
-		Hand{
-			Card{jack, diamonds},
-			Card{queen, diamonds},
-			Card{king, diamonds},
-			Card{ace, diamonds},
-			Card{ten, diamonds},
-			Card{jack, diamonds},
-			Card{queen, spades},
-			Card{queen, spades},
-			Card{king, spades},
-			Card{ace, spades},
-			Card{ten, spades},
-			Card{jack, spades},
-		},
-		Hand{
-			Card{jack, diamonds},
-			Card{queen, diamonds},
-			Card{king, diamonds},
-			Card{queen, diamonds},
-			Card{king, diamonds},
-			Card{jack, hearts},
-			Card{jack, clubs},
-			Card{queen, spades},
-			Card{king, spades},
-			Card{ace, spades},
-			Card{ten, spades},
-			Card{jack, spades},
-		},
-		Hand{
-			Card{nine, diamonds},
-			Card{queen, diamonds},
-			Card{king, diamonds},
-			Card{ace, diamonds},
-			Card{ten, diamonds},
-			Card{jack, diamonds},
-			Card{queen, spades},
-			Card{queen, spades},
-			Card{king, spades},
-			Card{ace, spades},
-			Card{nine, spades},
-			Card{nine, spades},
-		},
-		Hand{
-			Card{jack, diamonds},
-			Card{queen, diamonds},
-			Card{king, diamonds},
-			Card{ace, diamonds},
-			Card{ten, diamonds},
-			Card{jack, diamonds},
-			Card{queen, diamonds},
-			Card{king, diamonds},
-			Card{ace, diamonds},
-			Card{ten, diamonds},
-			Card{ten, spades},
-			Card{jack, spades},
-		},
+		Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")},
+		Hand{C("JD"), C("QD"), C("KD"), C("QD"), C("KD"), C("JH"), C("JC"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")},
+		Hand{C("9D"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("9S"), C("9S")},
+		Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("TS"), C("JS")},
 	}
 	// spades, hearts, clubs, diamonds
-	results := [][]int{
-		[]int{47, 34, 34, 47},
-		[]int{27, 14, 14, 18},
-		[]int{12, 8, 8, 22},
-		[]int{4, 4, 4, 150},
+	results := []map[string]int{
+		map[string]int{spades: 47, hearts: 34, clubs: 34, diamonds: 47},
+		map[string]int{spades: 27, hearts: 14, clubs: 14, diamonds: 18},
+		map[string]int{spades: 12, hearts: 8, clubs: 8, diamonds: 22},
+		map[string]int{spades: 4, hearts: 4, clubs: 4, diamonds: 150},
 	}
-
 	for x := 0; x < len(hands); x++ {
-		for _, suit := range []int{spades, hearts, clubs, diamonds} {
-			var trump string
-			switch suit {
-			case hearts:
-				trump = "hearts"
-			case spades:
-				trump = "spades"
-			case diamonds:
-				trump = "diamonds"
-			case clubs:
-				trump = "clubs"
-			}
+		for _, trump := range Suits() {
 			sort.Sort(hands[x])
-			meld, _ := hands[x].Meld(suit)
-			if meld != results[x][suit] {
+			meld, _ := hands[x].Meld(trump)
+			if meld != results[x][string(trump)] {
 				fmt.Printf("Tested hand #%d %v with %s\n", x, hands[x], trump)
-				t.Errorf("Trump is %s, hand %d, %s, should be %d", trump, x, hands[x], results[x][suit])
+				t.Errorf("Trump is %s, hand %d, %s, should be %d", trump, x, hands[x], results[x][string(trump)])
 			}
 		}
 	}

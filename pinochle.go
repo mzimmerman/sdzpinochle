@@ -40,12 +40,8 @@ func Suits() [4]Suit {
 type Deck [48]Card
 type Hand []Card
 
-func C(c string) Card {
-	return Card(c)
-}
-
 func CreateCard(suit Suit, face Face) Card {
-	return Card(string(suit) + string(face))
+	return Card(string(face) + string(suit))
 }
 
 func (c Card) Suit() Suit {
@@ -228,11 +224,11 @@ func (h *Hand) Play(x int) (card Card) {
 
 func (h Hand) Count() (cards map[Card]int) {
 	cards = make(map[Card]int)
-	//	for card := range []int{ace, ten, king, queen, jack, nine} {
-	//		for suit := range []int{spades, hearts, clubs, diamonds} {
-	//			cards[Card{suit:suit, card:card}] = 0
-	//		}
-	//	}
+	for _, face := range Faces() {
+		for _, suit := range Suits() {
+			cards[CreateCard(suit, face)] = 0
+		}
+	}
 	for x := 0; x < len(h); x++ {
 		cards[h[x]]++
 	}
@@ -256,6 +252,9 @@ func min(a, b int) int {
 func (h Hand) Meld(trump Suit) (meld int, show map[Card]int) {
 	// hand does not have to be sorted
 	count := h.Count()
+	if debug {
+		fmt.Printf("Count is %v\n", count)
+	}
 	show = make(map[Card]int)
 	around := make(map[Face]int)
 	for _, value := range Faces() {
@@ -266,7 +265,7 @@ func (h Hand) Meld(trump Suit) (meld int, show map[Card]int) {
 		switch { // straights & marriages
 		case trump == suit:
 			if debug {
-				fmt.Printf("Scoring %d nine(s) in trump %d\n", count[CreateCard(suit, nine)])
+				fmt.Printf("Scoring %d nine(s) in trump %s\n", count[CreateCard(suit, nine)], trump)
 			}
 			meld += count[CreateCard(suit, nine)] // 9s in trump
 			show[CreateCard(suit, nine)] = count[CreateCard(suit, nine)]
