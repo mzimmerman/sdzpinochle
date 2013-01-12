@@ -55,7 +55,7 @@ func (ai AI) Close() {
 }
 
 func (ai AI) powerBid(suit sdz.Suit) (count int) {
-	count += 7 // your partner's good for at least this right?!?
+	count = 7 // your partner's good for at least this right?!?
 	suitMap := make(map[sdz.Suit]int)
 	for _, card := range ai.hand {
 		suitMap[card.Suit()]++
@@ -76,6 +76,8 @@ func (ai AI) powerBid(suit sdz.Suit) (count int) {
 			}
 		} else if card.Face() == ace {
 			count += 2
+		} else if card.Face() == jack || card.Face() == nine {
+			count -= 1
 		}
 	}
 	for _, x := range sdz.Suits() {
@@ -94,7 +96,7 @@ func (ai AI) calculateBid() (amount int, trump sdz.Suit, show map[sdz.Card]int) 
 	for _, suit := range sdz.Suits() {
 		bids[suit], show = ai.hand.Meld(suit)
 		bids[suit] = bids[suit] + ai.powerBid(suit)
-		Log("Could bid %d in %s", bids[suit], suit)
+		//		Log("Could bid %d in %s", bids[suit], suit)
 		if bids[trump] < bids[suit] {
 			trump = suit
 		} else if bids[trump] == bids[suit] {
@@ -145,7 +147,6 @@ func (ai *AI) Go() {
 					Playerid: ai.playerid,
 				}
 			} else {
-				// TODO: track the amount of bidders to bid low if last
 				// received someone else's bid value'
 				if ai.highBid < action.Amount {
 					ai.highBid = action.Amount
