@@ -1,22 +1,32 @@
 package sdzpinochle
 
 import (
-	"fmt"
+	pt "github.com/remogatto/prettytest"
 	"sort"
 	"testing"
 )
 
-func checkForDupes(h []Hand, t *testing.T) {
+type testSuite struct {
+	pt.Suite
+}
+
+func TestFoo(t *testing.T) {
+	pt.RunWithFormatter(
+		t,
+		new(pt.TDDFormatter),
+		new(testSuite),
+	)
+}
+
+func checkForDupes(h []Hand, t *testSuite) {
 	check := map[Card]int{}
 	for x := 0; x < 4; x++ {
 		for y := 0; y < len(h[x]); y++ {
 			check[h[x][y]]++
 		}
 	}
-	for key, value := range check {
-		if value != 2 {
-			t.Fatalf("there are %d %s", value, key)
-		}
+	for _, value := range check {
+		t.Equal(value, 2)
 	}
 }
 
@@ -28,7 +38,7 @@ func fakeDeal(d *Deck) (h []Hand) {
 	return
 }
 
-func TestDeal(t *testing.T) {
+func (t *testSuite) TestDeal() {
 	deck := CreateDeck()
 	var h []Hand
 	h = fakeDeal(&deck)
@@ -49,81 +59,44 @@ func TestDeal(t *testing.T) {
 	checkForDupes(h, t)
 }
 
-func TestMin(t *testing.T) {
-	if min(1, 2) != 1 {
-		t.FailNow()
-	}
-	if min(2, 1) != 1 {
-		t.FailNow()
-	}
-	if min(5, 5) != 5 {
-		t.FailNow()
-	}
+func (t *testSuite) TestMin() {
+	t.Equal(min(1, 2), 1)
+	t.Equal(min(2, 1), 1)
+	t.Equal(min(5, 5), 5)
 }
 
 func C(c string) Card {
 	return Card(c)
 }
 
-func TestPlay(t *testing.T) {
+func (t *testSuite) TestPlay() {
 	hand := Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")}
 	card := hand.Play(11)
-	if card.Face() != jack || card.Suit() != spades {
-		t.Errorf("Should have gotten a jack of spades - %s", card)
-	}
+	t.True(card.Face() == jack && card.Suit() == spades)
 	card = hand.Play(0)
-	if card.Face() != jack || card.Suit() != diamonds {
-		t.Errorf("Should have gotten a jack of diamonds - %s", card)
-	}
+	t.True(card.Face() == jack && card.Suit() == diamonds)
 	card = hand.Play(3)
-	if card.Face() != ten || card.Suit() != diamonds {
-		t.Errorf("Should have gotten a ten of diamonds - %s", card)
-	}
+	t.True(card.Face() == ten && card.Suit() == diamonds)
 	card = hand.Play(8)
-	if card.Face() != ten || card.Suit() != spades {
-		t.Errorf("Should have gotten a ten of spades - %s", card)
-	}
+	t.True(card.Face() == ten && card.Suit() == spades)
 }
 
-func TestCount(t *testing.T) {
+func (t *testSuite) TestCount() {
 	hand := Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("JD"), C("JS"), C("QD"), C("KS"), C("AS"), C("TS"), C("JS"), C("TD")}
 	count := hand.Count()
-	if count[C("JS")] != 2 {
-		t.Errorf("There should be two jacks of diamonds")
-	}
-	if count[C("QD")] != 2 {
-		t.Errorf("There should be two queens of diamonds")
-	}
-	if count[C("KD")] != 1 {
-		t.Errorf("There should be one king of diamonds")
-	}
-	if count[C("AD")] != 1 {
-		t.Errorf("There should be one ace of diamonds")
-	}
-	if count[C("TD")] != 1 {
-		t.Errorf("There should be one ten of diamonds")
-	}
-	if count[C("QS")] != 0 {
-		t.Errorf("There should be 0 queens of spades")
-	}
-	if count[C("KS")] != 1 {
-		t.Errorf("There should be one king of spades")
-	}
-	if count[C("AS")] != 1 {
-		t.Errorf("There should be one ace of spades")
-	}
-	if count[C("TS")] != 1 {
-		t.Errorf("There should be one ten of spades")
-	}
-	if count[C("JS")] != 2 {
-		t.Errorf("There should be two jack of spades")
-	}
-	if count[C("JH")] != 0 {
-		t.Errorf("There should be zero jacks of hearts")
-	}
+	t.Equal(count[C("JS")], 2)
+	t.Equal(count[C("KD")], 1)
+	t.Equal(count[C("AD")], 1)
+	t.Equal(count[C("TD")], 1)
+	t.Equal(count[C("QS")], 0)
+	t.Equal(count[C("KS")], 1)
+	t.Equal(count[C("AS")], 1)
+	t.Equal(count[C("TS")], 1)
+	t.Equal(count[C("JS")], 2)
+	t.Equal(count[C("JH")], 0)
 }
 
-func TestMeld2(t *testing.T) {
+func (t *testSuite) TestMeld2() {
 	// spades, hearts, clubs, diamonds
 	shown := map[Card]int{
 		C("JD"): 2,
@@ -142,14 +115,12 @@ func TestMeld2(t *testing.T) {
 	for _, face := range Faces() {
 		for _, suit := range Suits() {
 			realCard := CreateCard(suit, face)
-			if shown[realCard] != results[realCard] {
-				t.Errorf("shown[realCard]=%d != results[realCard]=%d for %s", shown[realCard], results[realCard], realCard)
-			}
+			t.Equal(shown[realCard], results[realCard])
 		}
 	}
 }
 
-func TestMeld(t *testing.T) {
+func (t *testSuite) TestMeld() {
 	hands := []Hand{
 		Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")},
 		Hand{C("JD"), C("QD"), C("KD"), C("QD"), C("KD"), C("JH"), C("JC"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")},
@@ -167,10 +138,7 @@ func TestMeld(t *testing.T) {
 		for _, trump := range Suits() {
 			sort.Sort(hands[x])
 			meld, _ := hands[x].Meld(trump)
-			if meld != results[x][string(trump)] {
-				fmt.Printf("Tested hand #%d %v with %s\n", x, hands[x], trump)
-				t.Errorf("Trump is %s, hand %d, %s, should be %d", trump, x, hands[x], results[x][string(trump)])
-			}
+			t.Equal(meld, results[x][string(trump)])
 		}
 	}
 }
