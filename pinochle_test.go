@@ -86,13 +86,13 @@ func C(c string) Card {
 func (t *testSuite) TestPlay() {
 	hand := Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")}
 	card := hand.Play(11)
-	t.True(card.Face() == jack && card.Suit() == spades)
+	t.True(card.Face() == Jack && card.Suit() == Spades)
 	card = hand.Play(0)
-	t.True(card.Face() == jack && card.Suit() == diamonds)
+	t.True(card.Face() == Jack && card.Suit() == Diamonds)
 	card = hand.Play(3)
-	t.True(card.Face() == ten && card.Suit() == diamonds)
+	t.True(card.Face() == Ten && card.Suit() == Diamonds)
 	card = hand.Play(8)
-	t.True(card.Face() == ten && card.Suit() == spades)
+	t.True(card.Face() == Ten && card.Suit() == Spades)
 }
 
 func (t *testSuite) TestCount() {
@@ -125,7 +125,7 @@ func (t *testSuite) TestMeld2() {
 		C("JS"): 0,
 	}
 	hand := Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")}
-	_, results := hand.Meld(hearts)
+	_, results := hand.Meld(Hearts)
 	for _, face := range Faces() {
 		for _, suit := range Suits() {
 			realCard := CreateCard(suit, face)
@@ -143,10 +143,10 @@ func (t *testSuite) TestMeld() {
 	}
 	// spades, hearts, clubs, diamonds
 	results := []map[string]int{
-		map[string]int{spades: 47, hearts: 34, clubs: 34, diamonds: 47},
-		map[string]int{spades: 27, hearts: 14, clubs: 14, diamonds: 18},
-		map[string]int{spades: 12, hearts: 8, clubs: 8, diamonds: 22},
-		map[string]int{spades: 4, hearts: 4, clubs: 4, diamonds: 150},
+		map[string]int{Spades: 47, Hearts: 34, Clubs: 34, Diamonds: 47},
+		map[string]int{Spades: 27, Hearts: 14, Clubs: 14, Diamonds: 18},
+		map[string]int{Spades: 12, Hearts: 8, Clubs: 8, Diamonds: 22},
+		map[string]int{Spades: 4, Hearts: 4, Clubs: 4, Diamonds: 150},
 	}
 	for x := 0; x < len(hands); x++ {
 		for _, trump := range Suits() {

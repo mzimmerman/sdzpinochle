@@ -273,11 +273,17 @@ func main() {
 			// TODO: adjust the score
 		case *sdz.TrumpAction:
 			game.Trump = response.Value().(sdz.Suit)
+			Log("Trump is set to %s", game.Trump)
 			game.Broadcast(response, game.HighPlayer)
+		default:
+			panic("Didn't receive either expected response")
 		}
 		// TODO: send meld of each player out to clients
 		next = game.HighPlayer
 		for trick := 0; trick < 12; trick++ {
+			var winningCard sdz.Card
+			winningPlayer := next
+			counters := 0
 			for x := 0; x < 4; x++ {
 				// play the hand
 				// TODO: handle possible throwin
@@ -286,10 +292,31 @@ func main() {
 				game.Players[next].Tell(action)
 				action, _ = game.Players[next].Listen()
 				// TODO: verify legal move for player
+				cardPlayed := action.Value().(sdz.Card)
+				switch cardPlayed.Face() {
+				case sdz.Ace:
+					fallthrough
+				case sdz.Ten:
+					fallthrough
+				case sdz.King:
+					counters++
+				}
+				if x == 0 {
+					winningCard = cardPlayed
+				} else {
+					if cardPlayed.Beats(winningCard, game.Trump) {
+						winningCard = cardPlayed
+						winningPlayer = next
+					}
+				}
 				game.Broadcast(action, next)
 				next = (next + 1) % 4
 			}
-			// next = winnerOfTheTrick
+			next = winningPlayer
+			if trick == 11 {
+				counters++
+			}
+			Log("Player %d wins trick with %s for %d points", winningPlayer, winningCard, counters)
 			// add counters to winner's points'
 		}
 		for x := 0; x < 4; x++ {

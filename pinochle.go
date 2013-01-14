@@ -9,16 +9,16 @@ import (
 
 const (
 	debug       = false
-	ace         = "A"
-	ten         = "T"
-	king        = "K"
-	queen       = "Q"
-	jack        = "J"
-	nine        = "9"
-	spades      = "S"
-	hearts      = "H"
-	clubs       = "C"
-	diamonds    = "D"
+	Ace         = "A"
+	Ten         = "T"
+	King        = "K"
+	Queen       = "Q"
+	Jack        = "J"
+	Nine        = "9"
+	Spades      = "S"
+	Hearts      = "H"
+	Clubs       = "C"
+	Diamonds    = "D"
 	acearound   = 10
 	kingaround  = 8
 	queenaround = 6
@@ -30,11 +30,11 @@ type Suit string // one char
 type Face string // one char
 
 func Faces() [6]Face {
-	return [6]Face{ace, ten, king, queen, jack, nine}
+	return [6]Face{Ace, Ten, King, Queen, Jack, Nine}
 }
 
 func Suits() [4]Suit {
-	return [4]Suit{spades, hearts, clubs, diamonds}
+	return [4]Suit{Spades, Hearts, Clubs, Diamonds}
 }
 
 type Deck [48]Card
@@ -44,16 +44,23 @@ func CreateCard(suit Suit, face Face) Card {
 	return Card(string(face) + string(suit))
 }
 
+func (a Card) Beats(b Card, trump Suit) bool {
+	// a is the challenging card
+	switch {
+	case a.Suit() == b.Suit():
+		return a.Face().Less(b.Face())
+	case a.Suit() == trump:
+		return true
+	}
+	return false
+}
+
 func (c Card) Suit() Suit {
 	return Suit(c[1])
 }
 
 func (c Card) Face() Face {
 	return Face(c[0])
-}
-
-func (c Card) isTrump(trump Suit) bool {
-	return c.Suit() == trump
 }
 
 func (d *Deck) Swap(i, j int) {
@@ -90,27 +97,27 @@ func (h Hand) Less(i, j int) bool {
 
 func (a Face) Less(b Face) bool {
 	switch {
-	case b == ace:
+	case b == Ace:
 		return false
-	case a == ace:
+	case a == Ace:
 		return true
-	case b == ten:
+	case b == Ten:
 		return false
-	case a == ten:
+	case a == Ten:
 		return true
-	case b == king:
+	case b == King:
 		return false
-	case a == king:
+	case a == King:
 		return true
-	case b == queen:
+	case b == Queen:
 		return false
-	case a == queen:
+	case a == Queen:
 		return true
-	case b == jack:
+	case b == Jack:
 		return false
-	case a == jack:
+	case a == Jack:
 		return true
-	case b == nine:
+	case b == Nine:
 		return false
 	}
 	return true
@@ -118,19 +125,19 @@ func (a Face) Less(b Face) bool {
 
 func (a Suit) Less(b Suit) bool { // only for sorting the suits for display in the hand
 	switch {
-	case a == spades:
+	case a == Spades:
 		return false
-	case b == spades:
+	case b == Spades:
 		return true
-	case a == hearts:
+	case a == Hearts:
 		return false
-	case b == hearts:
+	case b == Hearts:
 		return true
-	case a == clubs:
+	case a == Clubs:
 		return false
-	case b == clubs:
+	case b == Clubs:
 		return true
-	case a == diamonds:
+	case a == Diamonds:
 		return false
 	}
 	return true
@@ -353,13 +360,13 @@ func (h Hand) Meld(trump Suit) (meld int, show map[Card]int) {
 		switch { // straights & marriages
 		case trump == suit:
 			if debug {
-				fmt.Printf("Scoring %d nine(s) in trump %s\n", count[CreateCard(suit, nine)], trump)
+				fmt.Printf("Scoring %d nine(s) in trump %s\n", count[CreateCard(suit, Nine)], trump)
 			}
-			meld += count[CreateCard(suit, nine)] // 9s in trump
-			show[CreateCard(suit, nine)] = count[CreateCard(suit, nine)]
+			meld += count[CreateCard(suit, Nine)] // 9s in trump
+			show[CreateCard(suit, Nine)] = count[CreateCard(suit, Nine)]
 			switch {
 			// double straight
-			case count[CreateCard(suit, ace)] == 2 && count[CreateCard(suit, ten)] == 2 && count[CreateCard(suit, king)] == 2 && count[CreateCard(suit, queen)] == 2 && count[CreateCard(suit, jack)] == 2:
+			case count[CreateCard(suit, Ace)] == 2 && count[CreateCard(suit, Ten)] == 2 && count[CreateCard(suit, King)] == 2 && count[CreateCard(suit, Queen)] == 2 && count[CreateCard(suit, Jack)] == 2:
 				meld += 150
 				for _, face := range Faces() {
 					show[CreateCard(suit, face)] = 2
@@ -368,13 +375,13 @@ func (h Hand) Meld(trump Suit) (meld int, show map[Card]int) {
 					fmt.Println("DoubleStraight")
 				}
 			// single straight
-			case count[CreateCard(suit, ace)] >= 1 && count[CreateCard(suit, ten)] >= 1 && count[CreateCard(suit, king)] >= 1 && count[CreateCard(suit, queen)] >= 1 && count[CreateCard(suit, jack)] >= 1:
-				for _, face := range []Face{ace, ten, king, queen, jack} {
+			case count[CreateCard(suit, Ace)] >= 1 && count[CreateCard(suit, Ten)] >= 1 && count[CreateCard(suit, King)] >= 1 && count[CreateCard(suit, Queen)] >= 1 && count[CreateCard(suit, Jack)] >= 1:
+				for _, face := range []Face{Ace, Ten, King, Queen, Jack} {
 					show[CreateCard(suit, face)] = max(show[CreateCard(suit, face)], 1)
 				}
-				if count[CreateCard(suit, king)] == 2 && count[CreateCard(suit, queen)] == 2 {
-					show[CreateCard(suit, king)] = 2
-					show[CreateCard(suit, queen)] = 2
+				if count[CreateCard(suit, King)] == 2 && count[CreateCard(suit, Queen)] == 2 {
+					show[CreateCard(suit, King)] = 2
+					show[CreateCard(suit, Queen)] = 2
 					meld += 19
 					if debug {
 						fmt.Println("SingleStraightWithExtraMarriage")
@@ -385,31 +392,31 @@ func (h Hand) Meld(trump Suit) (meld int, show map[Card]int) {
 					}
 					meld += 15
 				}
-			case count[CreateCard(suit, king)] == 2 && count[CreateCard(suit, queen)] == 2:
+			case count[CreateCard(suit, King)] == 2 && count[CreateCard(suit, Queen)] == 2:
 				meld += 8
-				show[CreateCard(suit, king)] = 2
-				show[CreateCard(suit, queen)] = 2
+				show[CreateCard(suit, King)] = 2
+				show[CreateCard(suit, Queen)] = 2
 				if debug {
 					fmt.Println("DoubleMarriageInTrump")
 				}
-			case count[CreateCard(suit, king)] >= 1 && count[CreateCard(suit, queen)] >= 1:
+			case count[CreateCard(suit, King)] >= 1 && count[CreateCard(suit, Queen)] >= 1:
 				meld += 4
-				show[CreateCard(suit, king)] = max(show[CreateCard(suit, king)], 1)
-				show[CreateCard(suit, queen)] = max(show[CreateCard(suit, queen)], 1)
+				show[CreateCard(suit, King)] = max(show[CreateCard(suit, King)], 1)
+				show[CreateCard(suit, Queen)] = max(show[CreateCard(suit, Queen)], 1)
 				if debug {
 					fmt.Println("SingleMarriageInTrump")
 				}
 			}
-		case count[CreateCard(suit, king)] == 2 && count[CreateCard(suit, queen)] == 2:
-			show[CreateCard(suit, king)] = 2
-			show[CreateCard(suit, queen)] = 2
+		case count[CreateCard(suit, King)] == 2 && count[CreateCard(suit, Queen)] == 2:
+			show[CreateCard(suit, King)] = 2
+			show[CreateCard(suit, Queen)] = 2
 			meld += 4
 			if debug {
 				fmt.Println("DoubleMarriage")
 			}
-		case count[CreateCard(suit, king)] >= 1 && count[CreateCard(suit, queen)] >= 1:
-			show[CreateCard(suit, king)] = max(show[CreateCard(suit, king)], 1)
-			show[CreateCard(suit, queen)] = max(show[CreateCard(suit, queen)], 1)
+		case count[CreateCard(suit, King)] >= 1 && count[CreateCard(suit, Queen)] >= 1:
+			show[CreateCard(suit, King)] = max(show[CreateCard(suit, King)], 1)
+			show[CreateCard(suit, Queen)] = max(show[CreateCard(suit, Queen)], 1)
 			if debug {
 				fmt.Println("SingleMarriage")
 			}
@@ -420,17 +427,17 @@ func (h Hand) Meld(trump Suit) (meld int, show map[Card]int) {
 			around[face] = min(count[CreateCard(suit, face)], around[face])
 		}
 	}
-	for _, face := range []Face{ace, king, queen, jack} {
+	for _, face := range []Face{Ace, King, Queen, Jack} {
 		if around[face] > 0 {
 			var worth int
 			switch face {
-			case ace:
+			case Ace:
 				worth = acearound
-			case king:
+			case King:
 				worth = kingaround
-			case queen:
+			case Queen:
 				worth = queenaround
-			case jack:
+			case Jack:
 				worth = jackaround
 			}
 			if around[face] == 2 {
@@ -446,17 +453,17 @@ func (h Hand) Meld(trump Suit) (meld int, show map[Card]int) {
 		}
 	}
 	switch { // pinochle
-	case count[CreateCard(diamonds, jack)] == 2 && count[CreateCard(spades, queen)] == 2:
+	case count[CreateCard(Diamonds, Jack)] == 2 && count[CreateCard(Spades, Queen)] == 2:
 		meld += 30
-		show[CreateCard(spades, queen)] = 2
-		show[CreateCard(diamonds, jack)] = 2
+		show[CreateCard(Spades, Queen)] = 2
+		show[CreateCard(Diamonds, Jack)] = 2
 		if debug {
 			fmt.Println("DoubleNochle")
 		}
-	case count[CreateCard(diamonds, jack)] >= 1 && count[CreateCard(spades, queen)] >= 1:
+	case count[CreateCard(Diamonds, Jack)] >= 1 && count[CreateCard(Spades, Queen)] >= 1:
 		meld += 4
-		show[CreateCard(diamonds, jack)] = max(show[CreateCard(diamonds, jack)], 1)
-		show[CreateCard(spades, queen)] = max(show[CreateCard(spades, queen)], 1)
+		show[CreateCard(Diamonds, Jack)] = max(show[CreateCard(Diamonds, Jack)], 1)
+		show[CreateCard(Spades, Queen)] = max(show[CreateCard(Spades, Queen)], 1)
 		if debug {
 			fmt.Println("Nochle")
 		}
