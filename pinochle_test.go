@@ -134,6 +134,13 @@ func (t *testSuite) TestMeld2() {
 	}
 }
 
+func (t *testSuite) TestBeats() {
+	t.True(C("JD").Beats(C("9D"), Diamonds))
+	t.True(C("JD").Beats(C("9D"), Spades))
+	t.True(C("JD").Beats(C("9S"), Diamonds))
+	t.True(C("9S").Beats(C("JD"), Spades))
+}
+
 func (t *testSuite) TestMeld() {
 	hands := []Hand{
 		Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")},
