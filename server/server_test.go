@@ -31,10 +31,7 @@ func (t *testSuite) TestBidding() {
 	ai := createAI(1)
 	ai.SetHand(hand, 0)
 	go ai.Go()
-	ai.c <- sdz.Action{
-		Action:   sdz.Bid,
-		Playerid: ai.playerid,
-	}
+	ai.c <- sdz.CreateBid(0, 1)
 	action := <-ai.c
-	t.False(21 > action.Amount || action.Amount > 23)
+	t.False(21 > action.Value().(int) || action.Value().(int) > 23)
 }

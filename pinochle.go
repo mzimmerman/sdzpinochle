@@ -90,27 +90,27 @@ func (h Hand) Less(i, j int) bool {
 
 func (a Face) Less(b Face) bool {
 	switch {
-	case a == ace:
-		return false
 	case b == ace:
-		return true
-	case a == ten:
 		return false
+	case a == ace:
+		return true
 	case b == ten:
-		return true
-	case a == king:
 		return false
+	case a == ten:
+		return true
 	case b == king:
-		return true
-	case a == queen:
 		return false
+	case a == king:
+		return true
 	case b == queen:
-		return true
-	case a == jack:
 		return false
-	case b == jack:
+	case a == queen:
 		return true
-	case a == nine:
+	case b == jack:
+		return false
+	case a == jack:
+		return true
+	case b == nine:
 		return false
 	}
 	return true
@@ -166,35 +166,123 @@ func CreateDeck() (deck Deck) {
 	return
 }
 
-const ( // Actions
-	Bid = iota
-	PlayCard
-	Throwin
-	Deal
-	Trump
-)
+func CreateBid(bid, playerid int) *BidAction {
+	bida := BidAction{bid: bid}
+	bida.SetPlayer(playerid)
+	return &bida
+}
 
-type Action struct {
-	Action   int // bid, card, throwin
-	Amount   int
-	Playerid int // 0 1 2 3
-	Card     Card
-	Trump    Suit
+type BidAction struct {
+	ActionImpl
+	bid int
+}
+
+func (b BidAction) Value() interface{} {
+	return b.bid
+}
+
+func CreatePlay(card Card, playerid int) *PlayAction {
+	play := PlayAction{card: card}
+	play.SetPlayer(playerid)
+	return &play
+}
+
+type PlayAction struct {
+	ActionImpl
+	card Card
+}
+
+func (b PlayAction) Value() interface{} {
+	return b.card
+}
+
+func CreateTrump(trump Suit, playerid int) *TrumpAction {
+	x := TrumpAction{trump: trump}
+	x.SetPlayer(playerid)
+	return &x
+}
+
+type TrumpAction struct {
+	ActionImpl
+	trump Suit
+}
+
+func (x TrumpAction) Value() interface{} {
+	return x.trump
+}
+
+func CreateThrowin(playerid int) *ThrowinAction {
+	x := ThrowinAction{}
+	x.SetPlayer(playerid)
+	return &x
+}
+
+type ThrowinAction struct {
+	ActionImpl
+}
+
+func (x ThrowinAction) Value() interface{} {
+	return nil
+}
+
+func CreateDeal(hand Hand, playerid int) *DealAction {
+	x := DealAction{hand: hand}
+	x.SetPlayer(playerid)
+	return &x
+}
+
+type DealAction struct {
+	ActionImpl
+	hand Hand
+}
+
+func (x DealAction) Value() interface{} {
+	return x.hand
+}
+
+func (a *ActionImpl) SetPlayer(playerid int) {
+	a.playerid = playerid
+}
+
+type ActionImpl struct {
+	playerid int
+}
+
+func (action ActionImpl) Playerid() int {
+	return action.playerid
+}
+
+type Action interface {
+	Playerid() int
+	Value() interface{}
 }
 
 type Player interface {
 	Tell(Action)
-	Listen() Action
+	Listen() (Action, bool)
 	Hand() Hand
 	SetHand(Hand, int)
 	Go()
 	Close()
+	Playerid() int
 }
 
-func (g *Game) sendAll(a Action) {
-	for x := 0; x < len(g.Players); x++ {
-		g.Players[x].Tell(a)
+type PlayerImpl struct {
+	Id int
+}
+
+func (p PlayerImpl) Playerid() int {
+	return p.Id
+}
+
+func (p PlayerImpl) IsPartner(player int) bool {
+	switch p.Playerid() {
+	case player - 2:
+		fallthrough
+	case player + 2:
+		return true
 	}
+	return false
 }
 
 type Game struct {
