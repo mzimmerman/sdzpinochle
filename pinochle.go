@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+func Log(m string, v ...interface{}) {
+	fmt.Printf(m+"\n", v...)
+}
+
 const (
 	debug       = false
 	Ace         = "A"
@@ -318,6 +322,140 @@ type Game struct {
 	HighBid    int
 	HighPlayer int
 	Trump      Suit
+}
+
+func (game *Game) Go(players []Player) {
+	game.Players = players
+	game.Score = make([]int, 2)
+	handsPlayed := 0
+	for {
+		handsPlayed++
+		// shuffle & deal
+		game.Deck.Shuffle()
+		hands := game.Deck.Deal()
+		next := game.Dealer
+		game.Meld = make([]int, len(game.Players))
+		game.MeldHands = make([]Hand, len(game.Players))
+		game.Counters = make([]int, len(game.Players))
+		for x := 0; x < 4; x++ {
+			next = (next + 1) % 4
+			sort.Sort(hands[x])
+			game.Players[next].SetHand(hands[x], game.Dealer)
+			Log("Dealing player %d hand %s", next, game.Players[next].Hand())
+		}
+		// ask players to bid
+		game.HighBid = 20
+		game.HighPlayer = game.Dealer
+		next = game.Dealer
+		for x := 0; x < 4; x++ {
+			next = (next + 1) % 4
+			game.Players[next].Tell(CreateBid(0, next))
+			bid, _ := game.Players[next].Listen()
+			game.Broadcast(bid, next)
+			if bid.Value().(int) > game.HighBid {
+				game.HighBid = bid.Value().(int)
+				game.HighPlayer = next
+			}
+		}
+		// ask trump
+		game.Players[game.HighPlayer].Tell(CreateTrump(*new(Suit), game.HighPlayer))
+		response, _ := game.Players[game.HighPlayer].Listen()
+		switch response.(type) {
+		case *ThrowinAction:
+			game.Broadcast(response, response.Playerid())
+			// TODO: adjust the score
+		case *TrumpAction:
+			game.Trump = response.Value().(Suit)
+			Log("Trump is set to %s", game.Trump)
+			game.Broadcast(response, game.HighPlayer)
+		default:
+			panic("Didn't receive either expected response")
+		}
+		for x := 0; x < len(game.Players); x++ {
+			game.Meld[x], game.MeldHands[x] = game.Players[x].Hand().Meld(game.Trump)
+			meldAction := CreateMeld(game.MeldHands[x], game.Meld[x], x)
+			game.BroadcastAll(meldAction)
+		}
+		next = game.HighPlayer
+		for trick := 0; trick < 12; trick++ {
+			var winningCard Card
+			winningPlayer := next
+			counters := 0
+			for x := 0; x < 4; x++ {
+				// play the hand
+				// TODO: handle possible throwin
+				var action Action
+				action = CreatePlay(*new(Card), next)
+				game.Players[next].Tell(action)
+				action, _ = game.Players[next].Listen()
+				// TODO: verify legal move for player
+				cardPlayed := action.Value().(Card)
+				switch cardPlayed.Face() {
+				case Ace:
+					fallthrough
+				case Ten:
+					fallthrough
+				case King:
+					counters++
+				}
+				if x == 0 {
+					winningCard = cardPlayed
+				} else {
+					if cardPlayed.Beats(winningCard, game.Trump) {
+						winningCard = cardPlayed
+						winningPlayer = next
+					}
+				}
+				game.Broadcast(action, next)
+				next = (next + 1) % 4
+			}
+			next = winningPlayer
+			if trick == 11 {
+				counters++
+			}
+			Log("Player %d wins trick with %s for %d points", winningPlayer, winningCard, counters)
+			game.Counters[game.Players[winningPlayer].Team()] += counters
+		}
+		game.Meld[0] += game.Meld[2]
+		game.Counters[0] += game.Counters[2]
+		game.Meld[1] += game.Meld[3]
+		game.Counters[1] += game.Counters[3]
+		switch game.Players[game.HighPlayer].Team() {
+		case 0:
+			if game.Meld[0]+game.Counters[0] < game.HighBid {
+				game.Score[0] -= game.HighBid
+			} else {
+				game.Score[0] += game.Meld[0] + game.Counters[0]
+			}
+			game.Score[1] += game.Meld[1] + game.Counters[1]
+		case 1:
+			if game.Meld[1]+game.Counters[1] < game.HighBid {
+				game.Score[1] -= game.HighBid
+			} else {
+				game.Score[1] += game.Meld[1] + game.Counters[1]
+			}
+			game.Score[0] += game.Meld[0] + game.Counters[0]
+		}
+		// check the score for a winner
+		Log("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], handsPlayed)
+		if game.Score[game.HighPlayer%2] >= 120 {
+			Log("Team%d wins with a score of %d!", game.HighPlayer%2, game.Score[game.HighPlayer%2])
+			break
+		}
+		if game.Score[0] >= 120 {
+			Log("Team0 wins with a score of %d!", game.Score[0])
+			break
+		}
+		if game.Score[1] >= 120 {
+			Log("Team1 wins with a score of %d!", game.Score[1])
+			break
+		}
+		game.Dealer = (game.Dealer + 1) % 4
+	}
+	for x := 0; x < 4; x++ {
+		game.Dealer = (game.Dealer + 1) % 4
+		game.Players[game.Dealer].Close()
+	}
 }
 
 func CreateGame() (game *Game) {

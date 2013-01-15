@@ -124,7 +124,9 @@ func (t *testSuite) TestMeld2() {
 	sort.Sort(hand)
 	_, results := hand.Meld(Hearts)
 	sort.Sort(results)
-	t.Equal(results, shown)
+	for x := range results {
+		t.Equal(results[x], shown[x])
+	}
 }
 
 func (t *testSuite) TestBeats() {
