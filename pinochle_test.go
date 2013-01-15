@@ -112,26 +112,19 @@ func (t *testSuite) TestCount() {
 
 func (t *testSuite) TestMeld2() {
 	// spades, hearts, clubs, diamonds
-	shown := map[Card]int{
-		C("JD"): 2,
-		C("QD"): 1,
-		C("KD"): 1,
-		C("AD"): 0,
-		C("TD"): 0,
-		C("QS"): 2,
-		C("KS"): 1,
-		C("AS"): 0,
-		C("TS"): 0,
-		C("JS"): 0,
+	shown := Hand{
+		C("JD"), C("JD"),
+		C("QD"),
+		C("KD"),
+		C("QS"), C("QS"),
+		C("KS"),
 	}
+	sort.Sort(shown)
 	hand := Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")}
+	sort.Sort(hand)
 	_, results := hand.Meld(Hearts)
-	for _, face := range Faces() {
-		for _, suit := range Suits() {
-			realCard := CreateCard(suit, face)
-			t.Equal(shown[realCard], results[realCard])
-		}
-	}
+	sort.Sort(results)
+	t.Equal(results, shown)
 }
 
 func (t *testSuite) TestBeats() {

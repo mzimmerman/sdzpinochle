@@ -31,7 +31,7 @@ type AI struct {
 	highBid    int
 	highBidder int
 	numBidders int
-	show       map[sdz.Card]int
+	show       sdz.Hand
 	sdz.PlayerImpl
 }
 
@@ -80,7 +80,7 @@ func (ai AI) powerBid(suit sdz.Suit) (count int) {
 	return
 }
 
-func (ai AI) calculateBid() (amount int, trump sdz.Suit, show map[sdz.Card]int) {
+func (ai AI) calculateBid() (amount int, trump sdz.Suit, show sdz.Hand) {
 	bids := make(map[sdz.Suit]int)
 	for _, suit := range sdz.Suits() {
 		bids[suit], show = ai.hand.Meld(suit)
@@ -232,18 +232,24 @@ func createAI(x int) (a *AI) {
 }
 
 func main() {
-	game := createGame()
+	game := sdz.CreateGame()
 	game.Players = make([]sdz.Player, 4)
+	game.Score = make([]int, 2)
+	handsPlayed := 0
 	// connect players
 	for x := 0; x < 4; x++ {
 		game.Players[x] = createAI(x)
 		go game.Players[x].Go()
 	}
 	for {
+		handsPlayed++
 		// shuffle & deal
 		game.Deck.Shuffle()
 		hands := game.Deck.Deal()
 		next := game.Dealer
+		game.Meld = make([]int, len(game.Players))
+		game.MeldHands = make([]sdz.Hand, len(game.Players))
+		game.Counters = make([]int, len(game.Players))
 		for x := 0; x < 4; x++ {
 			next = (next + 1) % 4
 			sort.Sort(hands[x])
@@ -278,7 +284,11 @@ func main() {
 		default:
 			panic("Didn't receive either expected response")
 		}
-		// TODO: send meld of each player out to clients
+		for x := 0; x < len(game.Players); x++ {
+			game.Meld[x], game.MeldHands[x] = game.Players[x].Hand().Meld(game.Trump)
+			meldAction := sdz.CreateMeld(game.MeldHands[x], game.Meld[x], x)
+			game.BroadcastAll(meldAction)
+		}
 		next = game.HighPlayer
 		for trick := 0; trick < 12; trick++ {
 			var winningCard sdz.Card
@@ -317,21 +327,47 @@ func main() {
 				counters++
 			}
 			Log("Player %d wins trick with %s for %d points", winningPlayer, winningCard, counters)
-			// add counters to winner's points'
+			game.Counters[game.Players[winningPlayer].Team()] += counters
 		}
-		for x := 0; x < 4; x++ {
-			game.Dealer = (game.Dealer + 1) % 4
-			game.Players[game.Dealer].Close()
+		game.Meld[0] += game.Meld[2]
+		game.Counters[0] += game.Counters[2]
+		game.Meld[1] += game.Meld[3]
+		game.Counters[1] += game.Counters[3]
+		switch game.Players[game.HighPlayer].Team() {
+		case 0:
+			if game.Meld[0]+game.Counters[0] < game.HighBid {
+				game.Score[0] -= game.HighBid
+			} else {
+				game.Score[0] += game.Meld[0] + game.Counters[0]
+			}
+			game.Score[1] += game.Meld[1] + game.Counters[1]
+		case 1:
+			if game.Meld[1]+game.Counters[1] < game.HighBid {
+				game.Score[1] -= game.HighBid
+			} else {
+				game.Score[1] += game.Meld[1] + game.Counters[1]
+			}
+			game.Score[0] += game.Meld[0] + game.Counters[0]
 		}
-		return
 		// check the score for a winner
+		Log("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], handsPlayed)
+		if game.Score[game.HighPlayer%2] >= 120 {
+			Log("Team%d wins with a score of %d!", game.HighPlayer%2, game.Score[game.HighPlayer%2])
+			break
+		}
+		if game.Score[0] >= 120 {
+			Log("Team0 wins with a score of %d!", game.Score[0])
+			break
+		}
+		if game.Score[1] >= 120 {
+			Log("Team1 wins with a score of %d!", game.Score[1])
+			break
+		}
 		game.Dealer = (game.Dealer + 1) % 4
 	}
-}
-
-func createGame() (game *sdz.Game) {
-	game = &sdz.Game{}
-	game.Deck = sdz.CreateDeck()
-	game.Dealer = 0
+	for x := 0; x < 4; x++ {
+		game.Dealer = (game.Dealer + 1) % 4
+		game.Players[game.Dealer].Close()
+	}
 	return
 }

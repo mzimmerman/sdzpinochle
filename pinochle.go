@@ -4,6 +4,7 @@ package sdzpinochle
 import (
 	"fmt"
 	"math/rand"
+	"sort"
 	"time"
 )
 
@@ -232,6 +233,21 @@ func (x ThrowinAction) Value() interface{} {
 	return nil
 }
 
+func CreateMeld(hand Hand, amount, playerid int) *MeldAction {
+	ma := MeldAction{hand: hand, amount: amount}
+	ma.SetPlayer(playerid)
+	return &ma
+}
+
+type MeldAction struct {
+	ActionImpl
+	hand   Hand
+	amount int
+}
+
+func (x MeldAction) Value() interface{} {
+	return []interface{}{x.hand, x.amount}
+}
 func CreateDeal(hand Hand, playerid int) *DealAction {
 	x := DealAction{hand: hand}
 	x.SetPlayer(playerid)
@@ -272,6 +288,7 @@ type Player interface {
 	Go()
 	Close()
 	Playerid() int
+	Team() int
 }
 
 type PlayerImpl struct {
@@ -282,25 +299,32 @@ func (p PlayerImpl) Playerid() int {
 	return p.Id
 }
 
+func (p PlayerImpl) Team() int {
+	return p.Playerid() % 2
+}
+
 func (p PlayerImpl) IsPartner(player int) bool {
-	switch p.Playerid() {
-	case player - 2:
-		fallthrough
-	case player + 2:
-		return true
-	}
-	return false
+	return p.Playerid()%2 == player%2
 }
 
 type Game struct {
 	Deck       Deck
 	Players    []Player
 	Dealer     int
-	Score1     int
-	Score2     int
+	Score      []int
+	Meld       []int
+	Counters   []int
+	MeldHands  []Hand
 	HighBid    int
 	HighPlayer int
 	Trump      Suit
+}
+
+func CreateGame() (game *Game) {
+	game = &Game{}
+	game.Deck = CreateDeck()
+	game.Dealer = 0
+	return
 }
 
 func (g Game) Broadcast(a Action, p int) {
@@ -309,6 +333,10 @@ func (g Game) Broadcast(a Action, p int) {
 			player.Tell(a)
 		}
 	}
+}
+
+func (g Game) BroadcastAll(a Action) {
+	g.Broadcast(a, -1)
 }
 
 func (h *Hand) Play(x int) (card Card) {
@@ -344,13 +372,13 @@ func min(a, b int) int {
 	return b
 }
 
-func (h Hand) Meld(trump Suit) (meld int, show map[Card]int) {
+func (h Hand) Meld(trump Suit) (meld int, result Hand) {
 	// hand does not have to be sorted
 	count := h.Count()
 	if debug {
 		fmt.Printf("Count is %v\n", count)
 	}
-	show = make(map[Card]int)
+	show := make(map[Card]int)
 	around := make(map[Face]int)
 	for _, value := range Faces() {
 		around[value] = 2
@@ -468,5 +496,17 @@ func (h Hand) Meld(trump Suit) (meld int, show map[Card]int) {
 			fmt.Println("Nochle")
 		}
 	}
+	result = make([]Card, 0, 12)
+	for card, amount := range show {
+		for {
+			if amount > 0 {
+				result = append(result, card)
+				amount--
+			} else {
+				break
+			}
+		}
+	}
+	sort.Sort(result)
 	return
 }
