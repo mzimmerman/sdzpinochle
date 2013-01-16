@@ -42,7 +42,7 @@ func fakeDeal(d *Deck) (h []Hand) {
 func (t *testSuite) TestAction() {
 	var action Action
 	action = &BidAction{bid: 20}
-	t.Equal(action.Value(), 20)
+	t.Equal(action.(*BidAction).Bid(), 20)
 	t.Equal(reflect.TypeOf(action).String(), "*sdzpinochle.BidAction")
 	switch action.(type) {
 	default:
@@ -83,16 +83,43 @@ func C(c string) Card {
 	return Card(c)
 }
 
-func (t *testSuite) TestPlay() {
+func (t *testSuite) TestRemove() {
 	hand := Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")}
-	card := hand.Play(11)
-	t.True(card.Face() == Jack && card.Suit() == Spades)
-	card = hand.Play(0)
-	t.True(card.Face() == Jack && card.Suit() == Diamonds)
-	card = hand.Play(3)
-	t.True(card.Face() == Ten && card.Suit() == Diamonds)
-	card = hand.Play(8)
-	t.True(card.Face() == Ten && card.Suit() == Spades)
+	sort.Sort(hand)
+	t.Equal(len(hand), 12)
+	t.True(hand.Remove(C("JD")))
+	t.Equal(len(hand), 11)
+	t.True(hand.Remove(C("JD")))
+	t.Equal(len(hand), 10)
+	t.False(hand.Remove(C("JD")))
+	t.False(hand.Remove(C("QH")))
+	t.True(hand.Remove(C("KD")))
+	t.False(hand.Remove(C("KD")))
+	t.True(hand.Remove(C("QD")))
+	t.True(hand.Remove(C("AD")))
+	t.True(hand.Remove(C("TD")))
+	t.True(hand.Remove(C("QS")))
+	t.True(hand.Remove(C("QS")))
+	t.True(hand.Remove(C("KS")))
+	t.True(hand.Remove(C("AS")))
+	t.True(hand.Remove(C("TS")))
+	t.True(hand.Remove(C("JS")))
+	t.Equal(len(hand), 0)
+	t.False(hand.Remove(C("9D")))
+}
+
+func (t *testSuite) TestValidPlay() {
+	// playedCard, winningCard Card, leadSuit Suit, hand Hand, trump Suit
+	hand := Hand{C("JD"), C("QS"), C("9D"), C("TH")}
+	t.True(ValidPlay(C("JD"), C("9D"), Diamonds, &hand, Diamonds))
+	t.False(ValidPlay(C("QD"), C("9D"), Diamonds, &hand, Diamonds))
+	t.True(ValidPlay(C("JD"), C("9D"), Diamonds, &hand, Spades))
+	t.False(ValidPlay(C("JD"), C("9D"), Hearts, &hand, Diamonds))
+	t.True(ValidPlay(C("TH"), C("9D"), Hearts, &hand, Diamonds))
+	t.True(ValidPlay(C("QS"), C("KS"), Spades, &hand, Diamonds))
+	t.False(ValidPlay(C("JD"), C("9D"), Hearts, &hand, Spades))
+	t.True(ValidPlay(C("QS"), C("9D"), Clubs, &hand, Spades))
+	t.False(ValidPlay(C("QS"), C("9D"), Diamonds, &hand, Spades))
 }
 
 func (t *testSuite) TestCount() {

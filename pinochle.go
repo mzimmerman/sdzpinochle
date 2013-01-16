@@ -189,23 +189,42 @@ type BidAction struct {
 	bid int
 }
 
-func (b BidAction) Value() interface{} {
+func (b BidAction) Bid() int {
 	return b.bid
 }
 
+func CreatePlayRequest(winning Card, lead, trump Suit, playerid int) *PlayAction {
+	play := PlayAction{winningCard: winning, lead: lead, trump: trump}
+	play.SetPlayer(playerid)
+	return &play
+}
+
 func CreatePlay(card Card, playerid int) *PlayAction {
-	play := PlayAction{card: card}
+	play := PlayAction{playedCard: card}
 	play.SetPlayer(playerid)
 	return &play
 }
 
 type PlayAction struct {
 	ActionImpl
-	card Card
+	playedCard, winningCard Card
+	lead, trump             Suit
 }
 
-func (b PlayAction) Value() interface{} {
-	return b.card
+func (b PlayAction) PlayedCard() Card {
+	return b.playedCard
+}
+
+func (b PlayAction) WinningCard() Card {
+	return b.winningCard
+}
+
+func (b PlayAction) Lead() Suit {
+	return b.lead
+}
+
+func (b PlayAction) Trump() Suit {
+	return b.trump
 }
 
 func CreateTrump(trump Suit, playerid int) *TrumpAction {
@@ -219,7 +238,7 @@ type TrumpAction struct {
 	trump Suit
 }
 
-func (x TrumpAction) Value() interface{} {
+func (x TrumpAction) Trump() Suit {
 	return x.trump
 }
 
@@ -249,8 +268,12 @@ type MeldAction struct {
 	amount int
 }
 
-func (x MeldAction) Value() interface{} {
-	return []interface{}{x.hand, x.amount}
+func (x MeldAction) Hand() Hand {
+	return x.hand
+}
+
+func (x MeldAction) Amount() int {
+	return x.amount
 }
 func CreateDeal(hand Hand, playerid int) *DealAction {
 	x := DealAction{hand: hand}
@@ -263,7 +286,7 @@ type DealAction struct {
 	hand Hand
 }
 
-func (x DealAction) Value() interface{} {
+func (x DealAction) Hand() Hand {
 	return x.hand
 }
 
@@ -281,13 +304,12 @@ func (action ActionImpl) Playerid() int {
 
 type Action interface {
 	Playerid() int
-	Value() interface{}
 }
 
 type Player interface {
 	Tell(Action)
 	Listen() (Action, bool)
-	Hand() Hand
+	Hand() *Hand
 	SetHand(Hand, int)
 	Go()
 	Close()
@@ -324,6 +346,70 @@ type Game struct {
 	Trump      Suit
 }
 
+// Used to determine if the leader of the trick made a valid play
+func IsCardInHand(card Card, hand Hand) bool {
+	for _, hc := range hand {
+		if hc == card {
+			return true
+		}
+	}
+	return false
+}
+
+// playedCard, winningCard Card, leadSuit Suit, hand Hand, trump Suit
+func ValidPlay(playedCard, winningCard Card, leadSuit Suit, hand *Hand, trump Suit) bool {
+	// hand is sorted
+	// 1 - Have to follow suit
+	// 2 - Can't follow suit, play trump
+	// 3 - Have to win
+	canFollow := false
+	hasTrump := false
+	canWin := false
+	hasCard := false
+	for _, card := range *hand {
+		if card.Suit() == leadSuit {
+			canFollow = true
+		}
+		if card.Suit() == trump {
+			hasTrump = true
+		}
+		if card == playedCard {
+			hasCard = true
+		}
+	}
+	// have to loop again because we can't set canWin to true if we're playing trump but we can follow a non-trump suit
+	for _, card := range *hand {
+		if canFollow && leadSuit != trump && card.Suit() == trump {
+			continue
+		}
+		if card.Beats(winningCard, trump) {
+			canWin = true
+			break
+		}
+	}
+	if !hasCard { // you don't have the card in your hand, not allowed to play it, cheater!
+		return false
+	}
+	if canFollow {
+		if playedCard.Suit() != leadSuit {
+			return false
+		} else if canWin { // we're following suit
+			return playedCard.Beats(winningCard, trump)
+		} else { // we're following suit and we can't win'
+			return true
+		}
+	} else if hasTrump {
+		if playedCard.Suit() != trump {
+			return false
+		} else if canWin { // we're playing trump
+			return playedCard.Beats(winningCard, trump)
+		} else { // we're playing trump but we can't win
+			return true
+		}
+	} // else { // we can't follow suit and we don't have trump - anything's legal
+	return true
+}
+
 func (game *Game) Go(players []Player) {
 	game.Players = players
 	game.Score = make([]int, 2)
@@ -351,9 +437,10 @@ func (game *Game) Go(players []Player) {
 			next = (next + 1) % 4
 			game.Players[next].Tell(CreateBid(0, next))
 			bid, _ := game.Players[next].Listen()
+			bidAction := bid.(*BidAction)
 			game.Broadcast(bid, next)
-			if bid.Value().(int) > game.HighBid {
-				game.HighBid = bid.Value().(int)
+			if bidAction.Bid() > game.HighBid {
+				game.HighBid = bidAction.Bid()
 				game.HighPlayer = next
 			}
 		}
@@ -365,7 +452,8 @@ func (game *Game) Go(players []Player) {
 			game.Broadcast(response, response.Playerid())
 			// TODO: adjust the score
 		case *TrumpAction:
-			game.Trump = response.Value().(Suit)
+			trumpAction := response.(*TrumpAction)
+			game.Trump = trumpAction.Trump()
 			Log("Trump is set to %s", game.Trump)
 			game.Broadcast(response, game.HighPlayer)
 		default:
@@ -379,17 +467,33 @@ func (game *Game) Go(players []Player) {
 		next = game.HighPlayer
 		for trick := 0; trick < 12; trick++ {
 			var winningCard Card
+			var cardPlayed Card
+			var leadSuit Suit
 			winningPlayer := next
 			counters := 0
 			for x := 0; x < 4; x++ {
 				// play the hand
 				// TODO: handle possible throwin
 				var action Action
-				action = CreatePlay(*new(Card), next)
-				game.Players[next].Tell(action)
-				action, _ = game.Players[next].Listen()
-				// TODO: verify legal move for player
-				cardPlayed := action.Value().(Card)
+				for {
+					action = CreatePlayRequest(winningCard, leadSuit, game.Trump, next)
+					game.Players[next].Tell(action)
+					action, _ = game.Players[next].Listen()
+					cardPlayed = action.(*PlayAction).PlayedCard()
+					//Log("Server received card %s", cardPlayed)
+					//Log("Hand length %d", len(*game.Players[next].Hand()))
+					if x > 0 {
+						if ValidPlay(cardPlayed, winningCard, leadSuit, game.Players[next].Hand(), game.Trump) &&
+							game.Players[next].Hand().Remove(cardPlayed) {
+							//Log("Hand length %s", len(*game.Players[next].Hand()))
+							// playedCard, winningCard Card, leadSuit Suit, hand Hand, trump Suit
+							break
+						}
+					} else if game.Players[next].Hand().Remove(cardPlayed) {
+						//Log("Hand length %s", len(*game.Players[next].Hand()))
+						break
+					}
+				}
 				switch cardPlayed.Face() {
 				case Ace:
 					fallthrough
@@ -400,12 +504,14 @@ func (game *Game) Go(players []Player) {
 				}
 				if x == 0 {
 					winningCard = cardPlayed
+					leadSuit = cardPlayed.Suit()
 				} else {
 					if cardPlayed.Beats(winningCard, game.Trump) {
 						winningCard = cardPlayed
 						winningPlayer = next
 					}
 				}
+				fmt.Printf("%d:%s - ", next, cardPlayed)
 				game.Broadcast(action, next)
 				next = (next + 1) % 4
 			}
@@ -413,7 +519,7 @@ func (game *Game) Go(players []Player) {
 			if trick == 11 {
 				counters++
 			}
-			Log("Player %d wins trick with %s for %d points", winningPlayer, winningCard, counters)
+			Log("Player %d wins trick #%d with %s for %d points", winningPlayer, trick, winningCard, counters)
 			game.Counters[game.Players[winningPlayer].Team()] += counters
 		}
 		game.Meld[0] += game.Meld[2]
@@ -451,6 +557,7 @@ func (game *Game) Go(players []Player) {
 			break
 		}
 		game.Dealer = (game.Dealer + 1) % 4
+		Log("-----------------------------------------------------------------------------")
 	}
 	for x := 0; x < 4; x++ {
 		game.Dealer = (game.Dealer + 1) % 4
@@ -477,10 +584,16 @@ func (g Game) BroadcastAll(a Action) {
 	g.Broadcast(a, -1)
 }
 
-func (h *Hand) Play(x int) (card Card) {
-	card = (*h)[x]
-	*h = append((*h)[:x], (*h)[x+1:]...)
-	return
+func (h *Hand) Remove(card Card) bool {
+	for x := range *h {
+		if (*h)[x] == card {
+			//temp := append((*h)[:x], (*h)[x+1:]...)
+			//h = &temp
+			*h = append((*h)[:x], (*h)[x+1:]...)
+			return true
+		}
+	}
+	return false
 }
 
 func (h Hand) Count() (cards map[Card]int) {
