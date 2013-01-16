@@ -120,6 +120,10 @@ func (t *testSuite) TestValidPlay() {
 	t.False(ValidPlay(C("JD"), C("9D"), Hearts, &hand, Spades))
 	t.True(ValidPlay(C("QS"), C("9D"), Clubs, &hand, Spades))
 	t.False(ValidPlay(C("QS"), C("9D"), Diamonds, &hand, Spades))
+	t.False(ValidPlay(C("JD"), C("9C"), Clubs, &hand, Spades))
+	t.True(ValidPlay(C("JD"), C("KD"), Clubs, &hand, Diamonds))
+	hand.Remove(C("QS"))
+	t.True(ValidPlay(C("JD"), C("9S"), Spades, &hand, Clubs))
 }
 
 func (t *testSuite) TestCount() {
@@ -156,11 +160,28 @@ func (t *testSuite) TestMeld2() {
 	}
 }
 
+func (t *testSuite) TestSuitLess() {
+	t.False(Spades.Less(Hearts))
+	t.False(Spades.Less(Diamonds))
+	t.True(Diamonds.Less(Spades))
+	t.False(Hearts.Less(Hearts))
+	t.True(Diamonds.Less(Hearts))
+	t.False(Diamonds.Less(Diamonds))
+}
+
 func (t *testSuite) TestBeats() {
 	t.True(C("JD").Beats(C("9D"), Diamonds))
 	t.True(C("JD").Beats(C("9D"), Spades))
 	t.True(C("JD").Beats(C("9S"), Diamonds))
 	t.True(C("9S").Beats(C("JD"), Spades))
+	t.False(C("9D").Beats(C("9D"), Diamonds))
+	t.False(C("9D").Beats(C("9D"), Diamonds))
+}
+
+func (t *testSuite) TestCardInHand() {
+	hand := Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")}
+	t.True(IsCardInHand(C("JD"), hand))
+	t.False(IsCardInHand(C("9S"), hand))
 }
 
 func (t *testSuite) TestMeld() {
@@ -169,19 +190,25 @@ func (t *testSuite) TestMeld() {
 		Hand{C("JD"), C("QD"), C("KD"), C("QD"), C("KD"), C("JH"), C("JC"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")},
 		Hand{C("9D"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("9S"), C("9S")},
 		Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("TS"), C("JS")},
+		Hand{C("AD"), C("TD"), C("KD"), C("KD"), C("QD"), C("QD"), C("JD"), C("AS"), C("KS"), C("TH"), C("QS"), C("9H")},
+		Hand{C("AD"), C("AH"), C("AS"), C("AC"), C("KD"), C("KH"), C("KS"), C("KC"), C("QS"), C("QS"), C("JD"), C("JD")},
+		Hand{C("QD"), C("QH"), C("QS"), C("QC"), C("QD"), C("QH"), C("QS"), C("QC"), C("9S"), C("9S"), C("JD"), C("9D")},
 	}
 	// spades, hearts, clubs, diamonds
-	results := []map[string]int{
-		map[string]int{Spades: 47, Hearts: 34, Clubs: 34, Diamonds: 47},
-		map[string]int{Spades: 27, Hearts: 14, Clubs: 14, Diamonds: 18},
-		map[string]int{Spades: 12, Hearts: 8, Clubs: 8, Diamonds: 22},
-		map[string]int{Spades: 4, Hearts: 4, Clubs: 4, Diamonds: 150},
+	results := []map[Suit]int{
+		map[Suit]int{Spades: 47, Hearts: 34, Clubs: 34, Diamonds: 47},
+		map[Suit]int{Spades: 27, Hearts: 14, Clubs: 14, Diamonds: 18},
+		map[Suit]int{Spades: 12, Hearts: 8, Clubs: 8, Diamonds: 22},
+		map[Suit]int{Spades: 4, Hearts: 4, Clubs: 4, Diamonds: 150},
+		map[Suit]int{Spades: 12, Hearts: 11, Clubs: 10, Diamonds: 25},
+		map[Suit]int{Spades: 52, Hearts: 50, Clubs: 50, Diamonds: 50},
+		map[Suit]int{Spades: 66, Hearts: 64, Clubs: 64, Diamonds: 65},
 	}
 	for x := 0; x < len(hands); x++ {
 		for _, trump := range Suits() {
 			sort.Sort(hands[x])
 			meld, _ := hands[x].Meld(trump)
-			t.Equal(meld, results[x][string(trump)])
+			t.Equal(results[x][trump], meld)
 		}
 	}
 }

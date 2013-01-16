@@ -308,6 +308,7 @@ func (h *Human) Go() {
 func (h Human) Tell(action sdz.Action) {
 	h.c <- action
 }
+
 func (h Human) Listen() (action sdz.Action, open bool) {
 	action, open = <-h.c
 	return

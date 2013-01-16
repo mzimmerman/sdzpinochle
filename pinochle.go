@@ -14,16 +14,16 @@ func Log(m string, v ...interface{}) {
 
 const (
 	debug       = false
-	Ace         = "A"
-	Ten         = "T"
-	King        = "K"
-	Queen       = "Q"
-	Jack        = "J"
-	Nine        = "9"
-	Spades      = "S"
-	Hearts      = "H"
-	Clubs       = "C"
-	Diamonds    = "D"
+	Ace         = Face("A")
+	Ten         = Face("T")
+	King        = Face("K")
+	Queen       = Face("Q")
+	Jack        = Face("J")
+	Nine        = Face("9")
+	Spades      = Suit("S")
+	Hearts      = Suit("H")
+	Clubs       = Suit("C")
+	Diamonds    = Suit("D")
 	acearound   = 10
 	kingaround  = 8
 	queenaround = 6
@@ -122,10 +122,8 @@ func (a Face) Less(b Face) bool {
 		return false
 	case a == Jack:
 		return true
-	case b == Nine:
-		return false
 	}
-	return true
+	return false
 }
 
 func (a Suit) Less(b Suit) bool { // only for sorting the suits for display in the hand
@@ -142,10 +140,8 @@ func (a Suit) Less(b Suit) bool { // only for sorting the suits for display in t
 		return false
 	case b == Clubs:
 		return true
-	case a == Diamonds:
-		return false
 	}
-	return true
+	return false
 }
 
 func (h Hand) Swap(i, j int) {
