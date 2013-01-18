@@ -183,7 +183,8 @@ func (ai *AI) Go() {
 		case "Throwin":
 			Log("Player %d saw that player %d threw in", ai.Playerid(), action.Playerid)
 		case "Deal": // should not happen as the server can set the Hand automagically for AI
-		case "Meld":
+		case "Meld": // nothing to do here, no one to read it
+		case "Message": // nothing to do here, no one to read it
 		default:
 			Log("Received an action I didn't understand - %v", action)
 		}
@@ -247,10 +248,11 @@ func (h *Human) Tell(action *sdz.Action) {
 func (h *Human) Listen() (action *sdz.Action, open bool) {
 	action = new(sdz.Action)
 	err := h.dec.Decode(action)
-	if err != nil {
-		return action, false
+	if err == nil {
+		return action, true
 	}
-	return nil, true
+	sdz.Log("Error receiving action from human - %v", err)
+	return nil, false
 }
 
 func (h Human) Hand() *sdz.Hand {
@@ -261,6 +263,7 @@ func (a *Human) SetHand(h sdz.Hand, dealer int) {
 	hand := make(sdz.Hand, len(h))
 	copy(hand, h)
 	a.hand = &hand
+	a.Tell(sdz.CreateDeal(hand, a.Playerid()))
 }
 
 func (h *Human) createGame(humans int, cp *ConnectionPool) {
@@ -300,6 +303,7 @@ func setupGame(net *net.Conn, cp *ConnectionPool) {
 	action := sdz.CreateHello("Do you want to join or create a new game?")
 	human.Tell(action)
 	action, _ = human.Listen()
+	sdz.Log("Action received from human = %v", action)
 	if action.Message == "create" {
 		human.createGame(1, cp)
 	} else {

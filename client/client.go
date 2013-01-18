@@ -8,11 +8,14 @@ import (
 	"net"
 )
 
-func send(enc *json.Encoder, data interface{}) {
-	err := enc.Encode(data)
+func send(enc *json.Encoder, action *sdz.Action) {
+	err := enc.Encode(action)
 	if err != nil {
 		sdz.Log("Error sending - %v", err)
+	} else {
+		//sdz.Log("Action sent to server = %v", action)
 	}
+
 }
 
 func main() {
@@ -20,6 +23,7 @@ func main() {
 	var playerid int
 	var hand *sdz.Hand
 	var bidAmount int
+	var trump sdz.Suit
 	if err != nil {
 		sdz.Log("Error - %v", err)
 		return
@@ -34,6 +38,7 @@ func main() {
 			sdz.Log("Error decoding - %v", err)
 			return
 		}
+		//sdz.Log("Action received from server = %v", action)
 		switch action.Type {
 		case "Bid":
 			if action.Playerid == playerid {
@@ -47,22 +52,24 @@ func main() {
 		case "Play":
 			if action.Playerid == playerid {
 				var card sdz.Card
-				sdz.Log("Your turn, in your hand is %s - what would you like to play?:", hand)
+				sdz.Log("Your turn, in your hand is %s - what would you like to play? Trump is %s:", hand, trump)
 				fmt.Scan(&card)
-				sdz.Log("Received input %s", card)
-				send(enc, sdz.CreatePlay(card, playerid))
+				//sdz.Log("Received input %s", card)
+				if hand.Remove(card) {
+					send(enc, sdz.CreatePlay(card, playerid))
+				}
 			} else {
 				sdz.Log("Player %d played card %s", action.Playerid, action.PlayedCard)
 				// received someone else's play'
 			}
 		case "Trump":
 			if action.Playerid == playerid {
-				var trump sdz.Suit
 				sdz.Log("What would you like to make trump?")
 				fmt.Scan(&trump)
 				send(enc, sdz.CreateTrump(trump, playerid))
 			} else {
 				sdz.Log("Player %d says trump is %s", action.Playerid, action.Trump)
+				trump = action.Trump
 			}
 		case "Throwin":
 			sdz.Log("Player %d threw in", action.Playerid)
@@ -72,6 +79,8 @@ func main() {
 			sdz.Log("Your hand is - %s", hand)
 		case "Meld":
 			sdz.Log("Player %d is melding %s for %d points", action.Playerid, action.Hand, action.Amount)
+		case "Message":
+			sdz.Log(action.Message)
 		case "Hello":
 			send(enc, sdz.CreateHello("create"))
 		default:

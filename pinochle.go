@@ -191,6 +191,10 @@ func CreateHello(m string) *Action {
 	return &Action{Type: "Hello", Message: m}
 }
 
+func CreateMessage(m string) *Action {
+	return &Action{Type: "Message", Message: m}
+}
+
 func CreateBid(bid, playerid int) *Action {
 	return &Action{Type: "Bid", Bid: bid, Playerid: playerid}
 }
@@ -324,9 +328,11 @@ func ValidPlay(playedCard, winningCard Card, leadSuit Suit, hand *Hand, trump Su
 }
 
 func (game *Game) Go(players []Player) {
+	game.Deck = CreateDeck()
 	game.Players = players
 	game.Score = make([]int, 2)
 	handsPlayed := 0
+	game.Dealer = 0
 	for {
 		handsPlayed++
 		// shuffle & deal
@@ -336,7 +342,7 @@ func (game *Game) Go(players []Player) {
 		game.Meld = make([]int, len(game.Players))
 		game.MeldHands = make([]Hand, len(game.Players))
 		game.Counters = make([]int, len(game.Players))
-		for x := 0; x < 4; x++ {
+		for x := 0; x < len(game.Players); x++ {
 			next = (next + 1) % 4
 			sort.Sort(hands[x])
 			game.Players[next].SetHand(hands[x], game.Dealer)
@@ -430,7 +436,9 @@ func (game *Game) Go(players []Player) {
 			if trick == 11 {
 				counters++
 			}
+			game.BroadcastAll(CreateMessage(fmt.Sprintf("Player %d wins trick #%d with %s for %d points", winningPlayer, trick, winningCard, counters)))
 			Log("Player %d wins trick #%d with %s for %d points", winningPlayer, trick, winningCard, counters)
+
 			game.Counters[game.Players[winningPlayer].Team()] += counters
 		}
 		game.Meld[0] += game.Meld[2]
@@ -454,16 +462,20 @@ func (game *Game) Go(players []Player) {
 			game.Score[0] += game.Meld[0] + game.Counters[0]
 		}
 		// check the score for a winner
+		game.BroadcastAll(CreateMessage(fmt.Sprintf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], handsPlayed)))
 		Log("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], handsPlayed)
 		if game.Score[game.HighPlayer%2] >= 120 {
+			game.BroadcastAll(CreateMessage(fmt.Sprintf("Team%d wins with a score of %d!", game.HighPlayer%2, game.Score[game.HighPlayer%2])))
 			Log("Team%d wins with a score of %d!", game.HighPlayer%2, game.Score[game.HighPlayer%2])
 			break
 		}
 		if game.Score[0] >= 120 {
+			game.BroadcastAll(CreateMessage(fmt.Sprintf("Team0 wins with a score of %d!", game.Score[0])))
 			Log("Team0 wins with a score of %d!", game.Score[0])
 			break
 		}
 		if game.Score[1] >= 120 {
+			game.BroadcastAll(CreateMessage(fmt.Sprintf("Team1 wins with a score of %d!", game.Score[1])))
 			Log("Team1 wins with a score of %d!", game.Score[1])
 			break
 		}
@@ -474,13 +486,6 @@ func (game *Game) Go(players []Player) {
 		game.Dealer = (game.Dealer + 1) % 4
 		game.Players[game.Dealer].Close()
 	}
-}
-
-func CreateGame() (game *Game) {
-	game = &Game{}
-	game.Deck = CreateDeck()
-	game.Dealer = 0
-	return
 }
 
 func (g Game) Broadcast(a *Action, p int) {
