@@ -185,6 +185,11 @@ type Action struct {
 	Amount                  int
 	Message                 string
 	Hand                    Hand
+	Option                  int
+}
+
+func CreateGame(option int) *Action {
+	return &Action{Type: "Game", Option: option}
 }
 
 func CreateHello(m string) *Action {
@@ -227,7 +232,7 @@ type Player interface {
 	Tell(*Action)
 	Listen() (*Action, bool)
 	Hand() *Hand
-	SetHand(Hand, int)
+	SetHand(Hand, int, int)
 	Go()
 	Close()
 	Playerid() int
@@ -345,7 +350,7 @@ func (game *Game) Go(players []Player) {
 		for x := 0; x < len(game.Players); x++ {
 			next = (next + 1) % 4
 			sort.Sort(hands[x])
-			game.Players[next].SetHand(hands[x], game.Dealer)
+			game.Players[next].SetHand(hands[x], game.Dealer, next)
 			Log("Dealing player %d hand %s", next, game.Players[next].Hand())
 		}
 		// ask players to bid

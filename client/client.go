@@ -82,7 +82,13 @@ func main() {
 		case "Message":
 			sdz.Log(action.Message)
 		case "Hello":
-			send(enc, sdz.CreateHello("create"))
+			var response string
+			fmt.Scan(&response)
+			send(enc, sdz.CreateHello(response))
+		case "Game":
+			var option int
+			fmt.Scan(&option)
+			send(enc, sdz.CreateGame(option))
 		default:
 			sdz.Log("Received an action I didn't understand - %v", action)
 		}

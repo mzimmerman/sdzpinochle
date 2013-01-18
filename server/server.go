@@ -40,9 +40,8 @@ type AI struct {
 	sdz.PlayerImpl
 }
 
-func createAI(x int) (a *AI) {
+func createAI() (a *AI) {
 	a = new(AI)
-	a.Id = x
 	a.c = make(chan *sdz.Action)
 	return a
 }
@@ -204,10 +203,11 @@ func (a AI) Hand() *sdz.Hand {
 	return a.hand
 }
 
-func (a *AI) SetHand(h sdz.Hand, dealer int) {
+func (a *AI) SetHand(h sdz.Hand, dealer, playerid int) {
 	hand := make(sdz.Hand, len(h))
 	copy(hand, h)
 	a.hand = &hand
+	a.Id = playerid
 	a.highBid = 20
 	a.highBidder = dealer
 	a.numBidders = 0
@@ -227,14 +227,13 @@ type Human struct {
 	sdz.PlayerImpl
 }
 
-func createHuman(x int, conn *net.Conn, enc *json.Encoder, dec *json.Decoder) (a *Human) {
-	human := &Human{sdz.PlayerImpl: sdz.PlayerImpl{Id: x}, conn: conn, enc: enc, dec: dec}
-	//human.PlayerImpl.Id = x
+func createHuman(conn *net.Conn, enc *json.Encoder, dec *json.Decoder) (a *Human) {
+	human := &Human{conn: conn, enc: enc, dec: dec}
 	return human
 }
 
 func (h Human) Close() {
-	//h.conn.Close()
+	(*h.conn).Close()
 }
 
 func (h *Human) Go() {
@@ -259,28 +258,50 @@ func (h Human) Hand() *sdz.Hand {
 	return h.hand
 }
 
-func (a *Human) SetHand(h sdz.Hand, dealer int) {
+func (a *Human) SetHand(h sdz.Hand, dealer, playerid int) {
 	hand := make(sdz.Hand, len(h))
 	copy(hand, h)
 	a.hand = &hand
+	a.Id = playerid
 	a.Tell(sdz.CreateDeal(hand, a.Playerid()))
 }
 
-func (h *Human) createGame(humans int, cp *ConnectionPool) {
+func (h *Human) createGame(option int, cp *ConnectionPool) {
 	game := new(sdz.Game)
 	players := make([]sdz.Player, 4)
 	// connect players
 	players[0] = h
-	go players[0].Go()
-	for x := 1; x < humans; x++ {
-		players[x] = cp.Pop()
-		go players[x].Go()
+	switch option {
+	case 1:
+		// Option 1 - Play against three AI players and start immediately
+		for x := 1; x < 4; x++ {
+			players[x] = createAI()
+		}
+	case 2:
+		// Option 2 - Play with a human partner against two AI players
+		players[1] = createAI()
+		players[2] = cp.Pop()
+		players[3] = createAI()
+	case 3:
+		// Option 3 - Play with a human partner against one AI players and 1 Human
+		players[1] = createAI()
+		players[2] = cp.Pop()
+		players[3] = cp.Pop()
+
+	case 4:
+		// Option 4 - Play with a human partner against two humans
+		for x := 1; x < 4; x++ {
+			players[x] = cp.Pop()
+		}
+	case 5:
+		// Option 5 - Play against a human with AI partners
+		players[1] = cp.Pop()
+		players[2] = createAI()
+		players[3] = createAI()
 	}
-	for x := humans; x < len(players); x++ {
-		players[x] = createAI(x)
-		go players[x].Go()
+	for x := 0; x < len(players); x++ {
+		go players[x].Go() // the humans will just start and die immediately
 	}
-	game.Players = players
 	game.Go(players)
 }
 
@@ -299,16 +320,55 @@ func (cp *ConnectionPool) Pop() *Human {
 
 func setupGame(net *net.Conn, cp *ConnectionPool) {
 	Log("Connection received")
-	human := createHuman(0, net, json.NewEncoder(*net), json.NewDecoder(*net))
-	action := sdz.CreateHello("Do you want to join or create a new game?")
-	human.Tell(action)
-	action, _ = human.Listen()
-	sdz.Log("Action received from human = %v", action)
-	if action.Message == "create" {
-		human.createGame(1, cp)
-	} else {
-		// old
-		cp.Push(human)
+	human := createHuman(net, json.NewEncoder(*net), json.NewDecoder(*net))
+	for {
+		for {
+			human.Tell(sdz.CreateMessage("Do you want to join a game, create a new game, or quit? (join, create, quit)"))
+			action := sdz.CreateHello("")
+			human.Tell(action)
+			action, _ = human.Listen()
+			sdz.Log("Action received from human = %v", action)
+			if action.Message == "create" {
+				break
+			} else if action.Message == "join" {
+				human.Tell(sdz.CreateMessage("Waiting on a game to be started that you can join..."))
+				cp.Push(human)
+				return
+				// wait for someone to pick me up
+			} else if action.Message == "quit" {
+				human.Tell(sdz.CreateMessage("Ok, bye bye!"))
+				human.Close()
+				return
+			}
+		}
+		for {
+			human.Tell(sdz.CreateMessage("Option 1 - Play against three AI players and start immediately"))
+			human.Tell(sdz.CreateMessage("Option 2 - Play with a human partner against two AI players"))
+			human.Tell(sdz.CreateMessage("Option 3 - Play with a human partner against one AI players and 1 Human"))
+			human.Tell(sdz.CreateMessage("Option 4 - Play with a human partner against two humans"))
+			human.Tell(sdz.CreateMessage("Option 5 - Play against a human with AI partners"))
+			human.Tell(sdz.CreateMessage("Option 6 - Go back"))
+			human.Tell(sdz.CreateGame(0))
+			action, _ := human.Listen()
+			sdz.Log("Action received from human = %v", action)
+			switch action.Option {
+			case 1:
+				fallthrough
+			case 2:
+				fallthrough
+			case 3:
+				fallthrough
+			case 4:
+				fallthrough
+			case 5:
+				human.createGame(action.Option, cp)
+			case 6:
+				break
+			default:
+				human.Tell(sdz.CreateMessage("Not a valid option"))
+			}
+			break // after their game is over, let's set them up again'
+		}
 	}
 }
 
