@@ -2,10 +2,10 @@
 package sdzpinochle
 
 import (
-	//"encoding/json"
+	"encoding/json"
 	"fmt"
 	"math/rand"
-	//"reflect"
+	"reflect"
 	"sort"
 	"time"
 )
@@ -186,6 +186,23 @@ type Action struct {
 	Message                 string
 	Hand                    Hand
 	Option                  int
+}
+
+func (action *Action) MarshalJSON() ([]byte, error) {
+	data := make(map[string]interface{})
+	typ := reflect.TypeOf(*action)
+	val := reflect.ValueOf(*action)
+	count := typ.NumField()
+	for x := 0; x < count; x++ {
+		if reflect.DeepEqual(val.Field(x).Interface(), reflect.New(typ.Field(x).Type).Elem().Interface()) {
+			continue
+		} else {
+			data[typ.Field(x).Name] = val.Field(x).Interface()
+		}
+	}
+	jsonData, _ := json.Marshal(data)
+	Log("JSON is - %s", jsonData)
+	return json.Marshal(data)
 }
 
 func CreateGame(option int) *Action {
