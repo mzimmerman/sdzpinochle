@@ -2,8 +2,10 @@
 package sdzpinochle
 
 import (
+	//"encoding/json"
 	"fmt"
 	"math/rand"
+	//"reflect"
 	"sort"
 	"time"
 )
@@ -174,137 +176,52 @@ func CreateDeck() (deck Deck) {
 	return
 }
 
-func CreateBid(bid, playerid int) *BidAction {
-	bida := BidAction{bid: bid}
-	bida.SetPlayer(playerid)
-	return &bida
+type Action struct {
+	Type                    string
+	Playerid                int
+	Bid                     int
+	PlayedCard, WinningCard Card
+	Lead, Trump             Suit
+	Amount                  int
+	Message                 string
+	Hand                    Hand
 }
 
-type BidAction struct {
-	ActionImpl
-	bid int
+func CreateHello(m string) *Action {
+	return &Action{Type: "Hello", Message: m}
 }
 
-func (b BidAction) Bid() int {
-	return b.bid
+func CreateBid(bid, playerid int) *Action {
+	return &Action{Type: "Bid", Bid: bid, Playerid: playerid}
 }
 
-func CreatePlayRequest(winning Card, lead, trump Suit, playerid int) *PlayAction {
-	play := PlayAction{winningCard: winning, lead: lead, trump: trump}
-	play.SetPlayer(playerid)
-	return &play
+func CreatePlayRequest(winning Card, lead, trump Suit, playerid int) *Action {
+	return &Action{Type: "Play", WinningCard: winning, Lead: lead, Trump: trump, Playerid: playerid}
 }
 
-func CreatePlay(card Card, playerid int) *PlayAction {
-	play := PlayAction{playedCard: card}
-	play.SetPlayer(playerid)
-	return &play
+func CreatePlay(card Card, playerid int) *Action {
+	return &Action{Type: "Play", PlayedCard: card, Playerid: playerid}
 }
 
-type PlayAction struct {
-	ActionImpl
-	playedCard, winningCard Card
-	lead, trump             Suit
+func CreateTrump(trump Suit, playerid int) *Action {
+	return &Action{Type: "Trump", Trump: trump, Playerid: playerid}
 }
 
-func (b PlayAction) PlayedCard() Card {
-	return b.playedCard
+func CreateThrowin(playerid int) *Action {
+	return &Action{Type: "Throwin", Playerid: playerid}
 }
 
-func (b PlayAction) WinningCard() Card {
-	return b.winningCard
+func CreateMeld(hand Hand, amount, playerid int) *Action {
+	return &Action{Type: "Meld", Hand: hand, Amount: amount, Playerid: playerid}
 }
 
-func (b PlayAction) Lead() Suit {
-	return b.lead
-}
-
-func (b PlayAction) Trump() Suit {
-	return b.trump
-}
-
-func CreateTrump(trump Suit, playerid int) *TrumpAction {
-	x := TrumpAction{trump: trump}
-	x.SetPlayer(playerid)
-	return &x
-}
-
-type TrumpAction struct {
-	ActionImpl
-	trump Suit
-}
-
-func (x TrumpAction) Trump() Suit {
-	return x.trump
-}
-
-func CreateThrowin(playerid int) *ThrowinAction {
-	x := ThrowinAction{}
-	x.SetPlayer(playerid)
-	return &x
-}
-
-type ThrowinAction struct {
-	ActionImpl
-}
-
-func (x ThrowinAction) Value() interface{} {
-	return nil
-}
-
-func CreateMeld(hand Hand, amount, playerid int) *MeldAction {
-	ma := MeldAction{hand: hand, amount: amount}
-	ma.SetPlayer(playerid)
-	return &ma
-}
-
-type MeldAction struct {
-	ActionImpl
-	hand   Hand
-	amount int
-}
-
-func (x MeldAction) Hand() Hand {
-	return x.hand
-}
-
-func (x MeldAction) Amount() int {
-	return x.amount
-}
-func CreateDeal(hand Hand, playerid int) *DealAction {
-	x := DealAction{hand: hand}
-	x.SetPlayer(playerid)
-	return &x
-}
-
-type DealAction struct {
-	ActionImpl
-	hand Hand
-}
-
-func (x DealAction) Hand() Hand {
-	return x.hand
-}
-
-func (a *ActionImpl) SetPlayer(playerid int) {
-	a.playerid = playerid
-}
-
-type ActionImpl struct {
-	playerid int
-}
-
-func (action ActionImpl) Playerid() int {
-	return action.playerid
-}
-
-type Action interface {
-	Playerid() int
+func CreateDeal(hand Hand, playerid int) *Action {
+	return &Action{Type: "Deal", Hand: hand, Playerid: playerid}
 }
 
 type Player interface {
-	Tell(Action)
-	Listen() (Action, bool)
+	Tell(*Action)
+	Listen() (*Action, bool)
 	Hand() *Hand
 	SetHand(Hand, int)
 	Go()
@@ -432,24 +349,22 @@ func (game *Game) Go(players []Player) {
 		for x := 0; x < 4; x++ {
 			next = (next + 1) % 4
 			game.Players[next].Tell(CreateBid(0, next))
-			bid, _ := game.Players[next].Listen()
-			bidAction := bid.(*BidAction)
-			game.Broadcast(bid, next)
-			if bidAction.Bid() > game.HighBid {
-				game.HighBid = bidAction.Bid()
+			bidAction, _ := game.Players[next].Listen()
+			game.Broadcast(bidAction, next)
+			if bidAction.Bid > game.HighBid {
+				game.HighBid = bidAction.Bid
 				game.HighPlayer = next
 			}
 		}
 		// ask trump
 		game.Players[game.HighPlayer].Tell(CreateTrump(*new(Suit), game.HighPlayer))
 		response, _ := game.Players[game.HighPlayer].Listen()
-		switch response.(type) {
-		case *ThrowinAction:
-			game.Broadcast(response, response.Playerid())
+		switch response.Type {
+		case "Throwin":
+			game.Broadcast(response, response.Playerid)
 			// TODO: adjust the score
-		case *TrumpAction:
-			trumpAction := response.(*TrumpAction)
-			game.Trump = trumpAction.Trump()
+		case "Trump":
+			game.Trump = response.Trump
 			Log("Trump is set to %s", game.Trump)
 			game.Broadcast(response, game.HighPlayer)
 		default:
@@ -470,12 +385,12 @@ func (game *Game) Go(players []Player) {
 			for x := 0; x < 4; x++ {
 				// play the hand
 				// TODO: handle possible throwin
-				var action Action
+				var action *Action
 				for {
 					action = CreatePlayRequest(winningCard, leadSuit, game.Trump, next)
 					game.Players[next].Tell(action)
 					action, _ = game.Players[next].Listen()
-					cardPlayed = action.(*PlayAction).PlayedCard()
+					cardPlayed = action.PlayedCard
 					//Log("Server received card %s", cardPlayed)
 					//Log("Hand length %d", len(*game.Players[next].Hand()))
 					if x > 0 {
@@ -568,7 +483,7 @@ func CreateGame() (game *Game) {
 	return
 }
 
-func (g Game) Broadcast(a Action, p int) {
+func (g Game) Broadcast(a *Action, p int) {
 	for x, player := range g.Players {
 		if p != x {
 			player.Tell(a)
@@ -576,7 +491,7 @@ func (g Game) Broadcast(a Action, p int) {
 	}
 }
 
-func (g Game) BroadcastAll(a Action) {
+func (g Game) BroadcastAll(a *Action) {
 	g.Broadcast(a, -1)
 }
 

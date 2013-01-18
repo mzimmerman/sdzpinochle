@@ -2,11 +2,12 @@
 package main
 
 import (
-	//	"encoding/json"
+	"encoding/json"
 	"fmt"
 	sdz "github.com/mzimmerman/sdzpinochle"
 	"math/rand"
 	//"sort"
+	"net"
 	"time"
 )
 
@@ -29,7 +30,7 @@ func Log(m string, v ...interface{}) {
 
 type AI struct {
 	hand       *sdz.Hand
-	c          chan sdz.Action
+	c          chan *sdz.Action
 	trump      sdz.Suit
 	bidAmount  int
 	highBid    int
@@ -42,7 +43,7 @@ type AI struct {
 func createAI(x int) (a *AI) {
 	a = new(AI)
 	a.Id = x
-	a.c = make(chan sdz.Action)
+	a.c = make(chan *sdz.Action)
 	return a
 }
 
@@ -114,10 +115,9 @@ func (ai *AI) Go() {
 		if !open {
 			return
 		}
-		switch action.(type) {
-		case *sdz.BidAction:
-			bidAction := action.(*sdz.BidAction)
-			if action.Playerid() == ai.Playerid() {
+		switch action.Type {
+		case "Bid":
+			if action.Playerid == ai.Playerid() {
 				Log("------------------Player %d asked to bid against player %d", ai.Playerid(), ai.highBidder)
 				ai.bidAmount, ai.trump, ai.show = ai.calculateBid()
 				if ai.numBidders == 1 && ai.IsPartner(ai.highBidder) && ai.bidAmount < 21 && ai.bidAmount+5 > 20 {
@@ -141,35 +141,32 @@ func (ai *AI) Go() {
 				ai.c <- sdz.CreateBid(ai.bidAmount, ai.Playerid())
 			} else {
 				// received someone else's bid value'
-				if ai.highBid < bidAction.Bid() {
-					ai.highBid = bidAction.Bid()
-					ai.highBidder = action.Playerid()
+				if ai.highBid < action.Bid {
+					ai.highBid = action.Bid
+					ai.highBidder = action.Playerid
 				}
 				ai.numBidders++
 			}
-		case *sdz.PlayAction:
-			if action.Playerid() == ai.Playerid() {
-				playRequest := action.(*sdz.PlayAction)
-				if playRequest.WinningCard() == "" { // nothing to compute as far as legal moves
-					playRequest = sdz.CreatePlay((*ai.hand)[0], ai.Playerid())
+		case "Play":
+			if action.Playerid == ai.Playerid() {
+				if action.WinningCard == "" { // nothing to compute as far as legal moves
+					action = sdz.CreatePlay((*ai.hand)[0], ai.Playerid())
 				} else {
 					for _, card := range *ai.hand {
 						// playedCard, winningCard Card, leadSuit Suit, hand Hand, trump Suit
-						if sdz.ValidPlay(card, playRequest.WinningCard(), playRequest.Lead(), ai.hand, playRequest.Trump()) {
-							playRequest = sdz.CreatePlay(card, ai.Playerid())
+						if sdz.ValidPlay(card, action.WinningCard, action.Lead, ai.hand, action.Trump) {
+							action = sdz.CreatePlay(card, ai.Playerid())
 							break
 						}
 					}
 				}
-				//Log("Player %d played card %s", ai.Playerid(), playRequest.PlayedCard())
-				ai.c <- playRequest
+				ai.c <- action
 			} else {
 				// TODO: Keep track of what has been played already
 				// received someone else's play'
 			}
-		case *sdz.TrumpAction:
-			trumpAction := action.(*sdz.TrumpAction)
-			if action.Playerid() == ai.Playerid() {
+		case "Trump":
+			if action.Playerid == ai.Playerid() {
 				meld, _ := ai.hand.Meld(ai.trump)
 				Log("Player %d being asked to name trump on hand %s and have %d meld", ai.Playerid(), ai.hand, meld)
 				switch {
@@ -181,25 +178,27 @@ func (ai *AI) Go() {
 				}
 			} else {
 				//Log("Player %d was told trump", ai.Playerid())
-				ai.trump = trumpAction.Trump()
+				ai.trump = action.Trump
 			}
-		case *sdz.ThrowinAction:
-			Log("Player %d saw that player %d threw in", ai.Playerid(), action.Playerid())
-		case *sdz.DealAction: // should not happen as the server can set the Hand automagically for AI
-		case *sdz.MeldAction:
+		case "Throwin":
+			Log("Player %d saw that player %d threw in", ai.Playerid(), action.Playerid)
+		case "Deal": // should not happen as the server can set the Hand automagically for AI
+		case "Meld":
 		default:
 			Log("Received an action I didn't understand - %v", action)
 		}
 	}
 }
 
-func (ai AI) Tell(action sdz.Action) {
+func (ai AI) Tell(action *sdz.Action) {
 	ai.c <- action
 }
-func (a AI) Listen() (action sdz.Action, open bool) {
+
+func (a AI) Listen() (action *sdz.Action, open bool) {
 	action, open = <-a.c
 	return
 }
+
 func (a AI) Hand() *sdz.Hand {
 	return a.hand
 }
@@ -215,7 +214,9 @@ func (a *AI) SetHand(h sdz.Hand, dealer int) {
 
 type Human struct {
 	hand *sdz.Hand
-	c    chan sdz.Action
+	conn *net.Conn
+	enc  *json.Encoder
+	dec  *json.Decoder
 	//trump      sdz.Suit
 	//bidAmount  int
 	//highBid    int
@@ -225,94 +226,33 @@ type Human struct {
 	sdz.PlayerImpl
 }
 
-func createHuman(x int) (a *Human) {
-	a = new(Human)
-	a.Id = x
-	a.c = make(chan sdz.Action)
-	return a
+func createHuman(x int, conn *net.Conn, enc *json.Encoder, dec *json.Decoder) (a *Human) {
+	human := &Human{sdz.PlayerImpl: sdz.PlayerImpl{Id: x}, conn: conn, enc: enc, dec: dec}
+	//human.PlayerImpl.Id = x
+	return human
 }
 
 func (h Human) Close() {
-	close(h.c)
+	//h.conn.Close()
 }
 
 func (h *Human) Go() {
-	Log("Welcome to Single-Deck Zimmerman Pinochle!  You are player #%d!", h.Playerid())
-	for {
-		var bidAmount int
-		action, open := h.Listen()
-		if !open {
-			return
-		}
-		switch action.(type) {
-		case *sdz.BidAction:
-			bidAction := action.(*sdz.BidAction)
-			if action.Playerid() == h.Playerid() {
-				Log("How much would you like to bid?:")
-				fmt.Scan(&bidAmount)
-				h.c <- sdz.CreateBid(bidAmount, h.Playerid())
-			} else {
-				// received someone else's bid value'
-				Log("Player #%d bid %d", bidAction.Playerid(), bidAction.Bid())
-			}
-		case *sdz.PlayAction:
-			playRequest := action.(*sdz.PlayAction)
-			if action.Playerid() == h.Playerid() {
-				var card sdz.Card
-				Log("Your turn, in your hand is %s - what would you like to play?:", h.Hand())
-				fmt.Scan(&card)
-				Log("Received input %s", card)
-				playRequest = sdz.CreatePlay(card, h.Playerid())
-				//if playRequest.WinningCard() == "" { // nothing to compute as far as legal moves
-				//	playRequest = sdz.CreatePlay((*ai.hand)[0], ai.Playerid())
-				//} else {
-				//	for _, card := range *ai.hand {
-				//		// playedCard, winningCard Card, leadSuit Suit, hand Hand, trump Suit
-				//		if sdz.ValidPlay(card, playRequest.WinningCard(), playRequest.Lead(), ai.hand, playRequest.Trump()) {
-				//			playRequest = sdz.CreatePlay(card, ai.Playerid())
-				//			break
-				//		}
-				//	}
-				//}
-				//Log("Player %d played card %s", ai.Playerid(), playRequest.PlayedCard())
-				h.c <- playRequest
-			} else {
-				Log("Player %d played card %s", playRequest.Playerid(), playRequest.PlayedCard())
-				// TODO: Keep track of what has been played already
-				// received someone else's play'
-			}
-		case *sdz.TrumpAction:
-			trumpAction := action.(*sdz.TrumpAction)
-			if action.Playerid() == h.Playerid() {
-				var trump sdz.Suit
-				Log("What would you like to make trump?")
-				fmt.Scan(&trump)
-				h.c <- sdz.CreateTrump(trump, h.Playerid())
-			} else {
-				Log("Player %d says trump is %s", trumpAction.Playerid(), trumpAction.Trump())
-			}
-		case *sdz.ThrowinAction:
-			Log("Player %d saw that player %d threw in", h.Playerid(), action.Playerid())
-		case *sdz.DealAction:
-			dealAction := action.(*sdz.DealAction)
-			Log("Your hand is - %s", dealAction.Hand())
-		case *sdz.MeldAction:
-			meldAction := action.(*sdz.MeldAction)
-			Log("Player %d is melding %s for %d points", meldAction.Playerid(), meldAction.Hand(), meldAction.Amount())
-		default:
-			Log("Received an action I didn't understand - %v", action)
-		}
+	// nothing to do here, the client is where this "thread" runs
+}
+
+func (h *Human) Tell(action *sdz.Action) {
+	h.enc.Encode(action)
+}
+
+func (h *Human) Listen() (action *sdz.Action, open bool) {
+	action = new(sdz.Action)
+	err := h.dec.Decode(action)
+	if err != nil {
+		return action, false
 	}
+	return nil, true
 }
 
-func (h Human) Tell(action sdz.Action) {
-	h.c <- action
-}
-
-func (h Human) Listen() (action sdz.Action, open bool) {
-	action, open = <-h.c
-	return
-}
 func (h Human) Hand() *sdz.Hand {
 	return h.hand
 }
@@ -323,15 +263,69 @@ func (a *Human) SetHand(h sdz.Hand, dealer int) {
 	a.hand = &hand
 }
 
-func main() {
-	game := sdz.CreateGame()
+func (h *Human) createGame(humans int, cp *ConnectionPool) {
+	game := new(sdz.Game)
 	players := make([]sdz.Player, 4)
 	// connect players
-	players[0] = createHuman(0)
+	players[0] = h
 	go players[0].Go()
-	for x := 1; x < len(players); x++ {
+	for x := 1; x < humans; x++ {
+		players[x] = cp.Pop()
+		go players[x].Go()
+	}
+	for x := humans; x < len(players); x++ {
 		players[x] = createAI(x)
 		go players[x].Go()
 	}
+	game.Players = players
 	game.Go(players)
+}
+
+type ConnectionPool struct {
+	connections chan *Human
+}
+
+func (cp *ConnectionPool) Push(h *Human) {
+	cp.connections <- h
+	return
+}
+
+func (cp *ConnectionPool) Pop() *Human {
+	return <-cp.connections
+}
+
+func setupGame(net *net.Conn, cp *ConnectionPool) {
+	Log("Connection received")
+	human := createHuman(0, net, json.NewEncoder(*net), json.NewDecoder(*net))
+	action := sdz.CreateHello("Do you want to join or create a new game?")
+	human.Tell(action)
+	action, _ = human.Listen()
+	if action.Message == "create" {
+		human.createGame(1, cp)
+	} else {
+		// old
+		cp.Push(human)
+	}
+}
+
+func main() {
+	cp := ConnectionPool{make(chan *Human, 100)}
+	service := ":1201"
+	tcpAddr, err := net.ResolveTCPAddr("tcp4", service)
+	if err != nil {
+		Log("Error - %v", err)
+		return
+	}
+	listener, err := net.ListenTCP("tcp", tcpAddr)
+	if err != nil {
+		Log("Error - %v", err)
+		return
+	}
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			continue
+		}
+		go setupGame(&conn, &cp)
+	}
 }

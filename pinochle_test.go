@@ -2,7 +2,6 @@ package sdzpinochle
 
 import (
 	pt "github.com/remogatto/prettytest"
-	"reflect"
 	"sort"
 	"testing"
 )
@@ -37,19 +36,6 @@ func fakeDeal(d *Deck) (h []Hand) {
 		h[x] = d[x*12 : x*12+12]
 	}
 	return
-}
-
-func (t *testSuite) TestAction() {
-	var action Action
-	action = &BidAction{bid: 20}
-	t.Equal(action.(*BidAction).Bid(), 20)
-	t.Equal(reflect.TypeOf(action).String(), "*sdzpinochle.BidAction")
-	switch action.(type) {
-	default:
-		t.True(false)
-	case *BidAction:
-
-	}
 }
 
 func (t *testSuite) TestDeal() {

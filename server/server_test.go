@@ -45,6 +45,5 @@ func (t *testSuite) TestBidding() {
 	go ai.Go()
 	ai.Tell(sdz.CreateBid(0, 1))
 	action, _ := ai.Listen()
-	bidAction := action.(*sdz.BidAction)
-	t.False(21 > bidAction.Bid() || bidAction.Bid() > 23)
+	t.False(21 > action.Bid || action.Bid > 23)
 }
