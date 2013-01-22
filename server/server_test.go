@@ -27,8 +27,8 @@ type testSuite struct {
 func (t *testSuite) TestRemove() {
 	hand := sdz.Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")}
 	sort.Sort(hand)
-	ai := createAI(1)
-	ai.SetHand(hand, 0)
+	ai := createAI()
+	ai.SetHand(hand, 0, 0)
 	t.Equal(12, len(*ai.Hand()))
 	t.True(ai.Hand().Remove(C("JD")))
 	t.True(ai.Hand().Remove(C("JD")))
@@ -40,8 +40,8 @@ func (t *testSuite) TestBidding() {
 	// 9D QD TD TD AD JC QC KC 9H AH AH KS
 	hand := sdz.Hand{C("9D"), C("QD"), C("TD"), C("TD"), C("AD"), C("JC"), C("QC"), C("KC"), C("9H"), C("AH"), C("AH"), C("KS")}
 	sort.Sort(hand)
-	ai := createAI(1)
-	ai.SetHand(hand, 0)
+	ai := createAI()
+	ai.SetHand(hand, 0, 1)
 	go ai.Go()
 	ai.Tell(sdz.CreateBid(0, 1))
 	action, _ := ai.Listen()

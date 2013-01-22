@@ -184,6 +184,7 @@ func (ai *AI) Go() {
 		case "Deal": // should not happen as the server can set the Hand automagically for AI
 		case "Meld": // nothing to do here, no one to read it
 		case "Message": // nothing to do here, no one to read it
+		case "Score": // TODO: save score to use for future bidding techniques
 		default:
 			Log("Received an action I didn't understand - %v", action)
 		}
@@ -241,17 +242,22 @@ func (h *Human) Go() {
 }
 
 func (h *Human) Tell(action *sdz.Action) {
+	jsonData, _ := json.Marshal(action)
+	Log("--> %s", jsonData)
 	h.enc.Encode(action)
 }
 
 func (h *Human) Listen() (action *sdz.Action, open bool) {
 	action = new(sdz.Action)
 	err := h.dec.Decode(action)
-	if err == nil {
-		return action, true
+	if err != nil {
+		sdz.Log("Error receiving action from human - %v", err)
+		return nil, false
 	}
-	sdz.Log("Error receiving action from human - %v", err)
-	return nil, false
+	jsonData, _ := json.Marshal(action)
+	Log("<-- %s", jsonData)
+	return action, true
+
 }
 
 func (h Human) Hand() *sdz.Hand {

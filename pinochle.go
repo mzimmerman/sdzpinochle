@@ -186,6 +186,8 @@ type Action struct {
 	Message                 string
 	Hand                    Hand
 	Option                  int
+	GameOver, Win           bool
+	Score                   []int
 }
 
 func (action *Action) MarshalJSON() ([]byte, error) {
@@ -194,14 +196,25 @@ func (action *Action) MarshalJSON() ([]byte, error) {
 	val := reflect.ValueOf(*action)
 	count := typ.NumField()
 	for x := 0; x < count; x++ {
-		if reflect.DeepEqual(val.Field(x).Interface(), reflect.New(typ.Field(x).Type).Elem().Interface()) {
+		switch {
+		case typ.Field(x).Name == "Playerid":
+			if action.Type == "Hello" || action.Type == "Score" || action.Type == "Message" || action.Type == "Game" {
+				// don't include playerid', it's not relevant'
+			} else {
+				data["Playerid"] = action.Playerid
+			}
+		case typ.Field(x).Name == "Win":
+			if action.Type == "Score" {
+				data["Win"] = action.Win
+			}
+		case reflect.DeepEqual(val.Field(x).Interface(), reflect.New(typ.Field(x).Type).Elem().Interface()):
 			continue
-		} else {
+		default:
 			data[typ.Field(x).Name] = val.Field(x).Interface()
 		}
 	}
-	jsonData, _ := json.Marshal(data)
-	Log("JSON is - %s", jsonData)
+	//jsonData, _ := json.Marshal(data)
+	//Log("%d - %s", time.Now().UnixNano(), jsonData)
 	return json.Marshal(data)
 }
 
@@ -243,6 +256,10 @@ func CreateMeld(hand Hand, amount, playerid int) *Action {
 
 func CreateDeal(hand Hand, playerid int) *Action {
 	return &Action{Type: "Deal", Hand: hand, Playerid: playerid}
+}
+
+func CreateScore(playerid int, score []int, gameOver, win bool) *Action {
+	return &Action{Type: "Score", Playerid: playerid, Score: score, Win: win, GameOver: gameOver}
 }
 
 type Player interface {
@@ -450,7 +467,6 @@ func (game *Game) Go(players []Player) {
 						winningPlayer = next
 					}
 				}
-				fmt.Printf("%d:%s - ", next, cardPlayed)
 				game.Broadcast(action, next)
 				next = (next + 1) % 4
 			}
@@ -458,8 +474,8 @@ func (game *Game) Go(players []Player) {
 			if trick == 11 {
 				counters++
 			}
-			game.BroadcastAll(CreateMessage(fmt.Sprintf("Player %d wins trick #%d with %s for %d points", winningPlayer, trick, winningCard, counters)))
-			Log("Player %d wins trick #%d with %s for %d points", winningPlayer, trick, winningCard, counters)
+			game.BroadcastAll(CreateMessage(fmt.Sprintf("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)))
+			Log("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)
 
 			game.Counters[game.Players[winningPlayer].Team()] += counters
 		}
@@ -486,20 +502,30 @@ func (game *Game) Go(players []Player) {
 		// check the score for a winner
 		game.BroadcastAll(CreateMessage(fmt.Sprintf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], handsPlayed)))
 		Log("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], handsPlayed)
+		gameOver := false
+		player0win := false
 		if game.Score[game.HighPlayer%2] >= 120 {
 			game.BroadcastAll(CreateMessage(fmt.Sprintf("Team%d wins with a score of %d!", game.HighPlayer%2, game.Score[game.HighPlayer%2])))
 			Log("Team%d wins with a score of %d!", game.HighPlayer%2, game.Score[game.HighPlayer%2])
-			break
-		}
-		if game.Score[0] >= 120 {
+			gameOver = true
+			player0win = (game.HighPlayer%2 == 0)
+		} else if game.Score[0] >= 120 {
 			game.BroadcastAll(CreateMessage(fmt.Sprintf("Team0 wins with a score of %d!", game.Score[0])))
 			Log("Team0 wins with a score of %d!", game.Score[0])
-			break
-		}
-		if game.Score[1] >= 120 {
+			gameOver = true
+			player0win = true
+		} else if game.Score[1] >= 120 {
 			game.BroadcastAll(CreateMessage(fmt.Sprintf("Team1 wins with a score of %d!", game.Score[1])))
 			Log("Team1 wins with a score of %d!", game.Score[1])
-			break
+			gameOver = true
+			player0win = false
+		}
+		for x := 0; x < len(game.Players); x++ {
+			win := player0win
+			if x%2 == 1 && gameOver {
+				win = !player0win
+			}
+			game.Players[x].Tell(CreateScore(x, game.Score, gameOver, win))
 		}
 		game.Dealer = (game.Dealer + 1) % 4
 		Log("-----------------------------------------------------------------------------")
