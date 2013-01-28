@@ -243,7 +243,7 @@ func (h *Human) Go() {
 
 func (h *Human) Tell(action *sdz.Action) {
 	jsonData, _ := json.Marshal(action)
-	Log("--> %s", jsonData)
+	//Log("--> %s", jsonData)
 	h.enc.Encode(action)
 }
 
@@ -255,7 +255,7 @@ func (h *Human) Listen() (action *sdz.Action, open bool) {
 		return nil, false
 	}
 	jsonData, _ := json.Marshal(action)
-	Log("<-- %s", jsonData)
+	//Log("<-- %s", jsonData)
 	return action, true
 
 }
@@ -333,7 +333,6 @@ func setupGame(net *net.Conn, cp *ConnectionPool) {
 			action := sdz.CreateHello("")
 			human.Tell(action)
 			action, _ = human.Listen()
-			sdz.Log("Action received from human = %v", action)
 			if action.Message == "create" {
 				break
 			} else if action.Message == "join" {
@@ -356,7 +355,6 @@ func setupGame(net *net.Conn, cp *ConnectionPool) {
 			human.Tell(sdz.CreateMessage("Option 6 - Go back"))
 			human.Tell(sdz.CreateGame(0))
 			action, _ := human.Listen()
-			sdz.Log("Action received from human = %v", action)
 			switch action.Option {
 			case 1:
 				fallthrough

@@ -50,7 +50,7 @@ func main() {
 			}
 		case "Play":
 			if action.Playerid == playerid {
-				if previousPlay == nil || previousPlay.Lead == "" {
+				if previousPlay == nil || action.Lead == "" {
 					previousPlay = &action
 				} else {
 					sdz.Log("Server rejected the play of %s, invalid play", previousCard)

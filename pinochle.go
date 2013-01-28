@@ -197,6 +197,10 @@ func (action *Action) MarshalJSON() ([]byte, error) {
 	count := typ.NumField()
 	for x := 0; x < count; x++ {
 		switch {
+		case typ.Field(x).Name == "Win":
+			if action.GameOver {
+				data["Win"] = action.Win
+			}
 		case typ.Field(x).Name == "Playerid":
 			if action.Type == "Hello" || action.Type == "Score" || action.Type == "Message" || action.Type == "Game" {
 				// don't include playerid', it's not relevant'
@@ -213,8 +217,6 @@ func (action *Action) MarshalJSON() ([]byte, error) {
 			data[typ.Field(x).Name] = val.Field(x).Interface()
 		}
 	}
-	//jsonData, _ := json.Marshal(data)
-	//Log("%d - %s", time.Now().UnixNano(), jsonData)
 	return json.Marshal(data)
 }
 
@@ -526,6 +528,9 @@ func (game *Game) Go(players []Player) {
 				win = !player0win
 			}
 			game.Players[x].Tell(CreateScore(x, game.Score, gameOver, win))
+		}
+		if gameOver {
+			return
 		}
 		game.Dealer = (game.Dealer + 1) % 4
 		Log("-----------------------------------------------------------------------------")
