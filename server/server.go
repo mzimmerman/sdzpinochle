@@ -3,6 +3,7 @@ package main
 
 import (
 	"code.google.com/p/go.net/websocket"
+	"html/template"
 	//"encoding/json"
 	"fmt"
 	sdz "github.com/mzimmerman/sdzpinochle"
@@ -390,11 +391,25 @@ func wshandler(ws *websocket.Conn) {
 	setupGame(ws, cp)
 }
 
+func serveGame(w http.ResponseWriter, r *http.Request) {
+	listTmpl, err := template.New("tempate").ParseGlob("*.html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = listTmpl.ExecuteTemplate(w, "game", nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 var cp *ConnectionPool
 
 func main() {
 	cp = &ConnectionPool{connections: make(chan *Human, 100)}
 	http.Handle("/connect", websocket.Handler(wshandler))
+	http.HandleFunc("/", serveGame)
 	//http.Handle("/", helloWorld)
 	err := http.ListenAndServe(":10080", nil)
 	if err != nil {
