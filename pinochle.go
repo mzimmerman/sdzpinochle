@@ -396,7 +396,11 @@ func (game *Game) Go(players []Player) {
 		for x := 0; x < 4; x++ {
 			next = (next + 1) % 4
 			game.Players[next].Tell(CreateBid(0, next))
-			bidAction, _ := game.Players[next].Listen()
+			bidAction, open := game.Players[next].Listen()
+			if !open {
+				game.Broadcast(CreateMessage("Player disconnected"), next)
+				return
+			}
 			game.Broadcast(bidAction, next)
 			if bidAction.Bid > game.HighBid {
 				game.HighBid = bidAction.Bid
@@ -405,7 +409,11 @@ func (game *Game) Go(players []Player) {
 		}
 		// ask trump
 		game.Players[game.HighPlayer].Tell(CreateTrump(*new(Suit), game.HighPlayer))
-		response, _ := game.Players[game.HighPlayer].Listen()
+		response, open := game.Players[game.HighPlayer].Listen()
+		if !open {
+			game.Broadcast(CreateMessage("Player disconnected"), game.HighPlayer)
+			return
+		}
 		switch response.Type {
 		case "Throwin":
 			game.Broadcast(response, response.Playerid)
@@ -436,7 +444,11 @@ func (game *Game) Go(players []Player) {
 				for {
 					action = CreatePlayRequest(winningCard, leadSuit, game.Trump, next)
 					game.Players[next].Tell(action)
-					action, _ = game.Players[next].Listen()
+					action, open = game.Players[next].Listen()
+					if !open {
+						game.Broadcast(CreateMessage("Player disconnected"), next)
+						return
+					}
 					cardPlayed = action.PlayedCard
 					//Log("Server received card %s", cardPlayed)
 					//Log("Hand length %d", len(*game.Players[next].Hand()))

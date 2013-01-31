@@ -2,12 +2,13 @@
 package main
 
 import (
-	"encoding/json"
+	"code.google.com/p/go.net/websocket"
+	//"encoding/json"
 	"fmt"
 	sdz "github.com/mzimmerman/sdzpinochle"
 	"math/rand"
 	//"sort"
-	"net"
+	"net/http"
 	"time"
 )
 
@@ -216,20 +217,13 @@ func (a *AI) SetHand(h sdz.Hand, dealer, playerid int) {
 
 type Human struct {
 	hand *sdz.Hand
-	conn *net.Conn
-	enc  *json.Encoder
-	dec  *json.Decoder
-	//trump      sdz.Suit
-	//bidAmount  int
-	//highBid    int
-	//highBidder int
-	//numBidders int
-	//show       sdz.Hand
+	conn *websocket.Conn
 	sdz.PlayerImpl
+	finished chan bool
 }
 
-func createHuman(conn *net.Conn, enc *json.Encoder, dec *json.Decoder) (a *Human) {
-	human := &Human{conn: conn, enc: enc, dec: dec}
+func createHuman(conn *websocket.Conn) (a *Human) {
+	human := &Human{conn: conn, finished: make(chan bool)}
 	return human
 }
 
@@ -238,26 +232,30 @@ func (h Human) Close() {
 }
 
 func (h *Human) Go() {
-	// nothing to do here, the client is where this "thread" runs
+	// this "thread" runs on the client
 }
 
 func (h *Human) Tell(action *sdz.Action) {
-	jsonData, _ := json.Marshal(action)
+	//jsonData, _ := json.Marshal(action)
 	//Log("--> %s", jsonData)
-	h.enc.Encode(action)
+	err := websocket.JSON.Send(h.conn, action)
+	if err != nil {
+		sdz.Log("Error in Human.Go Send - %v", err)
+		h.Close()
+		return
+	}
 }
 
 func (h *Human) Listen() (action *sdz.Action, open bool) {
 	action = new(sdz.Action)
-	err := h.dec.Decode(action)
+	err := websocket.JSON.Receive(h.conn, action)
 	if err != nil {
 		sdz.Log("Error receiving action from human - %v", err)
 		return nil, false
 	}
-	jsonData, _ := json.Marshal(action)
+	//jsonData, _ := json.Marshal(action)
 	//Log("<-- %s", jsonData)
 	return action, true
-
 }
 
 func (h Human) Hand() *sdz.Hand {
@@ -309,6 +307,12 @@ func (h *Human) createGame(option int, cp *ConnectionPool) {
 		go players[x].Go() // the humans will just start and die immediately
 	}
 	game.Go(players)
+	//h.finished <- true
+	for x := 1; x < 4; x++ {
+		if th, ok := players[x].(*Human); ok {
+			th.finished <- true
+		}
+	}
 }
 
 type ConnectionPool struct {
@@ -324,22 +328,25 @@ func (cp *ConnectionPool) Pop() *Human {
 	return <-cp.connections
 }
 
-func setupGame(net *net.Conn, cp *ConnectionPool) {
+func setupGame(net *websocket.Conn, cp *ConnectionPool) {
 	Log("Connection received")
-	human := createHuman(net, json.NewEncoder(*net), json.NewDecoder(*net))
+	human := createHuman(net)
 	for {
 		for {
 			human.Tell(sdz.CreateMessage("Do you want to join a game, create a new game, or quit? (join, create, quit)"))
 			action := sdz.CreateHello("")
 			human.Tell(action)
-			action, _ = human.Listen()
+			action, open := human.Listen()
+			if !open {
+				return
+			}
 			if action.Message == "create" {
 				break
 			} else if action.Message == "join" {
 				human.Tell(sdz.CreateMessage("Waiting on a game to be started that you can join..."))
 				cp.Push(human)
-				return
-				// wait for someone to pick me up
+				<-human.finished // this will block to keep the websocket open
+				continue
 			} else if action.Message == "quit" {
 				human.Tell(sdz.CreateMessage("Ok, bye bye!"))
 				human.Close()
@@ -354,7 +361,10 @@ func setupGame(net *net.Conn, cp *ConnectionPool) {
 			human.Tell(sdz.CreateMessage("Option 5 - Play against a human with AI partners"))
 			human.Tell(sdz.CreateMessage("Option 6 - Go back"))
 			human.Tell(sdz.CreateGame(0))
-			action, _ := human.Listen()
+			action, open := human.Listen()
+			if !open {
+				return
+			}
 			switch action.Option {
 			case 1:
 				fallthrough
@@ -376,24 +386,18 @@ func setupGame(net *net.Conn, cp *ConnectionPool) {
 	}
 }
 
+func wshandler(ws *websocket.Conn) {
+	setupGame(ws, cp)
+}
+
+var cp *ConnectionPool
+
 func main() {
-	cp := ConnectionPool{make(chan *Human, 100)}
-	service := ":1201"
-	tcpAddr, err := net.ResolveTCPAddr("tcp4", service)
+	cp = &ConnectionPool{connections: make(chan *Human, 100)}
+	http.Handle("/connect", websocket.Handler(wshandler))
+	//http.Handle("/", helloWorld)
+	err := http.ListenAndServe(":10080", nil)
 	if err != nil {
-		Log("Error - %v", err)
-		return
-	}
-	listener, err := net.ListenTCP("tcp", tcpAddr)
-	if err != nil {
-		Log("Error - %v", err)
-		return
-	}
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			continue
-		}
-		go setupGame(&conn, &cp)
+		panic("ListenAndServe: " + err.Error())
 	}
 }

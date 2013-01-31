@@ -2,22 +2,30 @@
 package main
 
 import (
-	"encoding/json"
+	"code.google.com/p/go.net/websocket"
+	//"encoding/json"
 	"fmt"
 	sdz "github.com/mzimmerman/sdzpinochle"
-	"net"
+	"os"
 	"sort"
 )
 
-func send(enc *json.Encoder, action *sdz.Action) {
-	err := enc.Encode(action)
+func send(conn *websocket.Conn, action *sdz.Action) {
+	err := websocket.JSON.Send(conn, action)
 	if err != nil {
 		sdz.Log("Error sending - %v", err)
 	}
 }
 
 func main() {
-	conn, err := net.Dial("tcp", "localhost:1201")
+	autoClient := false
+	for _, s := range os.Args {
+		fmt.Println(s)
+		if s == "auto" {
+			autoClient = true
+		}
+	}
+	conn, err := websocket.Dial("ws://localhost:10080/connect", "", "http://localhost:10080/")
 	var playerid int
 	var hand *sdz.Hand
 	var bidAmount int
@@ -27,13 +35,11 @@ func main() {
 		return
 	}
 	defer conn.Close()
-	dec := json.NewDecoder(conn)
-	enc := json.NewEncoder(conn)
 	var previousPlay *sdz.Action
 	var previousCard sdz.Card
 	for {
 		var action sdz.Action
-		err := dec.Decode(&action)
+		err := websocket.JSON.Receive(conn, &action)
 		if err != nil {
 			sdz.Log("Error decoding - %v", err)
 			return
@@ -43,7 +49,7 @@ func main() {
 			if action.Playerid == playerid {
 				sdz.Log("How much would you like to bid?:")
 				fmt.Scan(&bidAmount)
-				send(enc, sdz.CreateBid(bidAmount, playerid))
+				send(conn, sdz.CreateBid(bidAmount, playerid))
 			} else {
 				// received someone else's bid value'
 				sdz.Log("Player #%d bid %d", action.Playerid, action.Bid)
@@ -58,12 +64,23 @@ func main() {
 					sort.Sort(hand)
 				}
 				var card sdz.Card
-				sdz.Log("Your turn, in your hand is %s - what would you like to play? Trump is %s:", hand, trump)
+				if action.Lead == "" {
+					card = (*hand)[0]
+				} else {
+					for _, c := range *hand {
+						if sdz.ValidPlay(c, action.WinningCard, action.Lead, hand, trump) {
+							card = c
+						}
+					}
+				}
+				sdz.Log("Your turn, in your hand is %s - what would you like to play? Trump is %s - valid play is %s:", hand, trump, card)
 				for {
-					fmt.Scan(&card)
+					if !autoClient {
+						fmt.Scan(&card)
+					}
 					//sdz.Log("Received input %s", card)
 					if hand.Remove(card) {
-						send(enc, sdz.CreatePlay(card, playerid))
+						send(conn, sdz.CreatePlay(card, playerid))
 						previousCard = card
 						break
 					} else {
@@ -79,7 +96,7 @@ func main() {
 			if action.Playerid == playerid {
 				sdz.Log("What would you like to make trump?")
 				fmt.Scan(&trump)
-				send(enc, sdz.CreateTrump(trump, playerid))
+				send(conn, sdz.CreateTrump(trump, playerid))
 			} else {
 				sdz.Log("Player %d says trump is %s", action.Playerid, action.Trump)
 				trump = action.Trump
@@ -98,11 +115,11 @@ func main() {
 		case "Hello":
 			var response string
 			fmt.Scan(&response)
-			send(enc, sdz.CreateHello(response))
+			send(conn, sdz.CreateHello(response))
 		case "Game":
 			var option int
 			fmt.Scan(&option)
-			send(enc, sdz.CreateGame(option))
+			send(conn, sdz.CreateGame(option))
 		default:
 			sdz.Log("Received an action I didn't understand - %v", action)
 		}
