@@ -3,10 +3,10 @@ package main
 
 import (
 	"code.google.com/p/go.net/websocket"
-	"html/template"
-	//"encoding/json"
+	"encoding/json"
 	"fmt"
 	sdz "github.com/mzimmerman/sdzpinochle"
+	"html/template"
 	"math/rand"
 	//"sort"
 	"net/http"
@@ -237,8 +237,8 @@ func (h *Human) Go() {
 }
 
 func (h *Human) Tell(action *sdz.Action) {
-	//jsonData, _ := json.Marshal(action)
-	//Log("--> %s", jsonData)
+	jsonData, _ := json.Marshal(action)
+	Log("--> %s", jsonData)
 	err := websocket.JSON.Send(h.conn, action)
 	if err != nil {
 		sdz.Log("Error in Human.Go Send - %v", err)
@@ -254,8 +254,8 @@ func (h *Human) Listen() (action *sdz.Action, open bool) {
 		sdz.Log("Error receiving action from human - %v", err)
 		return nil, false
 	}
-	//jsonData, _ := json.Marshal(action)
-	//Log("<-- %s", jsonData)
+	jsonData, _ := json.Marshal(action)
+	Log("<-- %s", jsonData)
 	return action, true
 }
 
@@ -409,7 +409,8 @@ var cp *ConnectionPool
 func main() {
 	cp = &ConnectionPool{connections: make(chan *Human, 100)}
 	http.Handle("/connect", websocket.Handler(wshandler))
-	http.HandleFunc("/", serveGame)
+	http.HandleFunc("/index.html", serveGame)
+	http.Handle("/", http.FileServer(http.Dir(".")))
 	//http.Handle("/", helloWorld)
 	err := http.ListenAndServe(":10080", nil)
 	if err != nil {
