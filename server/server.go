@@ -391,27 +391,26 @@ func wshandler(ws *websocket.Conn) {
 	setupGame(ws, cp)
 }
 
-func serveGame(w http.ResponseWriter, r *http.Request) {
-	listTmpl, err := template.New("tempate").ParseGlob("*.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	err = listTmpl.ExecuteTemplate(w, "game", nil)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-}
+//func serveGame(w http.ResponseWriter, r *http.Request) {
+//	listTmpl, err := template.New("tempate").ParseGlob("*.html")
+//	if err != nil {
+//		http.Error(w, err.Error(), http.StatusInternalServerError)
+//		return
+//	}
+//	err = listTmpl.ExecuteTemplate(w, "game", nil)
+//	if err != nil {
+//		http.Error(w, err.Error(), http.StatusInternalServerError)
+//		return
+//	}
+//}
 
 var cp *ConnectionPool
 
 func main() {
 	cp = &ConnectionPool{connections: make(chan *Human, 100)}
 	http.Handle("/connect", websocket.Handler(wshandler))
-	http.HandleFunc("/index.html", serveGame)
+	//http.HandleFunc("/index.html", serveGame)
 	http.Handle("/", http.FileServer(http.Dir(".")))
-	//http.Handle("/", helloWorld)
 	err := http.ListenAndServe(":10080", nil)
 	if err != nil {
 		panic("ListenAndServe: " + err.Error())
