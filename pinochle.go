@@ -248,6 +248,10 @@ func CreateTrump(trump Suit, playerid int) *Action {
 	return &Action{Type: "Trump", Trump: trump, Playerid: playerid}
 }
 
+func CreateTrick(winningPlayer int) *Action {
+	return &Action{Type: "Trick", Playerid: winningPlayer}
+}
+
 func CreateThrowin(playerid int) *Action {
 	return &Action{Type: "Throwin", Playerid: playerid}
 }
@@ -489,8 +493,8 @@ func (game *Game) Go(players []Player) {
 				counters++
 			}
 			game.BroadcastAll(CreateMessage(fmt.Sprintf("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)))
+			game.BroadcastAll(CreateTrick(winningPlayer))
 			Log("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)
-
 			game.Counters[game.Players[winningPlayer].Team()] += counters
 		}
 		game.Meld[0] += game.Meld[2]

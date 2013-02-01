@@ -6,6 +6,14 @@
 		<link rel="stylesheet" type="text/css" media="all" href="jspc/playingCards.ui.css"/>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<link href="bootstrap/css/bootstrap-responsive.css" rel="stylesheet">
+		<style media="screen" type="text/css">
+			.center {
+				text-align: center;
+			}
+			.full {
+				width: 100%;
+			}
+		</style>
 	</head>
 	<body>
 		<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js"></script>
@@ -58,20 +66,38 @@
 			}
 			running()
 			
+			$("#bid").hide();
 			$("#bid-button").click(function() {
 				var amount = parseInt($("#bid-value").val());
 				send({Type:"Bid",Bid:amount});
-				$("#bid").addClass('hide');
+				$("#hand").children('.playingCard').click(function () {
+					send({Type:"Play",PlayedCard:$(this).children("[name='card']").attr("value")});
+					getPlayer(playerid).children(".play").empty().append($(this));
+				});
+				$("#bid").hide();
 			});
+
+			$("#game").hide();
 			$("#game button").click(function() {
-				var option = parseInt($("#game select").val());
+				var option = parseInt($("#game input:checked").val());
 				send({Type:"Game",Option:option});
-				$("#game").addClass("hide");
+				$("#game").hide();
+				$("#we").html("0");
+				$("#they").html("0");
 			});
+			
+			$("#hello").hide();
 			$("#hello button").click(function() {
-				var option = $("#hello select").val();
+				var option = $("#hello input:checked").val();
 				send({Type:"Hello",Message:option});
-				$("#hello").addClass("hide");
+				$("#hello").hide();
+			});
+			
+			$("#chooseTrump").hide();
+			$("#chooseTrump button").click(function() {
+				var trump = $("#chooseTrump input:checked").val();
+				send({Type:"Trump",Trump:trump});
+				$("#chooseTrump").hide();
 			});
 		});
 		
@@ -98,6 +124,17 @@
 			switch (action.Type) {
 				case "Message":
 					appendMessage(action.Message);
+					break;
+				case "Hello":
+					$("#hello").show();
+					break;
+				case "Game":
+					$("#game").show();
+					break;
+				case "Trick":
+					runQueue.push(function () {
+						getPlayer(action.Playerid).children(".play").effect("shake");
+					});
 					runQueue.push(function (){
 						getPlayer(left).children(".play").empty();
 						getPlayer(partner).children(".play").empty();
@@ -105,27 +142,20 @@
 						getPlayer(playerid).children(".play").empty();
 					});
 					break;
-				case "Hello":
-					$("#hello").removeClass('hide');
-					break;
-				case "Game":
-					$("#game").removeClass('hide');
-					break;
 				case "Deal":
 					playerid = action.Playerid;
 					left = (playerid + 1) % 4;
 					partner = (playerid + 2) % 4;
 					right = (playerid + 3) % 4;
-					showHand($("#hand"),action.Hand);
-					$("#hand").children('.playingCard').click(function () {
-						send({Type:"Play",PlayedCard:$(this).children("[name='card']").attr("value")});
-						getPlayer(playerid).children(".play").empty().append($(this));
+					runQueue.push(function(){
+						showHand($("#hand"),action.Hand);
 					});
+					$("bid-value").val(20);
 					break;
 				case "Bid":
 					if (action.Playerid == playerid) {
 						runQueue.push(function(){
-							$("#bid").removeClass('hide');
+							$("#bid").show();
 						});
 					} else {
 						var current = $("#bid-value").val();
@@ -143,6 +173,13 @@
 						}
 					}
 					break;
+				case "Trump":
+					if (action.Playerid == playerid) {
+						$("#chooseTrump").show();
+					} else {
+						$("#trump").html(action.Trump);
+					}
+					break;
 				case "Play":
 					if (action.Playerid != playerid) {
 						var played = createCard(action.PlayedCard)
@@ -152,7 +189,6 @@
 					}
 					break;
 				case "Meld":
-				//{"Amount":4,"Hand":["KD","QD","9H","9H"],"Playerid":0,"Type":"Meld"}
 					pause = true;
 					showHand(getPlayer(action.Playerid).children(".meld"),action.Hand);
 					if (action.Playerid == playerid) {
@@ -163,67 +199,118 @@
 							getPlayer(partner).children(".meld").empty();
 							getPlayer(right).children(".meld").empty();
 							getPlayer(playerid).children(".meld").empty();
+							getPlayer(left).children(".bid").empty();
+							getPlayer(partner).children(".bid").empty();
+							getPlayer(right).children(".bid").empty();
 						});
 					}
 			}
 		}
 		</script>
 		<div class="container-fluid">
-			<!-- <div id="messages" class="span12 well">
-			</div> -->
-			<div id="hello" class="row-fluid hide">
-				<select name="option">
-					<option value="create">Create (create a game now)</option>
-					<option value="join">Join (wait for others to create a game I can join)</option>
-					<option value="quit">Quit (goodbye!)</option>
-				</select>
-				<button>Go</button>
-			</div>
-			<div id="game" class="row-fluid hide">
-				<select name="option">
-					<option value="1">Option 1 - Play against three AI players and start immediately</option>
-					<option value="2">Option 2 - Play with a human partner against two AI players</option>
-					<option value="3">Option 3 - Play with a human partner against one AI players and 1 Human</option>
-					<option value="4">Option 4 - Play with a human partner against two humans</option>
-					<option value="5">Option 5 - Play against a human with AI partners</option>
-					<option value="6">Option 6 - Go back</option>
-				</select>
-				<button>Go</button>
-			</div>
 			<div class="row-fluid">
-				<div class="span4"></div>
+				<div class="span4">
+					<table class="table table-bordered table-hover table-condensed"><thead></thead><tbody>
+					<tr><td>Trump</td><td id="trump"></td></tr>
+					<tr><td>We</td><td id="we"></td></tr>
+					<tr><td>They</td><td id="they"></td></tr>
+					</tbody></table>
+				</div>
 				<div id="partner" class="span4 well">
+					<h4 class="center">Partner</h4>
 					<div class="bid"></div>
 					<div class="meld"></div>
 					<div class="play"></div>
 				</div>
-				<div class="span4"></div>
 			</div>
 			<div class="row-fluid">
 				<div id="left" class="span4 well">
+					<h4 class="center">Opponent</h4>
 					<div class="bid"></div>
 					<div class="meld"></div>
 					<div class="play"></div>
 				</div>
-				<div class="span4"></div>
+				<div class="span4">
+					<div id="hello" class="row-fluid">
+						<label class="radio">
+  							<input type="radio" name="option" value="create">
+  							Create (create a game now)
+						</label>
+						<label class="radio">
+  							<input type="radio" name="option" value="join">
+  							Join (wait for others to create a game I can join)
+						</label>
+						<label class="radio">
+  							<input type="radio" name="option" value="quit">
+  							Quit (goodbye!)
+						</label>
+						<button class="btn full">Go</button>
+					</div>
+					<div id="bid" class="hide">
+						<input id="bid-value" type="number" value="20" class="full">
+						<button id="bid-button" class="btn full">Bid</bid>
+					</div>
+					<div id="chooseTrump" class="row-fluid">
+						<label class="radio">
+							<input type="radio" name="option" value="D">
+							Diamonds
+						</label>
+						<label class="radio">
+							<input type="radio" name="option" value="S">
+							Spades
+						</label>
+						<label class="radio">
+							<input type="radio" name="option" value="H">
+							Hearts
+						</label>
+						<label class="radio">
+							<input type="radio" name="option" value="C">
+							Clubs
+						</label>
+						<button class="btn full">Set Trump</button>
+					</div>
+					<div id="game" class="row-fluid">
+						<label class="radio">
+							<input type="radio" name="option" value="1">
+							Play against three AI players and start immediately
+						</label>
+						<label class="radio">
+							<input type="radio" name="option" value="2">
+							Play with a human partner against two AI players
+						</label>
+						<label class="radio">
+							<input type="radio" name="option" value="3">
+							Play with a human partner against one AI players and 1 Human
+						</label>
+						<label class="radio">
+							<input type="radio" name="option" value="4">
+							Play with a human partner against two humans
+						</label>
+						<label class="radio">
+							<input type="radio" name="option" value="5">
+							Play against a human with AI partners
+						</label>
+						<label class="radio">
+							<input type="radio" name="option" value="6">
+							Go back
+						</label>
+						<button class="btn full">Go</button>
+					</div>
+				</div>
 				<div id="right" class="span4 well">
+					<h4 class="center">Opponent</h4>
 					<div class="bid"></div>
 					<div class="meld"></div>
 					<div class="play"></div>
 				</div>
 			</div>
 			<div class="row-fluid">
-				<div class="span4"></div>
-				<div id="bottom" class="span4 well">
+				<div id="bottom" class="span4 offset4 well">
+					<h4 class="center">Me</h4>
 					<div class="bid"></div>
 					<div class="meld"></div>
 					<div class="play"></div>
 				</div>
-				<div class="span4"></div>
-			</div>
-			<div id="bid" class="hide">
-				<input id="bid-value" type="number" value="20">
-				<button id="bid-button">Bid</bid>
 			</div>
 			<div id="hand" class="row-fluid">
 			</div>

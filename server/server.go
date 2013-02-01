@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	sdz "github.com/mzimmerman/sdzpinochle"
-	"html/template"
+	//"html/template"
 	"math/rand"
 	//"sort"
 	"net/http"
@@ -186,6 +186,7 @@ func (ai *AI) Go() {
 		case "Deal": // should not happen as the server can set the Hand automagically for AI
 		case "Meld": // nothing to do here, no one to read it
 		case "Message": // nothing to do here, no one to read it
+		case "Trick": // nothing to do here, nothing to display
 		case "Score": // TODO: save score to use for future bidding techniques
 		default:
 			Log("Received an action I didn't understand - %v", action)
