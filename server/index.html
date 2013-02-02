@@ -43,8 +43,8 @@
 		var websocket;
 		var runQueue = [];
 		var pause = false;
-		var lastAction;
-		var lastCard;
+		var lastAction = null;
+		var lastCard = null;
 		
 		function showError(msg){
 			$('#error').html(msg).show();
@@ -70,6 +70,14 @@
 				return "<img src='cards/" + c + ".svg' class='playingCard' width='"+width+"%' alt='"+c+"'>";
 			}
 		}
+		
+		function playCard() {
+			var c = $(this).attr("alt");
+			send({Type:"Play",PlayedCard:c});
+			lastCard = c;
+			getPlayer(playerid).children(".play").empty().append($(this));
+		}
+				
 		$(document).ready(function(){
 			websocket = new WebSocket("ws://localhost:10080/connect");
 			//websocket.onopen = function(evt) { showError("Connected!"); };
@@ -100,10 +108,7 @@
 			$("#bid-button").click(function() {
 				var amount = parseInt($("#bid-value").val());
 				send({Type:"Bid",Bid:amount});
-				$("#hand").children('.playingCard').click(function () {
-					send({Type:"Play",PlayedCard:$(this).attr("alt")});
-					getPlayer(playerid).children(".play").empty().append($(this));
-				});
+				$("#hand").children('.playingCard').click(playCard);
 				$("#bid").hide();
 			});
 
@@ -183,6 +188,7 @@
 						showHand($("#hand"),action.Hand);
 					});
 					$("bid-value").val(20);
+					lastAction = null;
 					break;
 				case "Bid":
 					if (action.Playerid == playerid) {
@@ -199,8 +205,7 @@
 							});
 						} else {
 							runQueue.push(function(){
-								getPlayer(action.Playerid).effect("shake");
-								getPlayer(action.Playerid).children(".bid").text("Pass");
+								getPlayer(action.Playerid).children(".bid").effect("shake").text("Pass");
 							});
 						}
 					}
@@ -213,11 +218,20 @@
 					}
 					break;
 				case "Play":
+					console.log("Comparing " + JSON.stringify(action) + " to " + JSON.stringify(lastAction));
 					if (action.Playerid != playerid) {
 						var played = createCard(action.PlayedCard)
+						lastAction = null;
 						runQueue.push(function(){
 							getPlayer(action.Playerid).children(".play").html(played);
 						});
+					} else if (lastAction != null && lastCard != null && lastAction.Lead == action.Lead && lastAction.WinningCard == action.WinningCard && lastAction.Trump == action.Trump) {
+						console.log("Compared as true");
+						$("#hand").append(createCard(lastCard,0)).children(".playingCard:last").click(playCard);
+						getPlayer(playerid).children(".play").empty();
+					} else {
+						lastAction = action;
+						console.log("Compared as false");
 					}
 					break;
 				case "Meld":
