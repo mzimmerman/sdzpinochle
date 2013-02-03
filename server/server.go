@@ -255,6 +255,7 @@ func (h *Human) Listen() (action *sdz.Action, open bool) {
 		sdz.Log("Error receiving action from human - %v", err)
 		return nil, false
 	}
+	action.Playerid = h.Id
 	jsonData, _ := json.Marshal(action)
 	Log("<-- %s", jsonData)
 	return action, true

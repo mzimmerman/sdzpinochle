@@ -79,7 +79,7 @@
 		}
 				
 		$(document).ready(function(){
-			websocket = new WebSocket("ws://localhost:10080/connect");
+			websocket = new WebSocket("ws://pinochle:10080/connect");
 			//websocket.onopen = function(evt) { showError("Connected!"); };
 			//websocket.onclose = function(evt) { onClose(evt) };
 			websocket.onmessage = function(evt) { onMessage(evt) };
@@ -148,6 +148,7 @@
 		}
 		
 		function send(action) {
+			action.Playerid = playerid
 			var text = JSON.stringify(action);
 			websocket.send(text);
 			console.log("Sending - " + text);
@@ -162,11 +163,11 @@
 					break;
 				case "Hello":
 					$("#hello").show();
-					$("#hello button").click(); // debug
+					//$("#hello button").click(); // debug
 					break;
 				case "Game":
 					$("#game").show();
-					$("#game button").click(); // debug
+					//$("#game button").click(); // debug
 					break;
 				case "Trick":
 					runQueue.push(function () {
