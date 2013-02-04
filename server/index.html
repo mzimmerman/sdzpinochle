@@ -15,9 +15,6 @@
 			.player.turn {
 				border: 1px solid red;
 			}
-			#bid {
-				height: auto;
-			}
 			.bid, .play {
 				height: 75%;
 			}
@@ -112,7 +109,7 @@
 			websocket.onmessage = function(evt) { onMessage(evt) };
 			websocket.onerror = function(evt) { console.log(evt.data) };
 						
-			timer = setInterval(processQueue,1000);
+			timer = setInterval(processQueue,500);
 
 			$("#game").dialog({
 				buttons:{Go:function () {
@@ -148,7 +145,7 @@
 			$("#continueMeld").dialog({
 				buttons:{Continue:function () {
 					$(this).dialog('close');
-					timer = setInterval(processQueue,1000);
+					timer = setInterval(processQueue,500);
 					$(".play").empty();
 				}},
 				closeOnEscape: false,
@@ -178,6 +175,7 @@
 					var trump = $("#chooseTrump input:checked").val();
 					send({Type:"Trump",Trump:trump});
 					$("#trump").html(trump);
+					setTurn(playerid);
 					$(this).dialog('close');
 				}},
 				closeOnEscape: false,
@@ -220,11 +218,15 @@
 					appendMessage(action.Message);
 					break;
 				case "Hello":
-					$("#hello").dialog('open');
+					addToQueue(function () {
+						$("#hello").dialog('open');
+					});
 					//$("#hello button").click(); // debug
 					break;
 				case "Game":
-					$("#game").dialog('open');
+					addToQueue(function () {
+						$("#game").dialog('open');
+					});
 					//$("#game button").click(); // debug
 					break;
 				case "Trick":
@@ -246,8 +248,8 @@
 					addToQueue(function(){
 						showHand($("#hand"),action.Hand);
 						$(".bid").show().empty();
-						$(".play").hide();
-						$("bid-value").val(20);
+						$(".play").hide().empty();
+						$("#bid-value").val(20);
 						$("#trump").text("N/A");
 						getPlayer(action.Dealer).children(".bid").text("Stuck");
 						setTurn((action.Dealer + 1) % 4);
@@ -274,11 +276,16 @@
 					break;
 				case "Trump":
 					if (action.Playerid == playerid) {
-						$("#chooseTrump").dialog('open');
+						addToQueue(function () {
+							$("#chooseTrump").dialog('open');
+						});
 					} else {
-						$("#trump").html(action.Trump);
-						setTurn(action.Playerid);
+						addToQueue(function () {
+							$("#trump").html(action.Trump);
+							setTurn(action.Playerid);
+						});
 					}
+					$('.bid').empty();
 					break;
 				case "Play":
 					playCount++;
@@ -322,6 +329,21 @@
 					if (meldActions == 4) {
 						addToQueue(function () {}); // add a dummy function to the queue to "hold" further actions
 					}
+					break;
+				case "Score":
+					addToQueue(function() {
+						$("#we").text(action.Score[playerid % 2]);
+						$("#they").text(action.Score[(playerid + 1) % 2]);
+						if (action.GameOver) {
+							alert("Game is over!");
+							if (action.Win) {
+								alert("You win!");
+							} else {
+								alert("You lose!");
+							}
+						}
+					});
+					break;
 			}
 		}
 		</script>

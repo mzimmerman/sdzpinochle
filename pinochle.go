@@ -206,6 +206,8 @@ func (action *Action) MarshalJSON() ([]byte, error) {
 			}
 		case typ.Field(x).Name == "Win" && action.GameOver:
 			data["Win"] = action.Win
+		case typ.Field(x).Name == "GameOver" && action.Type == "Score":
+			data["GameOver"] = action.GameOver
 		case typ.Field(x).Name == "Dealer" && action.Type == "Deal":
 			data["Dealer"] = action.Dealer
 		case reflect.DeepEqual(val.Field(x).Interface(), reflect.New(typ.Field(x).Type).Elem().Interface()):
