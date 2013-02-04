@@ -9,8 +9,14 @@
 			html, body, .container-fluid, .player, .tall {
 				height: 100%;
 			}
+			button.ui-dialog-titlebar-close {
+				display: none;
+			}
 			.player.turn {
 				border: 1px solid red;
+			}
+			#bid {
+				height: auto;
 			}
 			.bid, .play {
 				height: 75%;
@@ -25,7 +31,7 @@
 			}
 			.playingCard {
 				max-height: 100%;
-				width: 100%;
+				max-width: 100%;
 			}
 			.center {
 				text-align: center;
@@ -76,7 +82,6 @@
 			}
 		}
 		function createCard(c,width) {
-			console.log("Creating card with width " + width);
 			if (width == 0) {
 				return "<img src='cards/" + c + ".svg' class='playingCard' alt='"+c+"'>";
 			} else {
@@ -88,7 +93,6 @@
 			var c = $(this).attr("alt");
 			send({Type:"Play",PlayedCard:c});
 			lastCard = c;
-			console.log("c = " + c);
 			cardObject = $(this);
 			getPlayer(playerid).children(".play").empty().append(cardObject).show();
 			$("#hand").children(".playingCard").unbind('click');
@@ -110,47 +114,80 @@
 						
 			timer = setInterval(processQueue,1000);
 
-			$("#continueMeld").click(function() {
-				$(this).hide();
-				timer = setInterval(processQueue,1000);
-				$(".play").empty();
+			$("#game").dialog({
+				buttons:{Go:function () {
+					var option = parseInt($("#game input:checked").val());
+					send({Type:"Game",Option:option});
+					$(this).dialog('close');
+					addToQueue(function () {
+						$("#we").html("0");
+						$("#they").html("0");
+					});						}},
+				closeOnEscape: false,
+				modal: true,
+				autoOpen: false,
+				minHeight: 0,
+				minWidth: 0,
+				dialogClass: "well",
 			});
-			$("#continueMeld").hide();
+			
+			$("#hello").dialog({
+				buttons:{Go:function () {
+					var option = $("#hello input:checked").val();
+					send({Type:"Hello",Message:option});
+					$(this).dialog('close');
+				}},
+				closeOnEscape: false,
+				modal: true,
+				autoOpen: false,
+				minHeight: 0,
+				minWidth: 0,
+				dialogClass: "well",
+			});
 
-			$("#bid").hide();
-			$("#bid-button").click(function() {
-				var amount = parseInt($("#bid-value").val());
-				send({Type:"Bid",Bid:amount});
-				$("#bid").hide();
+			$("#continueMeld").dialog({
+				buttons:{Continue:function () {
+					$(this).dialog('close');
+					timer = setInterval(processQueue,1000);
+					$(".play").empty();
+				}},
+				closeOnEscape: false,
+				modal: true,
+				autoOpen: false,
+				minHeight: 0,
+				minWidth: 0,
+				dialogClass: "well",
 			});
 
-			$("#game").hide();
-			$("#game button").click(function() {
-				var option = parseInt($("#game input:checked").val());
-				send({Type:"Game",Option:option});
-				$("#game").hide();
-				addToQueue(function () {
-					$("#we").html("0");
-					$("#they").html("0");
-				});
+			$("#bid").dialog({
+				buttons:{Bid:function () {
+					var amount = parseInt($("#bid-value").val());
+					send({Type:"Bid",Bid:amount});
+					$(this).dialog('close');
+				}},
+				closeOnEscape: false,
+				modal: true,
+				autoOpen: false,
+				minHeight: 0,
+				dialogClass: "well",
+				minWidth: 0,
 			});
-			
-			
-			$("#hello").hide();
-			$("#hello button").click(function() {
-				var option = $("#hello input:checked").val();
-				send({Type:"Hello",Message:option});
-				$("#hello").hide();
+
+			$("#chooseTrump").dialog({
+				buttons:{"Set Trump":function () {
+					var trump = $("#chooseTrump input:checked").val();
+					send({Type:"Trump",Trump:trump});
+					$("#trump").html(trump);
+					$(this).dialog('close');
+				}},
+				closeOnEscape: false,
+				modal: true,
+				autoOpen: false,
+				minHeight: 0,
+				minWidth: 0,
+				dialogClass: "well",
 			});
-			
-			$("#chooseTrump").hide();
-			$("#chooseTrump button").click(function() {
-				var trump = $("#chooseTrump input:checked").val();
-				send({Type:"Trump",Trump:trump});
-				$("#trump").html(trump);
-				$("#chooseTrump").hide();
-			});
-		});
+		}); // end of $(document).ready()
 		
 		function getPlayer(id) {
 			if (id == left) return $("#left");
@@ -171,7 +208,6 @@
 		}
 		
 		function setTurn(id) {
-			console.log("Setting turn for " + id);
 			$(".player").removeClass('turn');
 			getPlayer(id).addClass('turn');
 		}
@@ -184,11 +220,11 @@
 					appendMessage(action.Message);
 					break;
 				case "Hello":
-					$("#hello").show();
+					$("#hello").dialog('open');
 					//$("#hello button").click(); // debug
 					break;
 				case "Game":
-					$("#game").show();
+					$("#game").dialog('open');
 					//$("#game button").click(); // debug
 					break;
 				case "Trick":
@@ -212,9 +248,8 @@
 						$(".bid").show().empty();
 						$(".play").hide();
 						$("bid-value").val(20);
-						$("#trump").empty();
+						$("#trump").text("N/A");
 						getPlayer(action.Dealer).children(".bid").text("Stuck");
-						console.log("action = " + JSON.stringify(action));
 						setTurn((action.Dealer + 1) % 4);
 					});
 					lastAction = null;
@@ -222,7 +257,7 @@
 				case "Bid":
 					if (action.Playerid == playerid) {
 						addToQueue(function(){
-							$("#bid").show();
+							$("#bid").dialog('open');
 						});
 					} else {
 						var current = $("#bid-value").val();
@@ -239,7 +274,7 @@
 					break;
 				case "Trump":
 					if (action.Playerid == playerid) {
-						$("#chooseTrump").show();
+						$("#chooseTrump").dialog('open');
 					} else {
 						$("#trump").html(action.Trump);
 						setTurn(action.Playerid);
@@ -282,7 +317,7 @@
 					getPlayer(action.Playerid).children(".bid").hide();
 					showHand(getPlayer(action.Playerid).children(".play"),action.Hand,true);
 					if (action.Playerid == playerid) {
-						$("#continueMeld").show();
+						$("#continueMeld").dialog('open');
 					}
 					if (meldActions == 4) {
 						addToQueue(function () {}); // add a dummy function to the queue to "hold" further actions
@@ -294,7 +329,7 @@
 			<div class="row-fluid quarter">
 				<div class="span4 tall">
 					<dl class="dl-horizontal tall">
-						<dt>Trump</dt><dd id="trump"></dd>
+						<dt>Trump</dt><dd id="trump">N/A</dd>
 						<dt>We</dt><dd id="we"></dd>
 						<dt>They</dt><dd id="they"></dd>
 					</dl>
@@ -302,39 +337,36 @@
 				<div id="partner" class="span4 player">
 					<h4 class="center quarter">Partner</h4>
 					<div class="bid center full"></div>
-					<div class="play"></div>
+					<div class="play center"></div>
 				</div>
 			</div>
 			<div class="row-fluid quarter">
 				<div id="left" class="span4 player">
 					<h4 class="center quarter">Opponent</h4>
 					<div class="bid center full"></div>
-					<div class="play"></div>
+					<div class="play center"></div>
 				</div>
 				<div class="span4 quarter">
-					<div class="row-fluid">
-						<button id="continueMeld">Continue</button>
+					<div id="continueMeld">
 					</div>
-					<div id="hello" class="tall">
+					<div id="hello" title="Welcome to SDZPinochle!">
 						<label class="radio">
-  							<input type="radio" name="optionHello" value="create" checked>
-  							Create (create a game now)
+							<input type="radio" name="optionHello" value="create" checked>
+							Create (create a game now)
 						</label>
 						<label class="radio">
-  							<input type="radio" name="optionHello" value="join">
-  							Join (wait for others to create a game I can join)
+							<input type="radio" name="optionHello" value="join">
+							Join (wait for others to create a game I can join)
 						</label>
 						<label class="radio">
-  							<input type="radio" name="optionHello" value="quit">
-  							Quit (goodbye!)
+							<input type="radio" name="optionHello" value="quit">
+							Quit (goodbye!)
 						</label>
-						<button class="btn full">Go</button>
 					</div>
-					<div id="bid" class="tall">
-						<input id="bid-value" type="number" value="20" class="full">
-						<button id="bid-button" class="btn full">Bid</bid>
+					<div id="bid" title="What's your Bid?">
+						<input id="bid-value" type="number" value="20">
 					</div>
-					<div id="chooseTrump" class="tall">
+					<div id="chooseTrump" title="Choose Trump"</div>
 						<label class="radio">
 							<input type="radio" name="optionTrump" value="D">
 							Diamonds
@@ -351,9 +383,8 @@
 							<input type="radio" name="optionTrump" value="C">
 							Clubs
 						</label>
-						<button class="btn full">Set Trump</button>
 					</div>
-					<div id="game" class="tall">
+					<div id="game" title="Create a Game">
 						<label class="radio">
 							<input type="radio" name="optionGame" value="1" checked>
 							Play against three AI players and start immediately
@@ -378,20 +409,19 @@
 							<input type="radio" name="optionGame" value="6">
 							Go back
 						</label>
-						<button class="btn full">Go</button>
 					</div>
 				</div>
 				<div id="right" class="span4 player">
 					<h4 class="center quarter">Opponent</h4>
 					<div class="bid center full"></div>
-					<div class="play"></div>
+					<div class="play center"></div>
 				</div>
 			</div>
 			<div class="row-fluid quarter">
 				<div id="bottom" class="span4 offset4 player">
 					<h4 class="center quarter">Me</h4>
 					<div class="bid center full"></div>
-					<div class="play"></div>
+					<div class="play center"></div>
 				</div>
 			</div>
 			<div id="hand" class="row-fluid quarter center full">
