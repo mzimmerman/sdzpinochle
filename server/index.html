@@ -18,7 +18,7 @@
 				width: 100%;
 			}
 			.player {
-				height: 150px;
+				height: auto;
 			}
 			.center {
 				text-align: center;
@@ -41,10 +41,13 @@
 		var top;
 		var right;
 		var websocket;
-		var runQueue = [];
-		var pause = false;
 		var lastAction = null;
 		var lastCard = null;
+		var timer;
+
+		function addToQueue(f) {
+			$('body').queue(f);
+		}
 		
 		function showError(msg){
 			$('#error').html(msg).show();
@@ -52,6 +55,7 @@
 				$('#error').fadeOut('slow');
 			},3000);
 		}
+		
 		function showHand(location, hand, wrap){
 			location.html('');
 			for(var i=0;i<hand.length;i++){
@@ -75,7 +79,13 @@
 			var c = $(this).attr("alt");
 			send({Type:"Play",PlayedCard:c});
 			lastCard = c;
-			getPlayer(playerid).children(".play").empty().append($(this));
+			console.log("c = " + c);
+			cardObject = $(this);
+			addToQueue(function () {getPlayer(playerid).children(".play").empty().append(cardObject)});
+		}
+		
+		function processQueue() {
+			$('body').dequeue();
 		}
 				
 		$(document).ready(function(){
@@ -84,16 +94,12 @@
 			//websocket.onclose = function(evt) { onClose(evt) };
 			websocket.onmessage = function(evt) { onMessage(evt) };
 			websocket.onerror = function(evt) { console.log(evt.data) };
-			
-			function running() {
-				if (!pause && runQueue.length > 0) runQueue.shift()();
-				setTimeout(running,1000);
-			}
-			running()
-			
+						
+			timer = setInterval(processQueue,1000);
+
 			$("#continueMeld").click(function() {
 				$(this).hide();
-				pause = false;
+				timer = setInterval(processQueue,1000);
 				getPlayer(left).children(".meld").empty();
 				getPlayer(partner).children(".meld").empty();
 				getPlayer(right).children(".meld").empty();
@@ -117,9 +123,12 @@
 				var option = parseInt($("#game input:checked").val());
 				send({Type:"Game",Option:option});
 				$("#game").hide();
-				$("#we").html("0");
-				$("#they").html("0");
+				addToQueue(function () {
+					$("#we").html("0");
+					$("#they").html("0");
+				});
 			});
+			
 			
 			$("#hello").hide();
 			$("#hello button").click(function() {
@@ -163,17 +172,17 @@
 					break;
 				case "Hello":
 					$("#hello").show();
-					//$("#hello button").click(); // debug
+					$("#hello button").click(); // debug
 					break;
 				case "Game":
 					$("#game").show();
-					//$("#game button").click(); // debug
+					$("#game button").click(); // debug
 					break;
 				case "Trick":
-					runQueue.push(function () {
+					addToQueue(function () {
 						getPlayer(action.Playerid).children(".play").effect("shake");
 					});
-					runQueue.push(function (){
+					addToQueue(function (){
 						getPlayer(left).children(".play").empty();
 						getPlayer(partner).children(".play").empty();
 						getPlayer(right).children(".play").empty();
@@ -185,7 +194,7 @@
 					left = (playerid + 1) % 4;
 					partner = (playerid + 2) % 4;
 					right = (playerid + 3) % 4;
-					runQueue.push(function(){
+					addToQueue(function(){
 						showHand($("#hand"),action.Hand);
 					});
 					$("bid-value").val(20);
@@ -193,19 +202,19 @@
 					break;
 				case "Bid":
 					if (action.Playerid == playerid) {
-						runQueue.push(function(){
+						addToQueue(function(){
 							$("#bid").show();
 						});
 					} else {
 						var current = $("#bid-value").val();
 						if (action.Bid && action.Bid > current) {
 							$("#bid-value").val(action.Bid);
-							runQueue.push(function(){
+							addToQueue(function(){
 								getPlayer(action.Playerid).effect("shake");
 								getPlayer(action.Playerid).children(".bid").text(action.Bid);
 							});
 						} else {
-							runQueue.push(function(){
+							addToQueue(function(){
 								getPlayer(action.Playerid).children(".bid").effect("shake").text("Pass");
 							});
 						}
@@ -219,24 +228,23 @@
 					}
 					break;
 				case "Play":
-					console.log("Comparing " + JSON.stringify(action) + " to " + JSON.stringify(lastAction));
 					if (action.Playerid != playerid) {
-						var played = createCard(action.PlayedCard)
+						var played = createCard(action.PlayedCard,0)
 						lastAction = null;
-						runQueue.push(function(){
+						addToQueue(function(){
 							getPlayer(action.Playerid).children(".play").html(played);
 						});
 					} else if (lastAction != null && lastCard != null && lastAction.Lead == action.Lead && lastAction.WinningCard == action.WinningCard && lastAction.Trump == action.Trump) {
-						console.log("Compared as true");
-						$("#hand").append(createCard(lastCard,0)).children(".playingCard:last").click(playCard);
-						getPlayer(playerid).children(".play").empty();
+						addToQueue(function () {
+							$("#hand").append(createCard(lastCard,0)).children(".playingCard:last").click(playCard);
+							getPlayer(playerid).children(".play").empty();
+						});
 					} else {
 						lastAction = action;
-						console.log("Compared as false");
 					}
 					break;
 				case "Meld":
-					pause = true;
+					clearInterval(timer);
 					showHand(getPlayer(action.Playerid).children(".meld"),action.Hand,true);
 					if (action.Playerid == playerid) {
 						$("#continueMeld").show();
@@ -244,6 +252,7 @@
 			}
 		}
 		</script>
+		<div id="queue"></div>
 		<div class="container-fluid">
 			<div class="row-fluid">
 				<div class="span4">
