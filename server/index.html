@@ -3,28 +3,26 @@
 	<head>
 		<title>Single Deck Pinochle</title>
 		<link href="bootstrap/css/bootstrap.min.css" rel="stylesheet" media="screen">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<link href="bootstrap/css/bootstrap-responsive.css" rel="stylesheet">
+		<!-- <meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<link href="bootstrap/css/bootstrap-responsive.css" rel="stylesheet"> -->
 		<style media="screen" type="text/css">
-			html, body, .container-fluid {
+			html, body, .container-fluid, .player, .tall {
 				height: 100%;
 			}
-			.row-fluid {
+			.bid, .play {
+				height: 75%;
+			}
+			.quarter {
 				height: 25%;
+				margin: 0;
+				padding: 0;
 			}
 			#hand .playingCard {
 				width: 8%;
-				min-width: 100px;
 			}
-			.meld .playingCard {
-				max-height: 149px;
-			}
-			.play .playingCard {
-				max-height: 149px;
+			.playingCard {
+				max-height: 100%;
 				width: 100%;
-			}
-			.player {
-				height: 100%;
 			}
 			.center {
 				text-align: center;
@@ -50,6 +48,7 @@
 		var lastAction = null;
 		var lastCard = null;
 		var timer;
+		var meldActions = 0;
 
 		function addToQueue(f) {
 			$('body').queue(f);
@@ -63,7 +62,7 @@
 		}
 		
 		function showHand(location, hand, wrap){
-			location.html('');
+			location.empty().show();
 			for(var i=0;i<hand.length;i++){
 				if (wrap) {
 					location.append(createCard(hand[i], 100/hand.length));
@@ -77,7 +76,7 @@
 			if (width == 0) {
 				return "<img src='cards/" + c + ".svg' class='playingCard' alt='"+c+"'>";
 			} else {
-				return "<img src='cards/" + c + ".svg' class='playingCard' width='"+width+"%' alt='"+c+"'>";
+				return "<img src='cards/" + c + ".svg' class='playingCard' style='max-width: "+width+"%;' alt='"+c+"'>";
 			}
 		}
 		
@@ -87,7 +86,7 @@
 			lastCard = c;
 			console.log("c = " + c);
 			cardObject = $(this);
-			addToQueue(function () {getPlayer(playerid).children(".play").empty().append(cardObject)});
+			addToQueue(function () {getPlayer(playerid).children(".play").empty().append(cardObject).show()});
 		}
 		
 		function processQueue() {
@@ -106,13 +105,7 @@
 			$("#continueMeld").click(function() {
 				$(this).hide();
 				timer = setInterval(processQueue,1000);
-				getPlayer(left).children(".meld").empty();
-				getPlayer(partner).children(".meld").empty();
-				getPlayer(right).children(".meld").empty();
-				getPlayer(playerid).children(".meld").empty();
-				getPlayer(left).children(".bid").empty();
-				getPlayer(partner).children(".bid").empty();
-				getPlayer(right).children(".bid").empty();
+				$(".play").empty();
 			});
 			$("#continueMeld").hide();
 
@@ -147,6 +140,7 @@
 			$("#chooseTrump button").click(function() {
 				var trump = $("#chooseTrump input:checked").val();
 				send({Type:"Trump",Trump:trump});
+				$("#trump").html(trump);
 				$("#chooseTrump").hide();
 			});
 		});
@@ -178,11 +172,11 @@
 					break;
 				case "Hello":
 					$("#hello").show();
-					$("#hello button").click(); // debug
+					//$("#hello button").click(); // debug
 					break;
 				case "Game":
 					$("#game").show();
-					$("#game button").click(); // debug
+					//$("#game button").click(); // debug
 					break;
 				case "Trick":
 					addToQueue(function () {
@@ -196,14 +190,18 @@
 					});
 					break;
 				case "Deal":
+					meldActions = 0;
 					playerid = action.Playerid;
 					left = (playerid + 1) % 4;
 					partner = (playerid + 2) % 4;
 					right = (playerid + 3) % 4;
 					addToQueue(function(){
 						showHand($("#hand"),action.Hand);
+						$(".bid").show();
+						$(".play").hide();
+						$("bid-value").val(20);
+						$("#trump").empty();
 					});
-					$("bid-value").val(20);
 					lastAction = null;
 					break;
 				case "Bid":
@@ -234,51 +232,53 @@
 					}
 					break;
 				case "Play":
+					console.log("Received a play action");
 					if (action.Playerid != playerid) {
 						var played = createCard(action.PlayedCard,0)
 						lastAction = null;
 						addToQueue(function(){
-							getPlayer(action.Playerid).children(".play").html(played);
+							getPlayer(action.Playerid).children(".play").html(played).show();
 						});
 					} else if (lastAction != null && lastCard != null && lastAction.Lead == action.Lead && lastAction.WinningCard == action.WinningCard && lastAction.Trump == action.Trump) {
 						addToQueue(function () {
 							$("#hand").append(createCard(lastCard,0)).children(".playingCard:last").click(playCard);
-							getPlayer(playerid).children(".play").empty();
+							getPlayer(playerid).children(".play").empty().show();
 						});
 					} else {
 						lastAction = action;
 					}
 					break;
 				case "Meld":
+					meldActions++;
 					clearInterval(timer);
-					showHand(getPlayer(action.Playerid).children(".meld"),action.Hand,true);
+					getPlayer(action.Playerid).children(".bid").hide();
+					showHand(getPlayer(action.Playerid).children(".play"),action.Hand,true);
 					if (action.Playerid == playerid) {
 						$("#continueMeld").show();
+					}
+					if (meldActions == 4) {
+						addToQueue(function () {}); // add a dummy function to the queue to "hold" further actions
 					}
 			}
 		}
 		</script>
 		<div class="container-fluid">
-			<div class="row-fluid">
-				<div class="span4">
-					<table class="table table-bordered table-hover table-condensed"><thead></thead><tbody>
-					<tr><td>Trump</td><td id="trump"></td></tr>
-					<tr><td>We</td><td id="we"></td></tr>
-					<tr><td>They</td><td id="they"></td></tr>
-					</tbody></table>
+			<div class="row-fluid quarter">
+				<div class="span4 tall">
+					<div class="row-fluid quarter"><div class="pull-left">Trump</div><div id="trump" class="pull-right"></div></div>
+					<div class="row-fluid quarter"><div class="pull-left">We</div><div id="we" class="pull-right"></div></div>
+					<div class="row-fluid quarter"><div class="pull-left">They</div><div id="they" class="pull-right"></div></div>
 				</div>
 				<div id="partner" class="span4 player">
-					<h4 class="center">Partner</h4>
-					<div class="bid"></div>
-					<div class="meld"></div>
+					<h4 class="center quarter">Partner</h4>
+					<div class="bid center full"></div>
 					<div class="play"></div>
 				</div>
 			</div>
-			<div class="row-fluid">
+			<div class="row-fluid quarter">
 				<div id="left" class="span4 player">
-					<h4 class="center">Opponent</h4>
-					<div class="bid"></div>
-					<div class="meld"></div>
+					<h4 class="center quarter">Opponent</h4>
+					<div class="bid center full"></div>
 					<div class="play"></div>
 				</div>
 				<div class="span4">
@@ -352,21 +352,19 @@
 					</div>
 				</div>
 				<div id="right" class="span4 player">
-					<h4 class="center">Opponent</h4>
-					<div class="bid"></div>
-					<div class="meld"></div>
+					<h4 class="center quarter">Opponent</h4>
+					<div class="bid center full"></div>
 					<div class="play"></div>
 				</div>
 			</div>
-			<div class="row-fluid">
+			<div class="row-fluid quarter">
 				<div id="bottom" class="span4 offset4 player">
-					<h4 class="center">Me</h4>
-					<div class="bid"></div>
-					<div class="meld"></div>
+					<h4 class="center quarter">Me</h4>
+					<div class="bid center full"></div>
 					<div class="play"></div>
 				</div>
 			</div>
-			<div id="hand" class="row-fluid">
+			<div id="hand" class="row-fluid quarter center full">
 			</div>
 		</div>
 	</body>
