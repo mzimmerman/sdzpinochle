@@ -270,7 +270,7 @@ func (a *Human) SetHand(h sdz.Hand, dealer, playerid int) {
 	copy(hand, h)
 	a.hand = &hand
 	a.Id = playerid
-	a.Tell(sdz.CreateDeal(hand, a.Playerid()))
+	a.Tell(sdz.CreateDeal(hand, a.Playerid(), dealer))
 }
 
 func (h *Human) createGame(option int, cp *ConnectionPool) {

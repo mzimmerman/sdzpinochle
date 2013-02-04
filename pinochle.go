@@ -188,6 +188,7 @@ type Action struct {
 	Option                  int
 	GameOver, Win           bool
 	Score                   []int
+	Dealer                  int
 }
 
 func (action *Action) MarshalJSON() ([]byte, error) {
@@ -197,20 +198,16 @@ func (action *Action) MarshalJSON() ([]byte, error) {
 	count := typ.NumField()
 	for x := 0; x < count; x++ {
 		switch {
-		case typ.Field(x).Name == "Win":
-			if action.GameOver {
-				data["Win"] = action.Win
-			}
 		case typ.Field(x).Name == "Playerid":
 			if action.Type == "Hello" || action.Type == "Score" || action.Type == "Message" || action.Type == "Game" {
 				// don't include playerid', it's not relevant'
 			} else {
 				data["Playerid"] = action.Playerid
 			}
-		case typ.Field(x).Name == "Win":
-			if action.Type == "Score" {
-				data["Win"] = action.Win
-			}
+		case typ.Field(x).Name == "Win" && action.GameOver:
+			data["Win"] = action.Win
+		case typ.Field(x).Name == "Dealer" && action.Type == "Deal":
+			data["Dealer"] = action.Dealer
 		case reflect.DeepEqual(val.Field(x).Interface(), reflect.New(typ.Field(x).Type).Elem().Interface()):
 			continue
 		default:
@@ -260,8 +257,8 @@ func CreateMeld(hand Hand, amount, playerid int) *Action {
 	return &Action{Type: "Meld", Hand: hand, Amount: amount, Playerid: playerid}
 }
 
-func CreateDeal(hand Hand, playerid int) *Action {
-	return &Action{Type: "Deal", Hand: hand, Playerid: playerid}
+func CreateDeal(hand Hand, playerid, dealer int) *Action {
+	return &Action{Type: "Deal", Hand: hand, Playerid: playerid, Dealer: dealer}
 }
 
 func CreateScore(playerid int, score []int, gameOver, win bool) *Action {

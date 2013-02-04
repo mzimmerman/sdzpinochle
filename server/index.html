@@ -9,6 +9,9 @@
 			html, body, .container-fluid, .player, .tall {
 				height: 100%;
 			}
+			.player.turn {
+				border: 1px solid red;
+			}
 			.bid, .play {
 				height: 75%;
 			}
@@ -49,6 +52,7 @@
 		var lastCard = null;
 		var timer;
 		var meldActions = 0;
+		var playCount = 0;
 
 		function addToQueue(f) {
 			$('body').queue(f);
@@ -88,6 +92,9 @@
 			cardObject = $(this);
 			getPlayer(playerid).children(".play").empty().append(cardObject).show();
 			$("#hand").children(".playingCard").unbind('click');
+			addToQueue(function () {
+				setTurn((playerid + 1) % 4);
+			});
 		}
 		
 		function processQueue() {
@@ -163,6 +170,12 @@
 			console.log("Sending - " + text);
 		}
 		
+		function setTurn(id) {
+			console.log("Setting turn for " + id);
+			$(".player").removeClass('turn');
+			getPlayer(id).addClass('turn');
+		}
+		
 		function onMessage(evt) {
 			console.log("Received - " + evt.data);
 			var action = $.parseJSON(evt.data);
@@ -179,14 +192,13 @@
 					//$("#game button").click(); // debug
 					break;
 				case "Trick":
+					playCount = 0;
 					addToQueue(function () {
 						getPlayer(action.Playerid).children(".play").effect("shake");
+						setTurn(action.Playerid);
 					});
 					addToQueue(function (){
-						getPlayer(left).children(".play").empty();
-						getPlayer(partner).children(".play").empty();
-						getPlayer(right).children(".play").empty();
-						getPlayer(playerid).children(".play").empty();
+						$(".play").empty();
 					});
 					break;
 				case "Deal":
@@ -197,10 +209,13 @@
 					right = (playerid + 3) % 4;
 					addToQueue(function(){
 						showHand($("#hand"),action.Hand);
-						$(".bid").show();
+						$(".bid").show().empty();
 						$(".play").hide();
 						$("bid-value").val(20);
 						$("#trump").empty();
+						getPlayer(action.Dealer).children(".bid").text("Stuck");
+						console.log("action = " + JSON.stringify(action));
+						setTurn((action.Dealer + 1) % 4);
 					});
 					lastAction = null;
 					break;
@@ -211,17 +226,15 @@
 						});
 					} else {
 						var current = $("#bid-value").val();
+						var setTo = "Pass";
 						if (action.Bid && action.Bid > current) {
 							$("#bid-value").val(action.Bid);
-							addToQueue(function(){
-								getPlayer(action.Playerid).effect("shake");
-								getPlayer(action.Playerid).children(".bid").text(action.Bid);
-							});
-						} else {
-							addToQueue(function(){
-								getPlayer(action.Playerid).children(".bid").effect("shake").text("Pass");
-							});
+							setTo = action.Bid;
 						}
+						addToQueue(function(){
+							setTurn((action.Playerid + 1) % 4);
+							getPlayer(action.Playerid).children(".bid").effect("shake").text(setTo);
+						});
 					}
 					break;
 				case "Trump":
@@ -229,22 +242,32 @@
 						$("#chooseTrump").show();
 					} else {
 						$("#trump").html(action.Trump);
+						setTurn(action.Playerid);
 					}
 					break;
 				case "Play":
-					console.log("Received a play action");
+					playCount++;
 					if (action.Playerid != playerid) {
 						var played = createCard(action.PlayedCard,0)
 						lastAction = null;
-						addToQueue(function(){
-							getPlayer(action.Playerid).children(".play").html(played).show();
-						});
+						if (playCount < 4) {
+							addToQueue(function () {
+								setTurn((action.Playerid + 1) % 4);
+								getPlayer(action.Playerid).children(".play").html(played).show();
+							});
+						} else {
+							addToQueue(function(){
+								getPlayer(action.Playerid).children(".play").html(played).show();
+							});
+						}
 						return;
 					}
 					if (lastAction != null && lastCard != null && lastAction.Lead == action.Lead && lastAction.WinningCard == action.WinningCard && lastAction.Trump == action.Trump) {
 						addToQueue(function () {
 							$("#hand").append(createCard(lastCard,0));
 							getPlayer(playerid).children(".play").empty().show();
+							setTurn(playerid);
+							playCount--;
 						});
 					} else {
 						lastAction = action;
@@ -270,9 +293,11 @@
 		<div class="container-fluid">
 			<div class="row-fluid quarter">
 				<div class="span4 tall">
-					<div class="row-fluid quarter"><div class="pull-left">Trump</div><div id="trump" class="pull-right"></div></div>
-					<div class="row-fluid quarter"><div class="pull-left">We</div><div id="we" class="pull-right"></div></div>
-					<div class="row-fluid quarter"><div class="pull-left">They</div><div id="they" class="pull-right"></div></div>
+					<dl class="dl-horizontal tall">
+						<dt>Trump</dt><dd id="trump"></dd>
+						<dt>We</dt><dd id="we"></dd>
+						<dt>They</dt><dd id="they"></dd>
+					</dl>
 				</div>
 				<div id="partner" class="span4 player">
 					<h4 class="center quarter">Partner</h4>
@@ -286,11 +311,11 @@
 					<div class="bid center full"></div>
 					<div class="play"></div>
 				</div>
-				<div class="span4">
+				<div class="span4 quarter">
 					<div class="row-fluid">
 						<button id="continueMeld">Continue</button>
 					</div>
-					<div id="hello" class="row-fluid">
+					<div id="hello" class="tall">
 						<label class="radio">
   							<input type="radio" name="optionHello" value="create" checked>
   							Create (create a game now)
@@ -305,11 +330,11 @@
 						</label>
 						<button class="btn full">Go</button>
 					</div>
-					<div id="bid" class="hide">
+					<div id="bid" class="tall">
 						<input id="bid-value" type="number" value="20" class="full">
 						<button id="bid-button" class="btn full">Bid</bid>
 					</div>
-					<div id="chooseTrump" class="row-fluid">
+					<div id="chooseTrump" class="tall">
 						<label class="radio">
 							<input type="radio" name="optionTrump" value="D">
 							Diamonds
@@ -328,7 +353,7 @@
 						</label>
 						<button class="btn full">Set Trump</button>
 					</div>
-					<div id="game" class="row-fluid">
+					<div id="game" class="tall">
 						<label class="radio">
 							<input type="radio" name="optionGame" value="1" checked>
 							Play against three AI players and start immediately
