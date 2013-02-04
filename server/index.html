@@ -86,7 +86,8 @@
 			lastCard = c;
 			console.log("c = " + c);
 			cardObject = $(this);
-			addToQueue(function () {getPlayer(playerid).children(".play").empty().append(cardObject).show()});
+			getPlayer(playerid).children(".play").empty().append(cardObject).show();
+			$("#hand").children(".playingCard").unbind('click');
 		}
 		
 		function processQueue() {
@@ -113,7 +114,6 @@
 			$("#bid-button").click(function() {
 				var amount = parseInt($("#bid-value").val());
 				send({Type:"Bid",Bid:amount});
-				$("#hand").children('.playingCard').click(playCard);
 				$("#bid").hide();
 			});
 
@@ -239,14 +239,19 @@
 						addToQueue(function(){
 							getPlayer(action.Playerid).children(".play").html(played).show();
 						});
-					} else if (lastAction != null && lastCard != null && lastAction.Lead == action.Lead && lastAction.WinningCard == action.WinningCard && lastAction.Trump == action.Trump) {
+						return;
+					}
+					if (lastAction != null && lastCard != null && lastAction.Lead == action.Lead && lastAction.WinningCard == action.WinningCard && lastAction.Trump == action.Trump) {
 						addToQueue(function () {
-							$("#hand").append(createCard(lastCard,0)).children(".playingCard:last").click(playCard);
+							$("#hand").append(createCard(lastCard,0));
 							getPlayer(playerid).children(".play").empty().show();
 						});
 					} else {
 						lastAction = action;
 					}
+					addToQueue(function () {
+						$("#hand").children('.playingCard').click(playCard);
+					});
 					break;
 				case "Meld":
 					meldActions++;
