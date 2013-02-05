@@ -285,7 +285,6 @@
 							setTurn(action.Playerid);
 						});
 					}
-					$('.bid').empty();
 					break;
 				case "Play":
 					playCount++;
@@ -320,14 +319,16 @@
 					break;
 				case "Meld":
 					meldActions++;
-					clearInterval(timer);
-					getPlayer(action.Playerid).children(".bid").hide();
-					showHand(getPlayer(action.Playerid).children(".play"),action.Hand,true);
-					if (action.Playerid == playerid) {
-						$("#continueMeld").dialog('open');
-					}
+					addToQueue(function() {
+						getPlayer(action.Playerid).children(".bid").hide();
+						showHand(getPlayer(action.Playerid).children(".play"),action.Hand,true);
+					});
 					if (meldActions == 4) {
-						addToQueue(function () {}); // add a dummy function to the queue to "hold" further actions
+						addToQueue(function () {
+							clearInterval(timer);
+							$("#continueMeld").dialog('open');
+						});
+						addToQueue(function () {}); // add a dummy function to the queue to "hold" further actions and reset paused for next hand
 					}
 					break;
 				case "Score":
