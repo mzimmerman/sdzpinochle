@@ -114,84 +114,46 @@
 						
 			timer = setInterval(processQueue,500);
 
-			$("#game").dialog({
-				buttons:{Go:function () {
-					var option = parseInt($("#game input:checked").val());
-					send({Type:"Game",Option:option});
-					$(this).dialog('close');
-					addToQueue(function () {
-						$("#we").html("0");
-						$("#they").html("0");
-					});						}},
-				closeOnEscape: false,
-				modal: true,
-				autoOpen: false,
-				minHeight: 0,
-				minWidth: 0,
-				dialogClass: "well",
+			$("#game button").click(function () {
+				var option = parseInt($("#game input:checked").val());
+				send({Type:"Game",Option:option});
+				$(this).parent().hide();
+				addToQueue(function () {
+					$("#we").html("0");
+					$("#they").html("0");
+				});
+			});
+						
+			$("#hello button").click(function () {
+				var option = $("#hello input:checked").val();
+				send({Type:"Hello",Message:option});
+				$(this).parent().hide();
+			});
+
+			$("#continueMeld button").click(function () {
+				$(this).parent().hide();
+				timer = setInterval(processQueue,500);
+				$(".play").empty();
+			});
+
+			$("#bid button").click(function () {
+				var amount = parseInt($("#bid input").val());
+				send({Type:"Bid",Bid:amount});
+				if (amount > highBid) {
+					highBid = amount;
+				}
+				$("#bid-value").html(highBid);
+				$(this).parent().hide();
 			});
 			
-			$("#hello").dialog({
-				buttons:{Go:function () {
-					var option = $("#hello input:checked").val();
-					send({Type:"Hello",Message:option});
-					$(this).dialog('close');
-				}},
-				closeOnEscape: false,
-				modal: true,
-				autoOpen: false,
-				minHeight: 0,
-				minWidth: 0,
-				dialogClass: "well",
+			$("#chooseTrump button").click(function () {
+				var trump = $("#chooseTrump input:checked").val();
+				send({Type:"Trump",Trump:trump});
+				$("#trump").html(trump);
+				setTurn(playerid);
+				$(this).parent().hide();
 			});
-
-			$("#continueMeld").dialog({
-				buttons:{Continue:function () {
-					$(this).dialog('close');
-					timer = setInterval(processQueue,500);
-					$(".play").empty();
-				}},
-				closeOnEscape: false,
-				modal: true,
-				autoOpen: false,
-				minHeight: 0,
-				minWidth: 0,
-				dialogClass: "well",
-			});
-
-			$("#bid").dialog({
-				buttons:{Bid:function () {
-					var amount = parseInt($("#bid input").val());
-					send({Type:"Bid",Bid:amount});
-					if (amount > highBid) {
-						highBid = amount;
-					}
-					$("#bid-value").html(highBid);
-					$(this).dialog('close');
-				}},
-				closeOnEscape: false,
-				modal: true,
-				autoOpen: false,
-				minHeight: 0,
-				dialogClass: "well",
-				minWidth: 0,
-			});
-
-			$("#chooseTrump").dialog({
-				buttons:{"Set Trump":function () {
-					var trump = $("#chooseTrump input:checked").val();
-					send({Type:"Trump",Trump:trump});
-					$("#trump").html(trump);
-					setTurn(playerid);
-					$(this).dialog('close');
-				}},
-				closeOnEscape: false,
-				modal: true,
-				autoOpen: false,
-				minHeight: 0,
-				minWidth: 0,
-				dialogClass: "well",
-			});
+			
 		}); // end of $(document).ready()
 		
 		function getPlayer(id) {
@@ -226,13 +188,13 @@
 					break;
 				case "Hello":
 					addToQueue(function () {
-						$("#hello").dialog('open');
+						$("#hello").show();
 					});
 					//$("#hello button").click(); // debug
 					break;
 				case "Game":
 					addToQueue(function () {
-						$("#game").dialog('open');
+						$("#game").show();
 					});
 					//$("#game button").click(); // debug
 					break;
@@ -272,7 +234,7 @@
 				case "Bid":
 					if (action.Playerid == playerid) {
 						addToQueue(function(){
-							$("#bid").dialog('open');
+							$("#bid").show();
 						});
 					} else {
 						addToQueue(function(){
@@ -291,7 +253,7 @@
 				case "Trump":
 					if (action.Playerid == playerid) {
 						addToQueue(function () {
-							$("#chooseTrump").dialog('open');
+							$("#chooseTrump").show();
 						});
 					} else {
 						addToQueue(function () {
@@ -347,7 +309,7 @@
 					if (meldActions == 4) {
 						addToQueue(function () {
 							clearInterval(timer);
-							$("#continueMeld").dialog('open');
+							$("#continueMeld").show();
 						});
 						addToQueue(function () {}); // add a dummy function to the queue to "hold" further actions and reset paused for next hand
 					}
@@ -397,10 +359,11 @@
 					<div class="bid center full"></div>
 					<div class="play center"></div>
 				</div>
-				<div class="span4 quarter">
-					<div id="continueMeld">
+				<div class="span4 full tall" style="overflow: auto;">
+					<div id="continueMeld" class="full tall hide">
+						<button>Continue</button>
 					</div>
-					<div id="hello" title="Welcome to SDZPinochle!">
+					<div id="hello" title="Welcome to SDZPinochle!" class="full tall hide">
 						<label class="radio">
 							<input type="radio" name="optionHello" value="create" checked>
 							Create (create a game now)
@@ -413,11 +376,13 @@
 							<input type="radio" name="optionHello" value="quit">
 							Quit (goodbye!)
 						</label>
+						<button>Go</button>
 					</div>
-					<div id="bid" title="What's your Bid?">
+					<div id="bid" title="What's your Bid?" class="full tall hide">
 						<input type="number" value="20">
+						<button>Bid</button>
 					</div>
-					<div id="chooseTrump" title="Choose Trump"</div>
+					<div id="chooseTrump" title="Choose Trump" class="full tall hide">
 						<label class="radio">
 							<input type="radio" name="optionTrump" value="D">
 							Diamonds
@@ -434,8 +399,9 @@
 							<input type="radio" name="optionTrump" value="C">
 							Clubs
 						</label>
+						<button>Go</button>
 					</div>
-					<div id="game" title="Create a Game">
+					<div id="game" title="Create a Game" class="full tall hide">
 						<label class="radio">
 							<input type="radio" name="optionGame" value="1" checked>
 							Play against three AI players and start immediately
@@ -460,6 +426,7 @@
 							<input type="radio" name="optionGame" value="6">
 							Go back
 						</label>
+						<button>Go</button>
 					</div>
 				</div>
 				<div id="right" class="span4 player">
