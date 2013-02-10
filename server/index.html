@@ -296,12 +296,14 @@
 				case "Meld":
 					meldActions++;
 					addToQueue(function() {
-						if (playerid % 2 == action.Playerid % 2) {
-							wemeld += action.Amount;
-							$("#wemeld").html(wemeld);
-						} else {
-							theymeld += action.Amount;
-							$("#theymeld").html(theymeld);
+						if (action.hasOwnProperty("Amount")) {
+							if (playerid % 2 == action.Playerid % 2) {
+								wemeld = wemeld + action.Amount;
+								$("#wemeld").html(wemeld);
+							} else {
+								theymeld = theymeld + action.Amount;
+								$("#theymeld").html(theymeld);
+							}
 						}
 						getPlayer(action.Playerid).children(".bid").hide();
 						showHand(getPlayer(action.Playerid).children(".play"),action.Hand,true);
