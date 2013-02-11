@@ -62,6 +62,10 @@ func (a Card) Beats(b Card, trump Suit) bool {
 	return false
 }
 
+func (c Card) Counter() bool {
+	return c.Face() == Ace || c.Face() == Ten || c.Face() == King
+}
+
 func (c Card) Suit() Suit {
 	return Suit(c[1])
 }
@@ -150,6 +154,32 @@ func (h Hand) Swap(i, j int) {
 	h[i], h[j] = h[j], h[i]
 }
 
+func (h Hand) Lowest(given Card) bool {
+	low := given
+	for _, card := range h {
+		if card.Suit() != given.Suit() {
+			continue
+		}
+		if low.Face().Less(card.Face()) {
+			low = card
+		}
+	}
+	return low == given
+}
+
+func (h Hand) Highest(given Card) bool {
+	high := given
+	for _, card := range h {
+		if card.Suit() != given.Suit() {
+			continue
+		}
+		if card.Face().Less(high.Face()) {
+			high = card
+		}
+	}
+	return high == given
+}
+
 func (d Deck) Deal() (hands []Hand) {
 	hands = make([]Hand, 4)
 	for x := 0; x < 4; x++ {
@@ -189,6 +219,7 @@ type Action struct {
 	GameOver, Win           bool
 	Score                   []int
 	Dealer                  int
+	WinningPlayer           int
 }
 
 func (action *Action) MarshalJSON() ([]byte, error) {
@@ -204,6 +235,8 @@ func (action *Action) MarshalJSON() ([]byte, error) {
 			} else {
 				data["Playerid"] = action.Playerid
 			}
+		case typ.Field(x).Name == "WinningPlayer" && action.Type == "Play":
+			data["WinningPlayer"] = action.WinningPlayer
 		case typ.Field(x).Name == "Amount" && action.Type == "Bid":
 			data["Amount"] = action.Amount
 		case typ.Field(x).Name == "Win" && action.GameOver:
@@ -555,6 +588,15 @@ func (h *Hand) Remove(card Card) bool {
 		}
 	}
 	return false
+}
+
+func (h Hand) CountSuit(suit Suit) (count int) {
+	for _, card := range h {
+		if card.Suit() == suit {
+			count++
+		}
+	}
+	return
 }
 
 func (h Hand) Count() (cards map[Card]int) {

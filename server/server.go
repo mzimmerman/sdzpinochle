@@ -40,6 +40,8 @@ type AI struct {
 	numBidders int
 	show       sdz.Hand
 	sdz.PlayerImpl
+	playedCards map[sdz.Card]int
+	playCount   int
 }
 
 func createAI() (a *AI) {
@@ -150,19 +152,48 @@ func (ai *AI) Go() {
 			}
 		case "Play":
 			if action.Playerid == ai.Playerid() {
-				if action.WinningCard == "" { // nothing to compute as far as legal moves
-					action = sdz.CreatePlay((*ai.hand)[0], ai.Playerid())
-				} else {
-					for _, card := range *ai.hand {
-						// playedCard, winningCard Card, leadSuit Suit, hand Hand, trump Suit
-						if sdz.ValidPlay(card, action.WinningCard, action.Lead, ai.hand, action.Trump) {
-							action = sdz.CreatePlay(card, ai.Playerid())
-							break
-						}
+				decisionMap := make(map[sdz.Card]int)
+				var selection sdz.Card
+				for _, card := range *ai.hand {
+					if ai.playCount == 0 || sdz.ValidPlay(card, action.WinningCard, action.Lead, ai.hand, action.Trump) {
+						decisionMap[card] = 1
+						selection = card
 					}
 				}
+				for card := range decisionMap {
+					if ai.playCount == 0 {
+						// TODO: Anticipate opponents trumping in
+						if card.Face() == sdz.Ace {
+							// choose the Ace with the least amount of cards in the suit
+							decisionMap[card] += 12 - ai.hand.CountSuit(card.Suit())
+						}
+					} else if card.Beats(action.WinningCard, action.Trump) {
+						if ai.hand.Highest(card) {
+							decisionMap[card]++
+						}
+					} else if ai.playCount > 0 && action.WinningPlayer%2 == ai.Playerid()%2 {
+						if card.Counter() {
+							decisionMap[card]++
+						} else {
+							decisionMap[card]--
+						}
+					} else {
+						// TODO: Anticipate partner winning the hand through trump or otherwise
+						if ai.hand.Lowest(card) {
+							decisionMap[card]++
+						}
+					}
+					if decisionMap[card] > decisionMap[selection] {
+						selection = card
+					}
+				}
+				Log("%d - Playing %s - Decision map = %v", ai.Playerid(), selection, decisionMap)
+				action = sdz.CreatePlay(selection, ai.Playerid())
+				ai.playedCards[action.PlayedCard]++
 				ai.c <- action
 			} else {
+				ai.playCount++
+				ai.playedCards[action.PlayedCard]++
 				// TODO: Keep track of what has been played already
 				// received someone else's play'
 			}
@@ -183,10 +214,11 @@ func (ai *AI) Go() {
 			}
 		case "Throwin":
 			Log("Player %d saw that player %d threw in", ai.Playerid(), action.Playerid)
-		case "Deal": // should not happen as the server can set the Hand automagically for AI
+		case "Deal": // nothing to do here, this is set automagically
 		case "Meld": // nothing to do here, no one to read it
 		case "Message": // nothing to do here, no one to read it
 		case "Trick": // nothing to do here, nothing to display
+			ai.playCount = 0
 		case "Score": // TODO: save score to use for future bidding techniques
 		default:
 			Log("Received an action I didn't understand - %v", action)
@@ -215,6 +247,8 @@ func (a *AI) SetHand(h sdz.Hand, dealer, playerid int) {
 	a.highBid = 20
 	a.highBidder = dealer
 	a.numBidders = 0
+	a.playedCards = make(map[sdz.Card]int)
+	a.playCount = 0
 }
 
 type Human struct {
