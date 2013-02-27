@@ -269,8 +269,8 @@ func CreateBid(bid, playerid int) *Action {
 	return &Action{Type: "Bid", Bid: bid, Playerid: playerid}
 }
 
-func CreatePlayRequest(winning Card, lead, trump Suit, playerid int) *Action {
-	return &Action{Type: "Play", WinningCard: winning, Lead: lead, Trump: trump, Playerid: playerid}
+func CreatePlayRequest(winning Card, lead, trump Suit, playerid int, hand *Hand) *Action {
+	return &Action{Type: "Play", WinningCard: winning, Lead: lead, Trump: trump, Playerid: playerid, Hand: *hand}
 }
 
 func CreatePlay(card Card, playerid int) *Action {
@@ -431,12 +431,19 @@ func (game *Game) Go(players []Player) {
 		game.HighPlayer = game.Dealer
 		next = game.Dealer
 		for x := 0; x < 4; x++ {
+			var bidAction *Action
 			next = (next + 1) % 4
-			game.Players[next].Tell(CreateBid(0, next))
-			bidAction, open := game.Players[next].Listen()
-			if !open {
-				game.Broadcast(CreateMessage("Player disconnected"), next)
-				return
+
+			if !(next == game.Dealer && game.HighBid == 20) { // no need to ask the dealer to bid if they've already won'
+				game.Players[next].Tell(CreateBid(0, next))
+				var open bool
+				bidAction, open = game.Players[next].Listen()
+				if !open {
+					game.Broadcast(CreateMessage("Player disconnected"), next)
+					return
+				}
+			} else {
+				bidAction = CreateBid(game.HighBid, game.Dealer)
 			}
 			game.Broadcast(bidAction, next)
 			if bidAction.Bid > game.HighBid {
@@ -480,7 +487,7 @@ func (game *Game) Go(players []Player) {
 				// TODO: handle possible throwin
 				var action *Action
 				for {
-					action = CreatePlayRequest(winningCard, leadSuit, game.Trump, next)
+					action = CreatePlayRequest(winningCard, leadSuit, game.Trump, next, game.Players[next].Hand())
 					game.Players[next].Tell(action)
 					action, open = game.Players[next].Listen()
 					if !open {

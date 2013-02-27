@@ -162,6 +162,7 @@ func (t *testSuite) TestBeats() {
 	t.True(C("9S").Beats(C("JD"), Spades))
 	t.False(C("9D").Beats(C("9D"), Diamonds))
 	t.False(C("9D").Beats(C("9D"), Diamonds))
+	t.False(C("AD").Beats(C("AD"), Diamonds))
 }
 
 func (t *testSuite) TestCardInHand() {
