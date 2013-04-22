@@ -67,7 +67,11 @@ func (t *testSuite) TestTracking() {
 			t.Not(t.True(ok), "Should not have a record for QD")
 		}
 		_, ok = ai.ht.cards[x][C("KH")]
-		t.Not(t.True(ok), "Should not have a record of a KH")
+		if x == 1 {
+			t.True(ok, "Should have a record of a KH")
+		} else {
+			t.True(!ok, "Should not have a record of a KH")
+		}
 	}
 	ai.ht.cards[2][C("QD")] = 1
 	ai.ht.cards[2][C("KH")] = 1
@@ -85,7 +89,6 @@ func (t *testSuite) TestTracking() {
 
 	ai.ht.calculate()
 
-	t.Equal(1, 2)
 	t.Equal(1, ai.ht.cards[3][C("JS")])
 	t.Equal(2, ai.ht.cards[3][C("QS")])
 
@@ -105,6 +108,4 @@ func (t *testSuite) TestTracking() {
 		_, ok = ai.ht.cards[x][C("TS")]
 		t.True(ok, "All TS cards should have been found")
 	}
-	t.Equal(1, ai.ht.cards[3][C("JS")])
-	t.Equal(2, ai.ht.cards[3][C("QS")])
 }

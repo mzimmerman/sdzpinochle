@@ -235,48 +235,24 @@ func (ai *AI) Go() {
 		case "Play":
 			if action.Playerid == ai.Playerid() {
 				decisionMap := make(map[sdz.Card]int)
-				var selection sdz.Card
 				for _, card := range *ai.hand {
 					if ai.playCount == 0 || sdz.ValidPlay(card, action.WinningCard, action.Lead, ai.hand, action.Trump) {
 						decisionMap[card] = 1
-						selection = card
 					}
 				}
-				for card := range decisionMap {
-					if ai.playCount == 0 {
-						// TODO: Anticipate opponents trumping in
-						if card.Face() == sdz.Ace {
-							// choose the Ace with the least amount of cards in the suit
-							decisionMap[card] += 12 - ai.hand.CountSuit(card.Suit())
-						}
-					} else if card.Beats(action.WinningCard, action.Trump) {
-						if ai.hand.Highest(card) {
-							decisionMap[card]++
-						}
-					} else if ai.playCount > 0 && action.WinningPlayer%2 == ai.Playerid()%2 {
-						if card.Counter() {
-							decisionMap[card]++
-						} else {
-							decisionMap[card]--
-						}
-					} else {
-						// TODO: Anticipate partner winning the hand through trump or otherwise
-						if ai.hand.Lowest(card) {
-							decisionMap[card]++
-						}
-					}
-					if decisionMap[card] > decisionMap[selection] {
-						selection = card
-					}
-				}
-				Log("%d - Playing %s - Decision map = %v", ai.Playerid(), selection, decisionMap)
-				action = sdz.CreatePlay(selection, ai.Playerid())
+				action = sdz.CreatePlay(ai.findCardToPlay(action, decisionMap), ai.Playerid())
 				ai.ht.playedCards[action.PlayedCard]++
 				ai.c <- action
 			} else {
 				ai.playCount++
 				ai.ht.playedCards[action.PlayedCard]++
-				// TODO: Keep track of what has been played already
+				if action.PlayedCard.Suit() != action.Lead {
+					ai.ht.noSuit(action.Playerid, action.Lead)
+					if action.PlayedCard.Suit() != action.Trump {
+						ai.ht.noSuit(action.Playerid, action.Trump)
+					}
+				}
+				// TODO: find all the cards that can beat the lead card and set those
 				// received someone else's play
 			}
 		case "Trump":
@@ -306,6 +282,42 @@ func (ai *AI) Go() {
 			Log("Received an action I didn't understand - %v", action)
 		}
 	}
+}
+
+func (ai *AI) findCardToPlay(action *sdz.Action, decisionMap map[sdz.Card]int) sdz.Card {
+	var selection sdz.Card
+	for card := range decisionMap {
+		if selection == "" {
+			selection = card
+		}
+		if ai.playCount == 0 {
+			// TODO: Anticipate opponents trumping in
+			if card.Face() == sdz.Ace {
+				// choose the Ace with the least amount of cards in the suit
+				decisionMap[card] += 12 - ai.hand.CountSuit(card.Suit())
+			}
+		} else if card.Beats(action.WinningCard, action.Trump) {
+			if ai.hand.Highest(card) {
+				decisionMap[card]++
+			}
+		} else if ai.playCount > 0 && action.WinningPlayer%2 == ai.Playerid()%2 {
+			if card.Counter() {
+				decisionMap[card]++
+			} else {
+				decisionMap[card]--
+			}
+		} else {
+			// TODO: Anticipate partner winning the hand through trump or otherwise
+			if ai.hand.Lowest(card) {
+				decisionMap[card]++
+			}
+		}
+		if decisionMap[card] > decisionMap[selection] {
+			selection = card
+		}
+	}
+	Log("%d - Playing %s - Decision map = %v", ai.Playerid(), selection, decisionMap)
+	return selection
 }
 
 func (ai AI) Tell(action *sdz.Action) {
