@@ -33,7 +33,7 @@ func (t *testSuite) TestRemove() {
 	t.Equal(12, len(*ai.Hand()))
 	t.True(ai.Hand().Remove(C("JD")))
 	t.True(ai.Hand().Remove(C("JD")))
-	t.Not(ai.Hand().Remove(C("9D")))
+	t.Not(t.True(ai.Hand().Remove(C("9D"))))
 	t.Equal(10, len(*ai.Hand()))
 }
 
@@ -46,7 +46,7 @@ func (t *testSuite) TestBidding() {
 	go ai.Go()
 	ai.Tell(sdz.CreateBid(0, 1))
 	action, _ := ai.Listen()
-	t.Not(22 > action.Bid || action.Bid > 24)
+	t.Not(t.True(22 > action.Bid || action.Bid > 24))
 }
 
 func (t *testSuite) TestTracking() {
@@ -64,10 +64,10 @@ func (t *testSuite) TestTracking() {
 		if x == 1 {
 			t.True(ok, "Should have a record of 1 for QD")
 		} else {
-			t.Not(ok, "Should not have a record for QD")
+			t.Not(t.True(ok), "Should not have a record for QD")
 		}
 		_, ok = ai.ht.cards[x][C("KH")]
-		t.Not(ok, "Should not have a record of a KH")
+		t.Not(t.True(ok), "Should not have a record of a KH")
 	}
 	ai.ht.cards[2][C("QD")] = 1
 	ai.ht.cards[2][C("KH")] = 1
@@ -98,7 +98,7 @@ func (t *testSuite) TestTracking() {
 		if x == 3 || x == 1 {
 			t.True(ok, "Value should be true for player "+strconv.Itoa(x)+" with KD")
 		} else {
-			t.Not(ok, "Value should be false for player "+strconv.Itoa(x)+" with KD")
+			t.Not(t.True(ok), "Value should be false for player "+strconv.Itoa(x)+" with KD")
 		}
 		_, ok = ai.ht.cards[x][C("9S")]
 		t.True(ok, "All 9S cards should have been found")
