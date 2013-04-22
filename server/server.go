@@ -8,7 +8,6 @@ import (
 	sdz "github.com/mzimmerman/sdzpinochle"
 	"html/template"
 	"math/rand"
-	//"sort"
 	"net"
 	"net/http"
 	"time"
@@ -31,6 +30,88 @@ func Log(m string, v ...interface{}) {
 	fmt.Printf(m+"\n", v...)
 }
 
+type HandTracker struct {
+	cards [4]map[sdz.Card]int
+	// missing entry = know nothing
+	// 0 = does not have any of this card
+	// 1 = has this card
+	// 2 = has two of these cards
+	playedCards map[sdz.Card]int
+}
+
+// Returns a new HandTracker with the initial population and calculation done
+func NewHandTracker(playerid int, hand sdz.Hand) *HandTracker {
+	ht := new(HandTracker)
+	for x := 0; x < 4; x++ {
+		ht.cards[x] = make(map[sdz.Card]int)
+	}
+	ht.playedCards = make(map[sdz.Card]int)
+	for _, suit := range sdz.Suits() {
+		for _, face := range sdz.Faces() {
+			card := sdz.CreateCard(suit, face)
+			ht.playedCards[card] = 0
+		}
+	}
+	ht.populate(playerid, hand)
+	return ht
+}
+
+func (ht *HandTracker) populate(playerid int, hand sdz.Hand) {
+	for _, suit := range sdz.Suits() {
+		for _, face := range sdz.Faces() {
+			card := sdz.CreateCard(suit, face)
+			ht.cards[playerid][card] = 0
+		}
+	}
+	for _, card := range hand {
+		ht.cards[playerid][card]++
+	}
+	ht.calculate()
+}
+
+func (ht *HandTracker) noSuit(playerid int, suit sdz.Suit) {
+	for _, face := range sdz.Faces() {
+		ht.cards[playerid][sdz.CreateCard(suit, face)] = 0
+	}
+}
+
+func (ht *HandTracker) calculate() {
+	for _, suit := range sdz.Suits() {
+		for _, face := range sdz.Faces() {
+			card := sdz.CreateCard(suit, face)
+			sum := ht.playedCards[card]
+			for x := 0; x < 4; x++ {
+				if val, ok := ht.cards[x][card]; ok {
+					sum += val
+				}
+			}
+			if sum == 2 {
+				for x := 0; x < 4; x++ {
+					if _, ok := ht.cards[x][card]; !ok {
+						ht.cards[x][card] = 0
+					}
+				}
+			} else {
+				unknown := -1
+				for x := 0; x < 4; x++ {
+					if _, ok := ht.cards[x][card]; !ok {
+						if unknown == -1 {
+							unknown = x
+						} else {
+							// at least two unknowns
+							unknown = -1
+							break
+						}
+					}
+				}
+				if unknown != -1 {
+					ht.cards[unknown][card] = 2 - sum
+				}
+			}
+		}
+	}
+}
+
 type AI struct {
 	hand       *sdz.Hand
 	c          chan *sdz.Action
@@ -41,8 +122,8 @@ type AI struct {
 	numBidders int
 	show       sdz.Hand
 	sdz.PlayerImpl
-	playedCards map[sdz.Card]int
-	playCount   int
+	ht        *HandTracker
+	playCount int
 }
 
 func createAI() (a *AI) {
@@ -56,7 +137,7 @@ func (ai AI) Close() {
 }
 
 func (ai AI) powerBid(suit sdz.Suit) (count int) {
-	count = 7 // your partner's good for at least this right?!?
+	count = 5 // your partner's good for at least this right?!?
 	suitMap := make(map[sdz.Suit]int)
 	for _, card := range *ai.hand {
 		suitMap[card.Suit()]++
@@ -190,13 +271,13 @@ func (ai *AI) Go() {
 				}
 				Log("%d - Playing %s - Decision map = %v", ai.Playerid(), selection, decisionMap)
 				action = sdz.CreatePlay(selection, ai.Playerid())
-				ai.playedCards[action.PlayedCard]++
+				ai.ht.playedCards[action.PlayedCard]++
 				ai.c <- action
 			} else {
 				ai.playCount++
-				ai.playedCards[action.PlayedCard]++
+				ai.ht.playedCards[action.PlayedCard]++
 				// TODO: Keep track of what has been played already
-				// received someone else's play'
+				// received someone else's play
 			}
 		case "Trump":
 			if action.Playerid == ai.Playerid() {
@@ -248,7 +329,7 @@ func (a *AI) SetHand(h sdz.Hand, dealer, playerid int) {
 	a.highBid = 20
 	a.highBidder = dealer
 	a.numBidders = 0
-	a.playedCards = make(map[sdz.Card]int)
+	a.ht = NewHandTracker(playerid, h)
 	a.playCount = 0
 }
 
@@ -471,6 +552,7 @@ func main() {
 	cp = &ConnectionPool{connections: make(chan *Human, 100)}
 	http.Handle("/connect", websocket.Handler(wshandler))
 	http.Handle("/cards/", http.StripPrefix("/cards/", http.FileServer(http.Dir("cards"))))
+	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("js"))))
 	http.Handle("/web-socket-js/", http.StripPrefix("/web-socket-js/", http.FileServer(http.Dir("web-socket-js"))))
 	http.HandleFunc("/", serveGame)
 	err := http.ListenAndServe(":80", nil)

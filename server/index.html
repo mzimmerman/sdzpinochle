@@ -60,6 +60,25 @@
 				background-image: url('cards/cards.svg');
 				background-size: 600%;
 			}
+			#trump {
+				width: 50%;
+				height: 100%;
+				background-image:url('cards/suits.svg');
+				background-size: 400%;
+				background-repeat: no-repeat;
+			}
+			#trump.C {
+				background-position-x: 0%;
+			}
+			#trump.H {
+				background-position-x: 100%;
+			}
+			#trump.S {
+				background-position-x: 200%;
+			}
+			#trump.D {
+				background-position-x: 300%;
+			}
 			.center {
 				text-align: center;
 			}
@@ -138,6 +157,8 @@
 		<script type="text/javascript" src="web-socket-js/web_socket.js"></script>
 		<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js"></script>
 		<script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.0/jquery-ui.min.js"></script>
+		<!--<script src="js/jquery.min.js"></script>
+		<script src="js/jquery-ui.min.js"></script>-->
 		<script type="text/javascript">
 		WEB_SOCKET_SWF_LOCATION = "web-socket-js/WebSocketMain.swf";
 		var playerid;
@@ -245,7 +266,7 @@
 			$("#chooseTrump button").click(function () {
 				var trump = $("#chooseTrump input:checked").val();
 				send({Type:"Trump",Trump:trump});
-				$("#trump").html(trump);
+				$("#trump").addClass(trump).show();
 				setTurn(playerid);
 				$(this).parent().parent().hide();
 			});
@@ -319,7 +340,7 @@
 						highBid = 20;
 						wemeld = 0;
 						theymeld = 0;
-						$("#trump").html("N/A");
+						$("#trump").attr('class', 'hide');
 						$("#wemeld").html(0);
 						$("#theymeld").html(0);
 						getPlayer(action.Dealer).children(".bid").html("Stuck");
@@ -352,7 +373,7 @@
 						});
 					} else {
 						addToQueue(function () {
-							$("#trump").html(action.Trump);
+							$("#trump").addClass(action.Trump).show();
 							setTurn(action.Playerid);
 						});
 					}
@@ -426,8 +447,11 @@
 		</script>
 		<div class="full quarter">
 			<div class="third tall">
-				<div class="centerThird third">
-					<div class="full">Trump<label class="right" id="trump"></label></div>
+				<div class="third center tall">
+					<div id="trump" class="hide"></div>
+				</div>
+				<div class="third">
+					<div class="full">Score</div>
 					<div class="full">We<label class="right" id="we"></label></div>
 					<div class="full">They<label class="right" id="they"></label></div>
 				</div>
