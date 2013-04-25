@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
+	"runtime/debug"
 	"sort"
 	"time"
 )
@@ -15,7 +16,7 @@ func Log(m string, v ...interface{}) {
 }
 
 const (
-	debug       = false
+	debugLog    = false
 	Ace         = Face("A")
 	Ten         = Face("T")
 	King        = Face("K")
@@ -31,6 +32,18 @@ const (
 	queenaround = 6
 	jackaround  = 4
 )
+
+func AllCards() []Card {
+	cards := make([]Card, 24)
+	x := 0
+	for _, suit := range Suits() {
+		for _, face := range Faces() {
+			cards[x] = CreateCard(suit, face)
+			x++
+		}
+	}
+	return cards
+}
 
 type Card string // two chars Face + String
 type Suit string // one char
@@ -48,11 +61,23 @@ type Deck [48]Card
 type Hand []Card
 
 func CreateCard(suit Suit, face Face) Card {
+	if suit == "" {
+		debug.PrintStack()
+		panic("Suit not set")
+	}
+	if face == "" {
+		debug.PrintStack()
+		panic("Face not set")
+	}
 	return Card(string(face) + string(suit))
 }
 
 func (a Card) Beats(b Card, trump Suit) bool {
 	// a is the challenging card
+	if b == "" {
+		debug.PrintStack()
+		panic("Card is not set")
+	}
 	switch {
 	case a.Suit() == b.Suit():
 		return a.Face().Less(b.Face())
@@ -67,10 +92,18 @@ func (c Card) Counter() bool {
 }
 
 func (c Card) Suit() Suit {
+	if c == "" {
+		debug.PrintStack()
+		panic("Card is not set")
+	}
 	return Suit(c[1])
 }
 
 func (c Card) Face() Face {
+	if c == "" {
+		debug.PrintStack()
+		panic("Card is not set")
+	}
 	return Face(c[0])
 }
 
@@ -372,6 +405,13 @@ func ValidPlay(playedCard, winningCard Card, leadSuit Suit, hand *Hand, trump Su
 			hasCard = true
 		}
 	}
+	if !hasCard { // you don't have the card in your hand, not allowed to play it, cheater!
+		return false
+	}
+	if winningCard == "" { // nothing to follow so far
+		return true
+	}
+
 	// have to loop again because we can't set canWin to true if we're playing trump but we can follow a non-trump suit
 	for _, card := range *hand {
 		if canFollow && leadSuit != trump && card.Suit() == trump {
@@ -381,9 +421,6 @@ func ValidPlay(playedCard, winningCard Card, leadSuit Suit, hand *Hand, trump Su
 			canWin = true
 			break
 		}
-	}
-	if !hasCard { // you don't have the card in your hand, not allowed to play it, cheater!
-		return false
 	}
 	if canFollow {
 		if playedCard.Suit() != leadSuit {
@@ -522,6 +559,8 @@ func (game *Game) Go(players []Player) {
 						winningPlayer = next
 					}
 				}
+				action.Lead = leadSuit
+				action.Trump = game.Trump
 				game.Broadcast(action, next)
 				next = (next + 1) % 4
 			}
@@ -636,7 +675,7 @@ func min(a, b int) int {
 func (h Hand) Meld(trump Suit) (meld int, result Hand) {
 	// hand does not have to be sorted
 	count := h.Count()
-	if debug {
+	if debugLog {
 		fmt.Printf("Count is %v\n", count)
 	}
 	show := make(map[Card]int)
@@ -648,7 +687,7 @@ func (h Hand) Meld(trump Suit) (meld int, result Hand) {
 	for _, suit := range Suits() { // look through each suit
 		switch { // straights & marriages
 		case trump == suit:
-			if debug {
+			if debugLog {
 				fmt.Printf("Scoring %d nine(s) in trump %s\n", count[CreateCard(suit, Nine)], trump)
 			}
 			meld += count[CreateCard(suit, Nine)] // 9s in trump
@@ -660,7 +699,7 @@ func (h Hand) Meld(trump Suit) (meld int, result Hand) {
 				for _, face := range Faces() {
 					show[CreateCard(suit, face)] = 2
 				}
-				if debug {
+				if debugLog {
 					fmt.Println("DoubleStraight")
 				}
 			// single straight
@@ -672,11 +711,11 @@ func (h Hand) Meld(trump Suit) (meld int, result Hand) {
 					show[CreateCard(suit, King)] = 2
 					show[CreateCard(suit, Queen)] = 2
 					meld += 19
-					if debug {
+					if debugLog {
 						fmt.Println("SingleStraightWithExtraMarriage")
 					}
 				} else {
-					if debug {
+					if debugLog {
 						fmt.Println("SingleStraight")
 					}
 					meld += 15
@@ -685,14 +724,14 @@ func (h Hand) Meld(trump Suit) (meld int, result Hand) {
 				meld += 8
 				show[CreateCard(suit, King)] = 2
 				show[CreateCard(suit, Queen)] = 2
-				if debug {
+				if debugLog {
 					fmt.Println("DoubleMarriageInTrump")
 				}
 			case count[CreateCard(suit, King)] >= 1 && count[CreateCard(suit, Queen)] >= 1:
 				meld += 4
 				show[CreateCard(suit, King)] = max(show[CreateCard(suit, King)], 1)
 				show[CreateCard(suit, Queen)] = max(show[CreateCard(suit, Queen)], 1)
-				if debug {
+				if debugLog {
 					fmt.Println("SingleMarriageInTrump")
 				}
 			}
@@ -700,13 +739,13 @@ func (h Hand) Meld(trump Suit) (meld int, result Hand) {
 			show[CreateCard(suit, King)] = 2
 			show[CreateCard(suit, Queen)] = 2
 			meld += 4
-			if debug {
+			if debugLog {
 				fmt.Println("DoubleMarriage")
 			}
 		case count[CreateCard(suit, King)] >= 1 && count[CreateCard(suit, Queen)] >= 1:
 			show[CreateCard(suit, King)] = max(show[CreateCard(suit, King)], 1)
 			show[CreateCard(suit, Queen)] = max(show[CreateCard(suit, Queen)], 1)
-			if debug {
+			if debugLog {
 				fmt.Println("SingleMarriage")
 			}
 			meld += 2
@@ -736,7 +775,7 @@ func (h Hand) Meld(trump Suit) (meld int, result Hand) {
 				show[CreateCard(suit, face)] = max(show[CreateCard(suit, face)], around[face])
 			}
 			meld += worth
-			if debug {
+			if debugLog {
 				fmt.Printf("Around-%d\n", worth)
 			}
 		}
@@ -746,14 +785,14 @@ func (h Hand) Meld(trump Suit) (meld int, result Hand) {
 		meld += 30
 		show[CreateCard(Spades, Queen)] = 2
 		show[CreateCard(Diamonds, Jack)] = 2
-		if debug {
+		if debugLog {
 			fmt.Println("DoubleNochle")
 		}
 	case count[CreateCard(Diamonds, Jack)] >= 1 && count[CreateCard(Spades, Queen)] >= 1:
 		meld += 4
 		show[CreateCard(Diamonds, Jack)] = max(show[CreateCard(Diamonds, Jack)], 1)
 		show[CreateCard(Spades, Queen)] = max(show[CreateCard(Spades, Queen)], 1)
-		if debug {
+		if debugLog {
 			fmt.Println("Nochle")
 		}
 	}
