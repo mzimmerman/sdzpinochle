@@ -70,10 +70,6 @@ func (ht *HandTracker) populate(playerid int, hand sdz.Hand) {
 }
 
 func (ht *HandTracker) noSuit(playerid int, suit sdz.Suit) {
-	if suit == "" {
-		debug.PrintStack()
-		panic("Suit not set")
-	}
 	for _, face := range sdz.Faces() {
 		ht.cards[playerid][sdz.CreateCard(suit, face)] = 0
 	}
@@ -258,21 +254,21 @@ func (ai *AI) Go() {
 				ai.ht.cards[ai.Playerid()][action.PlayedCard]--
 				ai.c <- action
 			} else {
-				if ai.trick.lead == "" {
-					ai.trick.lead = action.PlayedCard.Suit()
-					sdz.Log("Player%d - Set lead to %s", ai.trick.lead)
+				if ai.trick.leadSuit() == sdz.NASuit {
+					ai.trick.lead = action.Playerid
+					sdz.Log("Player%d - Set lead to %d", ai.trick.lead)
 				}
-				sdz.Log("Player%d - ai.trick.lead = %s", ai.Playerid(), ai.trick.lead)
+				sdz.Log("Player%d - ai.trick.lead = %d", ai.Playerid(), ai.trick.lead)
 				ai.trick.playCount++
 				ai.ht.playedCards[action.PlayedCard]++
 				ai.trick.played[action.Playerid] = action.PlayedCard
 				if _, ok := ai.ht.cards[action.Playerid][action.PlayedCard]; ok {
 					ai.ht.cards[action.Playerid][action.PlayedCard]--
 				}
-				if action.PlayedCard.Suit() != ai.trick.lead {
-					ai.ht.noSuit(action.Playerid, ai.trick.lead)
-					if action.PlayedCard.Suit() != action.Trump {
-						ai.ht.noSuit(action.Playerid, action.Trump)
+				if action.PlayedCard.Suit() != ai.trick.leadSuit() {
+					ai.ht.noSuit(action.Playerid, ai.trick.leadSuit())
+					if action.PlayedCard.Suit() != ai.trump {
+						ai.ht.noSuit(action.Playerid, ai.trump)
 					}
 				}
 				// TODO: find all the cards that can beat the lead card and set those in the HandTracker
@@ -339,11 +335,15 @@ type Trick struct {
 	winningPlayer int
 	certain       bool
 	playCount     int
-	lead          sdz.Suit
+	lead          int
 }
 
 func (t *Trick) String() string {
-	return fmt.Sprintf("[%s %s %s %s] playCount=%d Winning=%s Lead=%s certain=%v", t.played[0], t.played[1], t.played[2], t.played[3], t.playCount, t.winningCard(), t.lead, t.certain)
+	winningCard := sdz.Card("N/A")
+	if t.winningPlayer != -1 {
+		winningCard = t.winningCard()
+	}
+	return fmt.Sprintf("[%s %s %s %s] playCount=%d Winning=%s Lead=%s certain=%v", t.played[0], t.played[1], t.played[2], t.played[3], t.playCount, winningCard, t.lead, t.certain)
 }
 
 func NewTrick() *Trick {
@@ -353,8 +353,18 @@ func NewTrick() *Trick {
 	return trick
 }
 
+func (trick *Trick) leadSuit() sdz.Suit {
+	if leadCard, ok := trick.played[trick.lead]; ok {
+		return leadCard.Suit()
+	}
+	return sdz.NASuit
+}
+
 func (trick *Trick) winningCard() sdz.Card {
-	return trick.played[trick.winningPlayer]
+	if winningCard, ok := trick.played[trick.winningPlayer]; ok {
+		return winningCard
+	}
+	return sdz.NACard
 }
 
 func (trick *Trick) counters() (counters int) {
@@ -409,9 +419,18 @@ func (trick *Trick) worth(playerid int, trump sdz.Suit) (worth int) {
 	return
 }
 
+func CardBeatsTrick(card sdz.Card, trick *Trick, trump sdz.Suit) bool {
+	winningCard, ok := trick.played[trick.winningPlayer]
+	if !ok {
+		return true
+	}
+	return card.Beats(winningCard, trump)
+}
+
 // PRE Condition: Initial call, trick.certain should be "true" - the cards have already been played
 func rankCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) *Trick {
-	decisionMap := potentialCards(playerid, ht, trick.winningCard(), trick.lead, trump)
+	sdz.Log("Player%d rankCard on trick %s", playerid, trick)
+	decisionMap := potentialCards(playerid, ht, trick.winningCard(), trick.leadSuit(), trump)
 	if len(decisionMap) == 0 {
 		debug.PrintStack()
 		sdz.Log("%#v", ht)
@@ -429,7 +448,7 @@ func rankCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) *Tric
 		for x := range tempTrick.played { // now copy the map
 			trick.played[x] = tempTrick.played[x]
 		}
-		if tempTrick.winningCard() != "" && card.Beats(tempTrick.winningCard(), trump) {
+		if CardBeatsTrick(card, tempTrick, trump) {
 			tempTrick.winningPlayer = playerid
 			if _, ok := ht.cards[playerid][card]; !ok {
 				tempTrick.certain = false
@@ -513,7 +532,8 @@ func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 //}
 
 func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Suit, trump sdz.Suit) map[sdz.Card]bool {
-	sdz.Log("PotentialCards called with %d,winning=%s,lead=%s,trump=%s,ht=%#v", playerid, winning, lead, trump, ht)
+	sdz.Log("PotentialCards called with %d,winning=%s,lead=%s,trump=%s", playerid, winning, lead, trump)
+	sdz.Log("PotentialCards Player%d - %#v", playerid, ht.cards[playerid])
 	trueHand := make(sdz.Hand, 0)
 	potentialHand := make(sdz.Hand, 0)
 	for _, card := range sdz.AllCards() {
@@ -524,6 +544,8 @@ func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Su
 			potentialHand = append(potentialHand, card)
 		}
 	}
+	sdz.Log("TrueHand = %#v", trueHand)
+	sdz.Log("PotentialHand = %#v", potentialHand)
 	validHand := make(sdz.Hand, 0)
 	decisionMap := make(map[sdz.Card]bool)
 	for _, card := range trueHand {
@@ -533,6 +555,7 @@ func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Su
 			continue
 		}
 	}
+	sdz.Log("validHand = %#v", validHand)
 	for _, card := range potentialHand {
 		tempHand := append(validHand, card)
 		if sdz.ValidPlay(card, winning, lead, &tempHand, trump) {

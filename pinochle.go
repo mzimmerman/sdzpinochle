@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/rand"
 	"reflect"
-	"runtime/debug"
 	"sort"
 	"time"
 )
@@ -31,6 +30,9 @@ const (
 	kingaround  = 8
 	queenaround = 6
 	jackaround  = 4
+	NACard      = Card("NA")
+	NASuit      = Suit("N")
+	NAFace      = Face("F")
 )
 
 func AllCards() []Card {
@@ -61,22 +63,19 @@ type Deck [48]Card
 type Hand []Card
 
 func CreateCard(suit Suit, face Face) Card {
-	if suit == "" {
-		debug.PrintStack()
-		panic("Suit not set")
+	if suit == NASuit {
+		return NACard
 	}
-	if face == "" {
-		debug.PrintStack()
-		panic("Face not set")
+	if face == NAFace {
+		return NACard
 	}
 	return Card(string(face) + string(suit))
 }
 
 func (a Card) Beats(b Card, trump Suit) bool {
 	// a is the challenging card
-	if b == "" {
-		debug.PrintStack()
-		panic("Card is not set")
+	if b == NACard {
+		return true
 	}
 	switch {
 	case a.Suit() == b.Suit():
@@ -92,17 +91,15 @@ func (c Card) Counter() bool {
 }
 
 func (c Card) Suit() Suit {
-	if c == "" {
-		debug.PrintStack()
-		panic("Card is not set")
+	if c == NACard {
+		return NASuit
 	}
 	return Suit(c[1])
 }
 
 func (c Card) Face() Face {
-	if c == "" {
-		debug.PrintStack()
-		panic("Card is not set")
+	if c == NACard {
+		return NAFace
 	}
 	return Face(c[0])
 }
@@ -408,7 +405,7 @@ func ValidPlay(playedCard, winningCard Card, leadSuit Suit, hand *Hand, trump Su
 	if !hasCard { // you don't have the card in your hand, not allowed to play it, cheater!
 		return false
 	}
-	if winningCard == "" { // nothing to follow so far
+	if winningCard == NACard { // nothing to follow so far, so you win!
 		return true
 	}
 

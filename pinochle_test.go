@@ -110,6 +110,8 @@ func (t *testSuite) TestValidPlay() {
 	t.True(ValidPlay(C("JD"), C("KD"), Clubs, &hand, Diamonds))
 	hand.Remove(C("QS"))
 	t.True(ValidPlay(C("JD"), C("9S"), Spades, &hand, Clubs))
+	t.False(ValidPlay(C("9S"), NACard, NASuit, &hand, Clubs))
+	t.True(ValidPlay(C("9D"), NACard, NASuit, &hand, Clubs))
 }
 
 func (t *testSuite) TestCount() {

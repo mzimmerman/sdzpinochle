@@ -67,7 +67,7 @@ func (t *testSuite) TestPotentialCards() {
 	delete(ht.cards[0], C("AD"))
 	ht.cards[0][C("TD")] = 1
 	ht.cards[0][C("KD")] = 2
-	potentials := potentialCards(0, ht, "", "", sdz.Spades)
+	potentials := potentialCards(0, ht, sdz.NACard, sdz.NASuit, sdz.Spades)
 	t.True(potentials[C("AD")])
 	t.True(potentials[C("TD")])
 	t.True(potentials[C("KD")])
@@ -117,7 +117,7 @@ func (t *testSuite) TestPotentialCards() {
 	ht.cards[0][C("9H")] = 1
 	ht.cards[0][C("KS")] = 1
 	ht.cards[0][C("QS")] = 1
-	potentials = potentialCards(0, ht, "", "", sdz.Hearts)
+	potentials = potentialCards(0, ht, sdz.NACard, sdz.NASuit, sdz.Hearts)
 	t.Equal(11, len(potentials))
 
 	//Playerid:2, Bid:0, PlayedCard:"", WinningCard:"JS", Lead:"S", Trump:"C", Amount:0, Message:"", Hand:sdzpinochle.Hand{"TD", "TD", "QD", "JD", "9D", "9D", "JS"}, Option:0, GameOver:false, Win:false, Score:[]int(nil), Dealer:0, WinningPlayer:0}
@@ -197,7 +197,7 @@ func (t *testSuite) TestRankCard() {
 	trick.played[1] = C("AD")
 	trick.played[2] = C("KD")
 	trick.winningPlayer = 0
-	trick.lead = sdz.Diamonds
+	trick.lead = 0
 	// 3 has options of KD
 	victim := rankCard(3, ht, trick, sdz.Diamonds)
 	t.Equal(C("AD"), victim.played[0])
@@ -211,7 +211,7 @@ func (t *testSuite) TestRankCard() {
 	trick.played[0] = C("AD")
 	trick.played[1] = C("AD")
 	trick.winningPlayer = 0
-	trick.lead = sdz.Diamonds
+	trick.lead = 0
 	// 2 has real options of KD, TD, QD
 	// 3 has real options of KD
 	victim = rankCard(2, ht, trick, sdz.Diamonds)
@@ -226,7 +226,7 @@ func (t *testSuite) TestRankCard() {
 	trick.played[0] = C("TD")
 	trick.played[1] = C("AD")
 	trick.winningPlayer = 1
-	trick.lead = sdz.Diamonds
+	trick.lead = 0
 	ht.cards[2][C("9D")] = 0
 	// 2 has real options of KD, TD, QD and no option of a 9D
 	ht.cards[3][C("KD")] = 1
@@ -318,7 +318,7 @@ func (t *testSuite) TestAITracking() {
 	t.Equal(0, ai.ht.playedCards[C("QS")])
 
 	ai.trump = sdz.Spades
-	ai.trick.lead = sdz.Diamonds
+	ai.trick.lead = 0
 	ai.Tell(sdz.CreatePlay(C("JD"), 1))
 	ai.Tell(sdz.CreatePlay(C("KD"), 2))
 	ai.Tell(sdz.CreatePlay(C("AD"), 3))
