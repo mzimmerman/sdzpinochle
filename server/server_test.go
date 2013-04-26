@@ -141,7 +141,21 @@ func (t *testSuite) TestPotentialCards() {
 	t.True(potentials[C("JS")])
 	t.False(potentials[C("TD")])
 
-	//PotentialCards called with 0,winning=AS,lead=D,trump=C,ht=&main.HandTracker{cards:[4]map[sdzpinochle.Card]int{map[sdzpinochle.Card]int{"9C":0, "AC":0, "AS":0, "KD":0, "QD":0, "QS":0, "TH":0, "JC":0, "AD":0, "9D":0, "KC":0, "TS":0, "9H":0, "TC":0, "TD":0, "QH":0, "9S":0, "JD":0, "QC":0, "KH":0, "JH":0, "KS":0, "AH":0, "JS":0}, map[sdzpinochle.Card]int{"9C":0, "QC":0, "9D":0, "AH":0, "AC":0, "QH":1, "JD":0, "KS":0, "JC":0, "AS":0, "KC":0, "TH":0, "TC":0, "QS":0, "KH":0, "TS":0}, map[sdzpinochle.Card]int{"KS":0, "JD":0, "JC":0, "TH":0, "KH":0, "AS":0, "QD":0, "TC":0, "AC":0, "AH":0, "QH":0, "9C":0, "KD":1, "QC":0, "9D":0, "KC":0, "QS":0, "TS":0}, map[sdzpinochle.Card]int{"TH":0, "AS":0, "AH":0, "TS":0, "KC":0, "9C":0, "QS":0, "TC":0, "9D":0, "AC":0, "KS":0, "QC":0, "KH":0, "JD":0, "QH":0, "JC":0}}, playedCards:map[sdzpinochle.Card]int{"KH":2, "KD":0, "JC":2, "AH":2, "TH":2, "TD":1, "9S":1, "TC":2, "9D":2, "AS":2, "KS":2, "JS":1, "QC":2, "KC":2, "QD":1, "QS":2, "9H":1, "QH":1, "AD":0, "JD":2, "AC":2, "JH":1, "9C":2, "TS":2}}
+	//PotentialCards called with 0,winning=AS,lead=D,trump=C,
+	//ht=&main.HandTracker{cards:[4]map[sdzpinochle.Card]int{map[sdzpinochle.Card]int{"9C":0, "AC":0, "AS":0, "KD":0, "QD":0, "QS":0, "TH":0, "JC":0, "AD":0, "9D":0, "KC":0, "TS":0, "9H":0, "TC":0, "TD":0, "QH":0, "9S":0, "JD":0, "QC":0, "KH":0, "JH":0, "KS":0, "AH":0, "JS":0}, map[sdzpinochle.Card]int{"9C":0, "QC":0, "9D":0, "AH":0, "AC":0, "QH":1, "JD":0, "KS":0, "JC":0, "AS":0, "KC":0, "TH":0, "TC":0, "QS":0, "KH":0, "TS":0}, map[sdzpinochle.Card]int{"KS":0, "JD":0, "JC":0, "TH":0, "KH":0, "AS":0, "QD":0, "TC":0, "AC":0, "AH":0, "QH":0, "9C":0, "KD":1, "QC":0, "9D":0, "KC":0, "QS":0, "TS":0}, map[sdzpinochle.Card]int{"TH":0, "AS":0, "AH":0, "TS":0, "KC":0, "9C":0, "QS":0, "TC":0, "9D":0, "AC":0, "KS":0, "QC":0, "KH":0, "JD":0, "QH":0, "JC":0}}, playedCards:map[sdzpinochle.Card]int{"KH":2, "KD":0, "JC":2, "AH":2, "TH":2, "TD":1, "9S":1, "TC":2, "9D":2, "AS":2, "KS":2, "JS":1, "QC":2, "KC":2, "QD":1, "QS":2, "9H":1, "QH":1, "AD":0, "JD":2, "AC":2, "JH":1, "9C":2, "TS":2}}
+	//ht = NewHandTracker(0, make(sdz.Hand, 0))
+	//for _, card := range sdz.AllCards() {
+	//	ht.cards[0][card] = 0
+	//}
+	//ht.cards[0][C("TD")] = 2
+	//ht.cards[0][C("9D")] = 2
+	//ht.cards[0][C("QD")] = 1
+	//ht.cards[0][C("JD")] = 1
+	//ht.cards[0][C("JS")] = 1
+	//potentials = potentialCards(0, ht, C("JS"), sdz.Spades, sdz.Clubs)
+	//t.Equal(1, len(potentials))
+	//t.True(potentials[C("JS")])
+	//t.False(potentials[C("TD")])
 
 }
 
@@ -183,8 +197,9 @@ func (t *testSuite) TestRankCard() {
 	trick.played[1] = C("AD")
 	trick.played[2] = C("KD")
 	trick.winningPlayer = 0
+	trick.lead = sdz.Diamonds
 	// 3 has options of KD
-	victim := rankCard(3, ht, trick, sdz.Diamonds, sdz.Diamonds)
+	victim := rankCard(3, ht, trick, sdz.Diamonds)
 	t.Equal(C("AD"), victim.played[0])
 	t.Equal(C("AD"), victim.played[1])
 	t.Equal(C("KD"), victim.played[2])
@@ -196,9 +211,10 @@ func (t *testSuite) TestRankCard() {
 	trick.played[0] = C("AD")
 	trick.played[1] = C("AD")
 	trick.winningPlayer = 0
+	trick.lead = sdz.Diamonds
 	// 2 has real options of KD, TD, QD
 	// 3 has real options of KD
-	victim = rankCard(2, ht, trick, sdz.Diamonds, sdz.Diamonds)
+	victim = rankCard(2, ht, trick, sdz.Diamonds)
 	t.Equal(C("AD"), victim.played[0])
 	t.Equal(C("AD"), victim.played[1])
 	t.Equal(C("KD"), victim.played[2])
@@ -210,6 +226,7 @@ func (t *testSuite) TestRankCard() {
 	trick.played[0] = C("TD")
 	trick.played[1] = C("AD")
 	trick.winningPlayer = 1
+	trick.lead = sdz.Diamonds
 	ht.cards[2][C("9D")] = 0
 	// 2 has real options of KD, TD, QD and no option of a 9D
 	ht.cards[3][C("KD")] = 1
@@ -218,7 +235,7 @@ func (t *testSuite) TestRankCard() {
 	ht.cards[3][C("9D")] = 1
 	ht.cards[3][C("QD")] = 1
 	// 3 has options of KD, TD, AD, 9D, and QD
-	victim = rankCard(2, ht, trick, sdz.Diamonds, sdz.Diamonds)
+	victim = rankCard(2, ht, trick, sdz.Diamonds)
 	sdz.Log("victim = %s", victim)
 	t.Equal(C("TD"), victim.played[0])
 	t.Equal(C("AD"), victim.played[1])
@@ -281,7 +298,57 @@ func (t *testSuite) TestWorth() {
 
 }
 
-func (t *testSuite) TestTracking() {
+func (t *testSuite) TestAITracking() {
+	ai := createAI()
+	hand := sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AD"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
+	go ai.Go()
+	ai.SetHand(hand, 0, 0)
+	ai.Tell(sdz.CreateMeld(sdz.Hand{C("JD"), C("QS")}, 4, 1))
+	ai.Tell(sdz.CreateMeld(sdz.Hand{C("JD"), C("QS")}, 4, 2))
+	ai.Tell(sdz.CreateMeld(sdz.Hand{}, 0, 3))
+	sdz.Log("StartTest")
+	ai.ht.calculate()
+	sdz.Log("EndTest")
+	t.Equal(1, ai.ht.cards[1][C("JD")])
+	t.Equal(1, ai.ht.cards[1][C("QS")])
+	t.Equal(1, ai.ht.cards[2][C("JD")])
+	t.Equal(1, ai.ht.cards[2][C("QS")])
+	t.Equal(0, ai.ht.cards[3][C("QS")])
+	t.Equal(0, ai.ht.playedCards[C("JD")])
+	t.Equal(0, ai.ht.playedCards[C("QS")])
+
+	ai.trump = sdz.Spades
+	ai.trick.lead = sdz.Diamonds
+	ai.Tell(sdz.CreatePlay(C("JD"), 1))
+	ai.Tell(sdz.CreatePlay(C("KD"), 2))
+	ai.Tell(sdz.CreatePlay(C("AD"), 3))
+	ai.ht.calculate()
+	t.Equal(0, ai.ht.cards[1][C("JD")])
+	t.Equal(1, ai.ht.cards[1][C("QS")])
+	t.Equal(1, ai.ht.cards[2][C("JD")])
+	t.Equal(1, ai.ht.cards[2][C("QS")])
+	t.Equal(0, ai.ht.cards[3][C("QS")])
+	t.Equal(1, ai.ht.playedCards[C("JD")])
+	t.Equal(0, ai.ht.playedCards[C("QS")])
+	t.Equal(1, ai.ht.playedCards[C("KD")])
+	t.Equal(1, ai.ht.playedCards[C("AD")])
+}
+
+func (t *testSuite) TestNoSuit() {
+	ht := NewHandTracker(0, sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AD"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")})
+	ht.cards[1][C("9D")] = 1
+	ht.noSuit(1, sdz.Diamonds)
+	ht.calculate()
+	t.Equal(0, ht.cards[1][C("9D")])
+	t.Equal(0, ht.cards[1][C("JD")])
+	t.Equal(0, ht.cards[1][C("QD")])
+	t.Equal(0, ht.cards[1][C("KD")])
+	t.Equal(0, ht.cards[1][C("TD")])
+	t.Equal(0, ht.cards[1][C("AD")])
+	t.Equal(0, ht.cards[1][C("AS")])
+}
+
+func (t *testSuite) TestCalculate() {
 	hand := sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AD"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
 	sort.Sort(hand)
 	ai := createAI()

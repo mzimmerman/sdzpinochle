@@ -559,8 +559,6 @@ func (game *Game) Go(players []Player) {
 						winningPlayer = next
 					}
 				}
-				action.Lead = leadSuit
-				action.Trump = game.Trump
 				game.Broadcast(action, next)
 				next = (next + 1) % 4
 			}

@@ -70,6 +70,10 @@ func (ht *HandTracker) populate(playerid int, hand sdz.Hand) {
 }
 
 func (ht *HandTracker) noSuit(playerid int, suit sdz.Suit) {
+	if suit == "" {
+		debug.PrintStack()
+		panic("Suit not set")
+	}
 	for _, face := range sdz.Faces() {
 		ht.cards[playerid][sdz.CreateCard(suit, face)] = 0
 	}
@@ -119,6 +123,11 @@ func (ht *HandTracker) calculate() {
 			}
 		}
 	}
+	sdz.Log("After calculate() - %v", ht.playedCards)
+	for x := 0; x < 4; x++ {
+		sdz.Log("Player%d - %v", x, ht.cards[x])
+	}
+
 }
 
 type AI struct {
@@ -249,14 +258,19 @@ func (ai *AI) Go() {
 				ai.ht.cards[ai.Playerid()][action.PlayedCard]--
 				ai.c <- action
 			} else {
+				if ai.trick.lead == "" {
+					ai.trick.lead = action.PlayedCard.Suit()
+					sdz.Log("Player%d - Set lead to %s", ai.trick.lead)
+				}
+				sdz.Log("Player%d - ai.trick.lead = %s", ai.Playerid(), ai.trick.lead)
 				ai.trick.playCount++
 				ai.ht.playedCards[action.PlayedCard]++
 				ai.trick.played[action.Playerid] = action.PlayedCard
 				if _, ok := ai.ht.cards[action.Playerid][action.PlayedCard]; ok {
 					ai.ht.cards[action.Playerid][action.PlayedCard]--
 				}
-				if action.PlayedCard.Suit() != action.Lead {
-					ai.ht.noSuit(action.Playerid, action.Lead)
+				if action.PlayedCard.Suit() != ai.trick.lead {
+					ai.ht.noSuit(action.Playerid, ai.trick.lead)
 					if action.PlayedCard.Suit() != action.Trump {
 						ai.ht.noSuit(action.Playerid, action.Trump)
 					}
@@ -283,6 +297,7 @@ func (ai *AI) Go() {
 			Log("Player %d saw that player %d threw in", ai.Playerid(), action.Playerid)
 		case "Deal": // nothing to do here, this is set automagically
 		case "Meld":
+			sdz.Log("Received meld action - %#v", action)
 			if action.Playerid == ai.Playerid() {
 				continue // seeing our own meld, we don't care
 			}
@@ -324,10 +339,11 @@ type Trick struct {
 	winningPlayer int
 	certain       bool
 	playCount     int
+	lead          sdz.Suit
 }
 
 func (t *Trick) String() string {
-	return fmt.Sprintf("[%s %s %s %s] playCount=%d Winning=%s certain=%v", t.played[0], t.played[1], t.played[2], t.played[3], t.playCount, t.winningCard(), t.certain)
+	return fmt.Sprintf("[%s %s %s %s] playCount=%d Winning=%s Lead=%s certain=%v", t.played[0], t.played[1], t.played[2], t.played[3], t.playCount, t.winningCard(), t.lead, t.certain)
 }
 
 func NewTrick() *Trick {
@@ -394,8 +410,8 @@ func (trick *Trick) worth(playerid int, trump sdz.Suit) (worth int) {
 }
 
 // PRE Condition: Initial call, trick.certain should be "true" - the cards have already been played
-func rankCard(playerid int, ht *HandTracker, trick *Trick, lead, trump sdz.Suit) *Trick {
-	decisionMap := potentialCards(playerid, ht, trick.winningCard(), lead, trump)
+func rankCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) *Trick {
+	decisionMap := potentialCards(playerid, ht, trick.winningCard(), trick.lead, trump)
 	if len(decisionMap) == 0 {
 		debug.PrintStack()
 		sdz.Log("%#v", ht)
@@ -422,7 +438,7 @@ func rankCard(playerid int, ht *HandTracker, trick *Trick, lead, trump sdz.Suit)
 		tempTrick.played[playerid] = card
 		if tempTrick.playCount < 3 {
 			tempTrick.playCount++
-			tempTrick = rankCard(nextPlayer, ht, tempTrick, lead, trump)
+			tempTrick = rankCard(nextPlayer, ht, tempTrick, trump)
 		}
 		sdz.Log("Playerid = %d - Top = %s, Temp = %s", playerid, topTrick, tempTrick)
 		if topTrick == nil {
@@ -453,7 +469,8 @@ func rankCard(playerid int, ht *HandTracker, trick *Trick, lead, trump sdz.Suit)
 func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	ai.trick.certain = true
 	ai.ht.calculate() // make sure we're making a decision based on the most up-to-date information
-	ai.trick = rankCard(ai.Playerid(), ai.ht, ai.trick, action.Lead, action.Trump)
+	sdz.Log("Before rankCard as player %d", ai.Playerid())
+	ai.trick = rankCard(ai.Playerid(), ai.ht, ai.trick, ai.trump)
 	sdz.Log("Playerid %d choosing card %s", ai.Playerid(), ai.trick.played[ai.Playerid()])
 	return ai.trick.played[ai.Playerid()]
 }
