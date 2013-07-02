@@ -308,7 +308,16 @@ func (ai *AI) Go() {
 			}
 		case "Throwin":
 			Log("Player %d saw that player %d threw in", ai.Playerid(), action.Playerid)
-		case "Deal": // nothing to do here, this is set automagically
+		case "Deal":
+			ai.hand = &action.Hand
+			ai.Id = action.Playerid
+			Log("Setting playerid to %d", ai.Id)
+			ai.highBid = 20
+			ai.highBid = action.Dealer
+			ai.numBidders = 0
+			ai.ht = NewHandTracker(ai.Id, *ai.hand)
+			ai.trick = NewTrick()
+			ai.trick.playCount = 0
 		case "Meld":
 			sdz.Log("Received meld action - %#v", action)
 			if action.Playerid == ai.Playerid() {
@@ -672,14 +681,7 @@ func (a AI) Hand() *sdz.Hand {
 func (a *AI) SetHand(h sdz.Hand, dealer, playerid int) {
 	hand := make(sdz.Hand, len(h))
 	copy(hand, h)
-	a.hand = &hand
-	a.Id = playerid
-	a.highBid = 20
-	a.highBidder = dealer
-	a.numBidders = 0
-	a.ht = NewHandTracker(playerid, h)
-	a.trick = NewTrick()
-	a.trick.playCount = 0
+	a.Tell(sdz.CreateDeal(hand, playerid, dealer))
 }
 
 type Human struct {

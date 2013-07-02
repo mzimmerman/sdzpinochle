@@ -29,6 +29,7 @@ func (t *testSuite) TestRemove() {
 	hand := sdz.Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")}
 	sort.Sort(hand)
 	ai := createAI()
+	go ai.Go()
 	ai.SetHand(hand, 0, 0)
 	t.Equal(12, len(*ai.Hand()))
 	t.True(ai.Hand().Remove(C("JD")))
@@ -42,8 +43,8 @@ func (t *testSuite) TestBidding() {
 	hand := sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AD"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
 	sort.Sort(hand)
 	ai := createAI()
-	ai.SetHand(hand, 0, 1)
 	go ai.Go()
+	ai.SetHand(hand, 0, 1)
 	ai.Tell(sdz.CreateBid(0, 1))
 	action, _ := ai.Listen()
 	t.Not(t.True(22 > action.Bid || action.Bid > 24))
@@ -180,6 +181,7 @@ func (t *testSuite) TestPotentialCards() {
 func (t *testSuite) TestFindCardToPlay() {
 	//func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	ai := createAI()
+	go ai.Go()
 	ai.SetHand(sdz.Hand{C("AD"), C("AD"), C("TD"), C("JD"), C("TC"), C("KC"), C("QC"), C("TH"), C("JH"), C("9H"), C("KS"), C("QS")}, 0, 3)
 	ai.ht.cards[0][C("KH")] = 1
 	ai.ht.cards[0][C("QH")] = 1
@@ -190,8 +192,7 @@ func (t *testSuite) TestFindCardToPlay() {
 	action := sdz.CreatePlayRequest(sdz.NACard, sdz.NASuit, sdz.Hearts, 3, ai.Hand())
 	card := ai.findCardToPlay(action)
 	sdz.Log("card = %v", card)
-	t.True(card == C("QC") || card == C("QS"))
-
+	t.True(card == C("TD"))
 }
 
 func (t *testSuite) TestRankCard() {
@@ -336,9 +337,11 @@ func (t *testSuite) TestAITracking() {
 	t.Equal(0, ai.ht.playedCards[C("QS")])
 	t.Equal(0, ai.ht.playedCards[C("QD")])
 	t.Equal(1, ai.ht.cards[1][C("QD")])
+	t.Equal(0, ai.ht.cards[2][C("QD")])
+	t.Equal(0, ai.ht.cards[3][C("QD")])
 	t.Equal(1, ai.ht.cards[1][C("KD")])
 
-	ai.trick.lead = 0
+	ai.trick.lead = 1
 	ai.Tell(sdz.CreatePlay(C("JD"), 1))
 	ai.Tell(sdz.CreatePlay(C("KD"), 2))
 	ai.Tell(sdz.CreatePlay(C("AD"), 3))
@@ -358,16 +361,18 @@ func (t *testSuite) TestAITracking() {
 	t.Equal(1, ai.ht.playedCards[C("KD")])
 	t.Equal(1, ai.ht.playedCards[C("AD")])
 
-	ai.trick.lead = 0
+	ai.trick.lead = 1
 	ai.Tell(sdz.CreatePlay(C("QD"), 1))
 	ai.Tell(sdz.CreatePlay(C("9H"), 2))
 	ai.Tell(sdz.CreatePlay(C("9H"), 3))
 	val, ok = ai.ht.cards[1][C("QD")]
 	t.False(ok)
 	t.Equal(0, val)
-	val, ok = ai.ht.cards[1][C("JD")]
+	val, ok = ai.ht.cards[1][C("QD")]
 	t.False(ok)
 	t.Equal(0, val)
+
+	ai.Close()
 
 	ai = createAI()
 	hand = sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AS"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
@@ -396,6 +401,8 @@ func (t *testSuite) TestAITracking() {
 	t.Equal(C("TD"), play.PlayedCard)
 	ai.Tell(sdz.CreateTrick(0))
 	ai.ht.calculate()
+
+	ai.Close()
 }
 
 func (t *testSuite) TestNoSuit() {
@@ -416,6 +423,7 @@ func (t *testSuite) TestCalculate() {
 	hand := sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AD"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
 	sort.Sort(hand)
 	ai := createAI()
+	go ai.Go()
 	ai.SetHand(hand, 0, 1)
 	for x := 0; x < 4; x++ {
 		if x == 1 {
