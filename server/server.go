@@ -84,13 +84,15 @@ func (ht *HandTracker) calculate() {
 		for _, face := range sdz.Faces() {
 			card := sdz.CreateCard(suit, face)
 			sum := ht.playedCards[card]
+			//sdz.Log("htcardset - Sum for %s is %d", card, sum)
 			for x := 0; x < 4; x++ {
 				if val, ok := ht.cards[x][card]; ok {
 					sum += val
+					//sdz.Log("htcardsetIterative%d - Sum for %s is now %d", x, card, sum)
 				}
 			}
 			if sum > 2 || sum < 0 {
-				sdz.Log("Card=%s,sum=%d", card, sum)
+				sdz.Log("htcardset - Card=%s,sum=%d", card, sum)
 				debug.PrintStack()
 				panic("Cannot have more cards than 2 or less than 0 - " + string(sum))
 			}
@@ -250,24 +252,39 @@ func (ai *AI) Go() {
 			sdz.Log("Received action - %#v", action)
 			if action.Playerid == ai.Playerid() {
 				action = sdz.CreatePlay(ai.findCardToPlay(action), ai.Playerid())
+				sdz.Log("Player%d is playing %s", ai.Playerid(), action.PlayedCard)
 				ai.ht.playedCards[action.PlayedCard]++
+				sdz.Log("htcardsetPlayed - Player%d set %s to %d", ai.Playerid(), action.PlayedCard, ai.ht.playedCards[action.PlayedCard])
 				ai.ht.cards[ai.Playerid()][action.PlayedCard]--
+				sdz.Log("htcardsetSelf - Player%d set Player%d's %s to %d", ai.Playerid(), action.Playerid, action.PlayedCard, ai.ht.cards[action.Playerid][action.PlayedCard])
+				sdz.Log("Sending action - %#v", action)
 				ai.c <- action
 			} else {
-				if ai.trick.leadSuit() == sdz.NASuit {
+				if ai.trick.leadSuit() == sdz.NASuit || ai.trick.winningCard() == sdz.NACard {
 					ai.trick.lead = action.Playerid
-					sdz.Log("Player%d - Set lead to %d", ai.trick.lead)
+					ai.trick.winningPlayer = action.Playerid
+					sdz.Log("Player%d - Set lead to %s", ai.Playerid(), ai.trick.leadSuit())
 				}
-				sdz.Log("Player%d - ai.trick.lead = %d", ai.Playerid(), ai.trick.lead)
 				ai.trick.playCount++
 				ai.ht.playedCards[action.PlayedCard]++
+				sdz.Log("htcardsetPlayed - Player%d set %s to %d", ai.Playerid(), action.PlayedCard, ai.ht.playedCards[action.PlayedCard])
 				ai.trick.played[action.Playerid] = action.PlayedCard
-				if _, ok := ai.ht.cards[action.Playerid][action.PlayedCard]; ok {
-					ai.ht.cards[action.Playerid][action.PlayedCard]--
+				if val, ok := ai.ht.cards[action.Playerid][action.PlayedCard]; ok {
+					if val != 0 {
+						ai.ht.cards[action.Playerid][action.PlayedCard]--
+					}
+					sdz.Log("htcardset - Player%d set Player%d's %s to %d", ai.Playerid(), action.Playerid, action.PlayedCard, ai.ht.cards[action.Playerid][action.PlayedCard])
+					if val == 1 && ai.ht.playedCards[action.PlayedCard] == 1 {
+						// He could have only shown one in meld, but has two - now we don't know who has the last one
+						sdz.Log("htcardset - deleted card")
+						delete(ai.ht.cards[action.Playerid], action.PlayedCard)
+					}
 				}
 				if action.PlayedCard.Suit() != ai.trick.leadSuit() {
 					ai.ht.noSuit(action.Playerid, ai.trick.leadSuit())
-					if action.PlayedCard.Suit() != ai.trump {
+					sdz.Log("nofollow - Player%d calling nosuit on Player%d on suit %s", ai.Playerid(), action.Playerid, ai.trick.leadSuit())
+					if ai.trick.leadSuit() != ai.trump && action.PlayedCard.Suit() != ai.trump {
+						sdz.Log("notrump - Player%d calling nosuit on Player%d on suit %s", ai.Playerid(), action.Playerid, ai.trick.leadSuit())
 						ai.ht.noSuit(action.Playerid, ai.trump)
 					}
 				}
@@ -339,11 +356,7 @@ type Trick struct {
 }
 
 func (t *Trick) String() string {
-	winningCard := sdz.Card("N/A")
-	if t.winningPlayer != -1 {
-		winningCard = t.winningCard()
-	}
-	return fmt.Sprintf("[%s %s %s %s] playCount=%d Winning=%s Lead=%s certain=%v", t.played[0], t.played[1], t.played[2], t.played[3], t.playCount, winningCard, t.lead, t.certain)
+	return fmt.Sprintf("[%s %s %s %s] playCount=%d Winning=%s Lead=%s certain=%v", t.played[0], t.played[1], t.played[2], t.played[3], t.playCount, t.winningCard(), t.leadSuit(), t.certain)
 }
 
 func NewTrick() *Trick {
@@ -487,6 +500,7 @@ func rankCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) *Tric
 
 func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	ai.trick.certain = true
+	sdz.Log("htcardset - Player%d is calculating", ai.Playerid())
 	ai.ht.calculate() // make sure we're making a decision based on the most up-to-date information
 	sdz.Log("Before rankCard as player %d", ai.Playerid())
 	ai.trick = rankCard(ai.Playerid(), ai.ht, ai.trick, ai.trump)
