@@ -29,7 +29,6 @@ func (t *testSuite) TestRemove() {
 	hand := sdz.Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")}
 	sort.Sort(hand)
 	ai := createAI()
-	go ai.Go()
 	ai.SetHand(hand, 0, 0)
 	t.Equal(12, len(*ai.Hand()))
 	t.True(ai.Hand().Remove(C("JD")))
@@ -43,22 +42,20 @@ func (t *testSuite) TestBidding() {
 	hand := sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AD"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
 	sort.Sort(hand)
 	ai := createAI()
-	go ai.Go()
 	ai.SetHand(hand, 0, 1)
 	ai.Tell(sdz.CreateBid(0, 1))
 	action, _ := ai.Listen()
 	t.Not(t.True(22 > action.Bid || action.Bid > 24))
 }
 
-func (t *testSuite) TestFullGame() {
-	game := new(sdz.Game)
-	players := make([]sdz.Player, 4)
-	for x := 0; x < len(players); x++ {
-		players[x] = createAI()
-		go players[x].Go() // the humans will just start and die immediately
-	}
-	game.Go(players)
-}
+//func (t *testSuite) TestFullGame() {
+//	game := new(sdz.Game)
+//	players := make([]sdz.Player, 4)
+//	for x := 0; x < len(players); x++ {
+//		players[x] = createAI()
+//	}
+//	game.Go(players)
+//}
 
 func (t *testSuite) TestPotentialCards() {
 	ht := NewHandTracker(0, make(sdz.Hand, 0))
@@ -181,7 +178,6 @@ func (t *testSuite) TestPotentialCards() {
 func (t *testSuite) TestFindCardToPlay() {
 	//func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	ai := createAI()
-	go ai.Go()
 	ai.SetHand(sdz.Hand{C("AD"), C("AD"), C("TD"), C("JD"), C("TC"), C("KC"), C("QC"), C("TH"), C("JH"), C("9H"), C("KS"), C("QS")}, 0, 3)
 	ai.ht.cards[0][C("KH")] = 1
 	ai.ht.cards[0][C("QH")] = 1
@@ -321,7 +317,6 @@ func (t *testSuite) TestWorth() {
 func (t *testSuite) TestAITracking() {
 	ai := createAI()
 	hand := sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AD"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
-	go ai.Go()
 	ai.SetHand(hand, 0, 0)
 	ai.trump = sdz.Spades
 	ai.Tell(sdz.CreateMeld(sdz.Hand{C("JD"), C("QS"), C("KD"), C("QD")}, 6, 1))
@@ -346,7 +341,7 @@ func (t *testSuite) TestAITracking() {
 	ai.Tell(sdz.CreatePlay(C("KD"), 2))
 	ai.Tell(sdz.CreatePlay(C("AD"), 3))
 	val, ok := ai.ht.cards[1][C("JD")]
-	t.False(ok)
+	t.True(ok)
 	t.Equal(0, val)
 	ai.ht.calculate()
 	val, ok = ai.ht.cards[1][C("JD")]
@@ -366,17 +361,11 @@ func (t *testSuite) TestAITracking() {
 	ai.Tell(sdz.CreatePlay(C("9H"), 2))
 	ai.Tell(sdz.CreatePlay(C("9H"), 3))
 	val, ok = ai.ht.cards[1][C("QD")]
-	t.False(ok)
+	t.True(ok)
 	t.Equal(0, val)
-	val, ok = ai.ht.cards[1][C("QD")]
-	t.False(ok)
-	t.Equal(0, val)
-
-	ai.Close()
 
 	ai = createAI()
 	hand = sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AS"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
-	go ai.Go()
 	ai.SetHand(hand, 0, 0)
 	ai.trump = sdz.Spades
 	ai.Tell(sdz.CreateMeld(sdz.Hand{}, 0, 0))
@@ -401,8 +390,6 @@ func (t *testSuite) TestAITracking() {
 	t.Equal(C("TD"), play.PlayedCard)
 	ai.Tell(sdz.CreateTrick(0))
 	ai.ht.calculate()
-
-	ai.Close()
 }
 
 func (t *testSuite) TestNoSuit() {
@@ -423,7 +410,6 @@ func (t *testSuite) TestCalculate() {
 	hand := sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AD"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
 	sort.Sort(hand)
 	ai := createAI()
-	go ai.Go()
 	ai.SetHand(hand, 0, 1)
 	for x := 0; x < 4; x++ {
 		if x == 1 {

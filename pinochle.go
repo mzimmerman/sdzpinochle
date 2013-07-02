@@ -336,7 +336,6 @@ type Player interface {
 	Listen() (*Action, bool)
 	Hand() *Hand
 	SetHand(Hand, int, int)
-	Go()
 	Close()
 	Playerid() int
 	Team() int
@@ -458,7 +457,7 @@ func (game *Game) Go(players []Player) {
 			next = (next + 1) % 4
 			sort.Sort(hands[x])
 			game.Players[next].SetHand(hands[x], game.Dealer, next)
-			Log("Dealing player %d hand %s", next, game.Players[next].Hand())
+			//Log("Dealing player %d hand %s", next, game.Players[next].Hand())
 		}
 		// ask players to bid
 		game.HighBid = 20
@@ -468,7 +467,7 @@ func (game *Game) Go(players []Player) {
 			var bidAction *Action
 			next = (next + 1) % 4
 
-			if !(next == game.Dealer && game.HighBid == 20) { // no need to ask the dealer to bid if they've already won'
+			if !(next == game.Dealer && game.HighBid == 20) { // no need to ask the dealer to bid if they've already won
 				game.Players[next].Tell(CreateBid(0, next))
 				var open bool
 				bidAction, open = game.Players[next].Listen()
