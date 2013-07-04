@@ -118,11 +118,13 @@ func (d *Deck) Shuffle() {
 	}
 }
 
-func (h Hand) String() {
-	cards := ""
+func (h Hand) String() string {
+	cards := "Hand{"
 	for x := 0; x < len(h); x++ {
-		cards += string(h[x]) + " "
+		cards += "C(\"" + string(h[x]) + "\"),"
 	}
+	cards += "}"
+	return cards
 }
 
 func (h Hand) Len() int {

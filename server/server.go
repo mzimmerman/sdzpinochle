@@ -11,6 +11,8 @@ import (
 	"net"
 	"net/http"
 	"runtime/debug"
+	"sort"
+	"strconv"
 	"time"
 )
 
@@ -27,8 +29,12 @@ const (
 	diamonds = "D"
 )
 
-func Log(m string, v ...interface{}) {
-	fmt.Printf(m+"\n", v...)
+func Log(playerid int, m string, v ...interface{}) {
+	if playerid == 4 {
+		fmt.Printf("NP - "+m+"\n", v...)
+	} else {
+		fmt.Printf("P"+strconv.Itoa(playerid)+" - "+m+"\n", v...)
+	}
 }
 
 type HandTracker struct {
@@ -40,59 +46,80 @@ type HandTracker struct {
 	playedCards map[sdz.Card]int
 }
 
+type Decision map[sdz.Card]bool
+
+func (dec Decision) Sort() sdz.Hand {
+	hand := make(sdz.Hand, len(dec))
+	x := 0
+	for card := range dec {
+		hand[x] = card
+		x++
+	}
+	sort.Sort(hand)
+	return hand
+}
+
+type HTString map[sdz.Card]int
+
+func (hts HTString) Sort() sdz.Hand {
+	hand := make(sdz.Hand, len(hts))
+	x := 0
+	for card := range hts {
+		hand[x] = card
+		x++
+	}
+	sort.Sort(hand)
+	return hand
+}
+
+func (hts HTString) String() (output string) {
+	hand := hts.Sort()
+	for x := range hand {
+		output += fmt.Sprintf("%s:%d ", hand[x], hts[hand[x]])
+	}
+	return output
+}
+
 func (ai *AI) PlayCard(c sdz.Card, playerid int) {
-	Log("In ht.PlayCard for %d-%s on player %d", playerid, c, ai.Playerid())
-	sdz.Log("ht.playedCards = %v", ai.ht.playedCards)
+	Log(ai.Playerid(), "In ht.PlayCard for %d-%s on player %d", playerid, c, ai.Playerid())
+	Log(ai.Playerid(), "ht.playedCards = %v", HTString(ai.ht.playedCards))
 	for x := 0; x < 4; x++ {
-		sdz.Log("Player%d - %v", x, ai.ht.cards[x])
+		Log(ai.Playerid(), "Player%d - %v", x, ai.ht.cards[x])
+		Log(ai.Playerid(), "Player%d - %s", x, HTString(ai.ht.cards[x]))
 	}
 	if ai.ht.playedCards[c] >= 2 {
-		panic("Played cards cannot be greater than 2 for card")
+		Log(ai.Playerid(), "Player %d has card %s", playerid, c)
+		panic("Played cards cannot be greater than 2")
 	}
 	ai.ht.playedCards[c]++
 	if val, ok := ai.ht.cards[playerid][c]; ok {
 		if val != 0 {
 			ai.ht.cards[playerid][c]--
 		} else {
-			panic("Player is supposed to have 0 cards, how can he have played it?! " + c)
+			Log(ai.Playerid(), "Player %d has card %s", playerid, c)
+			panic("Player is supposed to have 0 cards, how can he have played it?!")
 		}
-		if val == 1 && ai.ht.playedCards[c] == 1 {
-			// He could have only shown one in meld, but has two - now we don't know who has the last one
-			sdz.Log("htcardset - deleted card %s for player %d", c, playerid)
+		if val == 1 && ai.ht.playedCards[c] == 1 && playerid != ai.Playerid() {
+			// Other player could have only shown one in meld, but has two - now we don't know who has the last one
+			Log(ai.Playerid(), "htcardset - deleted card %s for player %d", c, playerid)
 			delete(ai.ht.cards[playerid], c)
 		}
 	}
-	ai.ht.calculateCard(c)
-	sdz.Log("Player %d played card %s", playerid, c)
+	ai.calculateCard(c)
+	Log(ai.Playerid(), "Player %d played card %s", playerid, c)
 }
 
-// Returns a new HandTracker with the initial population and calculation done
-func NewHandTracker(playerid int, hand sdz.Hand) *HandTracker {
-	ht := new(HandTracker)
-	for x := 0; x < 4; x++ {
-		ht.cards[x] = make(map[sdz.Card]int)
-	}
-	ht.playedCards = make(map[sdz.Card]int)
-	for _, suit := range sdz.Suits() {
-		for _, face := range sdz.Faces() {
-			ht.playedCards[sdz.CreateCard(suit, face)] = 0
-		}
-	}
-	ht.populate(playerid, hand)
-	return ht
-}
-
-func (ht *HandTracker) populate(playerid int, hand sdz.Hand) {
+func (ai *AI) populate() {
 	for _, suit := range sdz.Suits() {
 		for _, face := range sdz.Faces() {
 			card := sdz.CreateCard(suit, face)
-			ht.cards[playerid][card] = 0
+			ai.ht.cards[ai.Playerid()][card] = 0
 		}
 	}
-	for _, card := range hand {
-		ht.cards[playerid][card]++
+	for _, card := range *ai.hand {
+		ai.ht.cards[ai.Playerid()][card]++
 	}
-	ht.calculate()
+	ai.calculate()
 }
 
 func (ht *HandTracker) noSuit(playerid int, suit sdz.Suit) {
@@ -101,13 +128,16 @@ func (ht *HandTracker) noSuit(playerid int, suit sdz.Suit) {
 	}
 }
 
-func (ht *HandTracker) calculateCard(c sdz.Card) {
-	sum := ht.playedCards[c]
-	//sdz.Log("htcardset - Sum for %s is %d", card, sum)
+func (ai *AI) calculateCard(c sdz.Card) {
+	if ai.Playerid() == 1 && c == "TD" {
+		Log(ai.Playerid(), "FLAG")
+	}
+	sum := ai.ht.playedCards[c]
+	Log(ai.Playerid(), "htcardset - Sum for %s is %d", c, sum)
 	for x := 0; x < 4; x++ {
-		if val, ok := ht.cards[x][c]; ok {
+		if val, ok := ai.ht.cards[x][c]; ok {
 			sum += val
-			//sdz.Log("htcardsetIterative%d - Sum for %s is now %d", x, card, sum)
+			Log(ai.Playerid(), "htcardsetIterative%d - Sum for %s is now %d", x, c, sum)
 		}
 	}
 	if sum > 2 || sum < 0 {
@@ -117,14 +147,14 @@ func (ht *HandTracker) calculateCard(c sdz.Card) {
 	}
 	if sum == 2 {
 		for x := 0; x < 4; x++ {
-			if _, ok := ht.cards[x][c]; !ok {
-				ht.cards[x][c] = 0
+			if _, ok := ai.ht.cards[x][c]; !ok {
+				ai.ht.cards[x][c] = 0
 			}
 		}
 	} else {
 		unknown := -1
 		for x := 0; x < 4; x++ {
-			if _, ok := ht.cards[x][c]; !ok {
+			if _, ok := ai.ht.cards[x][c]; !ok {
 				if unknown == -1 {
 					unknown = x
 				} else {
@@ -135,25 +165,31 @@ func (ht *HandTracker) calculateCard(c sdz.Card) {
 			}
 		}
 		if unknown != -1 {
-			ht.cards[unknown][c] = 2 - sum
+			ai.ht.cards[unknown][c] = 2 - sum
+		}
+	}
+	Log(ai.Playerid(), "TT[%s]=%d", c, ai.ht.playedCards[c])
+	for x := 0; x < 4; x++ {
+		if _, ok := ai.ht.cards[x][c]; ok {
+			Log(ai.Playerid(), "P%d[%s]=%d", x, c, ai.ht.cards[x][c])
 		}
 	}
 }
 
-func (ht *HandTracker) calculate() {
-	sdz.Log("Starting calculate() - %v", ht.playedCards)
+func (ai *AI) calculate() {
+	//Log(ai.Playerid(), "Starting calculate() - %v", HTString(ai.ht.playedCards))
 	for x := 0; x < 4; x++ {
-		sdz.Log("Player%d - %v", x, ht.cards[x])
+		//Log(ai.Playerid(), "Player%d - %v", x, HTString(ai.ht.cards[x]))
 	}
 	for _, suit := range sdz.Suits() {
 		for _, face := range sdz.Faces() {
 			card := sdz.CreateCard(suit, face)
-			ht.calculateCard(card)
+			ai.calculateCard(card)
 		}
 	}
-	sdz.Log("After calculate() - %v", ht.playedCards)
+	//Log(ai.Playerid(), "After calculate() - %v", HTString(ai.ht.playedCards))
 	for x := 0; x < 4; x++ {
-		sdz.Log("Player%d - %v", x, ht.cards[x])
+		Log(ai.Playerid(), "Player%d - %s", x, HTString(ai.ht.cards[x]))
 	}
 
 }
@@ -174,6 +210,16 @@ type AI struct {
 
 func createAI() (a *AI) {
 	a = new(AI)
+	a.ht = new(HandTracker)
+	for x := 0; x < 4; x++ {
+		a.ht.cards[x] = make(map[sdz.Card]int)
+	}
+	a.ht.playedCards = make(map[sdz.Card]int)
+	for _, suit := range sdz.Suits() {
+		for _, face := range sdz.Faces() {
+			a.ht.playedCards[sdz.CreateCard(suit, face)] = 0
+		}
+	}
 	return a
 }
 
@@ -346,19 +392,18 @@ func CardBeatsTrick(card sdz.Card, trick *Trick, trump sdz.Suit) bool {
 
 // PRE Condition: Initial call, trick.certain should be "true" - the cards have already been played
 func rankCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) *Trick {
-	sdz.Log("Player%d rankCard on trick %s", playerid, trick)
+	//sdz.Log("Player%d rankCard on trick %s", playerid, trick)
 	decisionMap := potentialCards(playerid, ht, trick.winningCard(), trick.leadSuit(), trump)
 	if len(decisionMap) == 0 {
 		debug.PrintStack()
 		sdz.Log("%#v", ht)
 		panic("decisionMap should not be empty")
 	}
-	sdz.Log("Player%d - Potential cards to play - %v", playerid, decisionMap)
+	//sdz.Log("Player%d - Potential cards to play - %v", playerid, decisionMap)
 	//sdz.Log("Received Trick %s", trick)
 	var topTrick *Trick
 	nextPlayer := (playerid + 1) % 4
-	//tricks := make([]*Trick, 0)
-	for card := range decisionMap {
+	for _, card := range Decision(decisionMap).Sort() {
 		tempTrick := new(Trick)
 		*tempTrick = *trick // make a copy
 		trick.played = make(map[int]sdz.Card)
@@ -393,22 +438,18 @@ func rankCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) *Tric
 		if topWorth < tempWorth || (topWorth == tempWorth && topTrick.played[playerid].Face().Less(card.Face())) {
 			topTrick = tempTrick
 		}
-		//tricks = append(tricks, tempTrick)
 	}
-	//for _, x := range tricks {
-	//sdz.Log("%d - player%d - %#v", x.worth(playerid, trump), playerid, x)
-	//}
 	//sdz.Log("Returning worth %d - %s", topTrick.worth(playerid, trump), topTrick)
 	return topTrick
 }
 
 func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	ai.trick.certain = true
-	sdz.Log("htcardset - Player%d is calculating", ai.Playerid())
-	ai.ht.calculate() // make sure we're making a decision based on the most up-to-date information
-	sdz.Log("Before rankCard as player %d", ai.Playerid())
+	//sdz.Log("htcardset - Player%d is calculating", ai.Playerid())
+	ai.calculate() // make sure we're making a decision based on the most up-to-date information
+	//sdz.Log("Before rankCard as player %d", ai.Playerid())
 	ai.trick = rankCard(ai.Playerid(), ai.ht, ai.trick, ai.trump)
-	sdz.Log("Playerid %d choosing card %s", ai.Playerid(), ai.trick.played[ai.Playerid()])
+	//sdz.Log("Playerid %d choosing card %s", ai.Playerid(), ai.trick.played[ai.Playerid()])
 	return ai.trick.played[ai.Playerid()]
 }
 
@@ -450,8 +491,8 @@ func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 //}
 
 func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Suit, trump sdz.Suit) map[sdz.Card]bool {
-	sdz.Log("PotentialCards called with %d,winning=%s,lead=%s,trump=%s", playerid, winning, lead, trump)
-	sdz.Log("PotentialCards Player%d - %#v", playerid, ht.cards[playerid])
+	//sdz.Log("PotentialCards called with %d,winning=%s,lead=%s,trump=%s", playerid, winning, lead, trump)
+	//sdz.Log("PotentialCards Player%d - %#v", playerid, ht.cards[playerid])
 	trueHand := make(sdz.Hand, 0)
 	potentialHand := make(sdz.Hand, 0)
 	for _, card := range sdz.AllCards() {
@@ -462,8 +503,8 @@ func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Su
 			potentialHand = append(potentialHand, card)
 		}
 	}
-	sdz.Log("TrueHand = %#v", trueHand)
-	sdz.Log("PotentialHand = %#v", potentialHand)
+	//sdz.Log("TrueHand = %#v", trueHand)
+	//sdz.Log("PotentialHand = %#v", potentialHand)
 	validHand := make(sdz.Hand, 0)
 	decisionMap := make(map[sdz.Card]bool)
 	for _, card := range trueHand {
@@ -473,7 +514,7 @@ func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Su
 			continue
 		}
 	}
-	sdz.Log("validHand = %#v", validHand)
+	//sdz.Log("validHand = %#v", validHand)
 	for _, card := range potentialHand {
 		tempHand := append(validHand, card)
 		if sdz.ValidPlay(card, winning, lead, &tempHand, trump) {
@@ -561,15 +602,15 @@ func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Su
 //}
 
 func (ai *AI) Tell(action *sdz.Action) {
-	Log("Action received by player %d with hand %s - %+v", ai.Playerid(), ai.hand, action)
+	//Log(ai.Playerid(), "Action received by player %d with hand %s - %+v", ai.Playerid(), ai.hand, action)
 	switch action.Type {
 	case "Bid":
 		if action.Playerid == ai.Playerid() {
-			Log("------------------Player %d asked to bid against player %d", ai.Playerid(), ai.highBidder)
+			Log(ai.Playerid(), "------------------Player %d asked to bid against player %d", ai.Playerid(), ai.highBidder)
 			ai.bidAmount, ai.trump, ai.show = ai.calculateBid()
 			if ai.numBidders == 1 && ai.IsPartner(ai.highBidder) && ai.bidAmount < 21 && ai.bidAmount+5 > 20 {
 				// save our parter
-				Log("Saving our partner with a recommended bid of %d", ai.bidAmount)
+				Log(ai.Playerid(), "Saving our partner with a recommended bid of %d", ai.bidAmount)
 				ai.bidAmount = 21
 			}
 			bidAmountOld := ai.bidAmount
@@ -584,7 +625,7 @@ func (ai *AI) Tell(action *sdz.Action) {
 				ai.bidAmount = ai.highBid + 1
 			}
 			meld, _ := ai.hand.Meld(ai.trump)
-			Log("------------------Player %d bid %d over %d with recommendation of %d and %d meld", ai.Playerid(), ai.bidAmount, ai.highBid, bidAmountOld, meld)
+			Log(ai.Playerid(), "------------------Player %d bid %d over %d with recommendation of %d and %d meld", ai.Playerid(), ai.bidAmount, ai.highBid, bidAmountOld, meld)
 			ai.action = sdz.CreateBid(ai.bidAmount, ai.Playerid())
 		} else {
 			// received someone else's bid value'
@@ -623,7 +664,7 @@ func (ai *AI) Tell(action *sdz.Action) {
 	case "Trump":
 		if action.Playerid == ai.Playerid() {
 			meld, _ := ai.hand.Meld(ai.trump)
-			Log("Player %d being asked to name trump on hand %s and have %d meld", ai.Playerid(), ai.hand, meld)
+			Log(ai.Playerid(), "Player %d being asked to name trump on hand %s and have %d meld", ai.Playerid(), ai.hand, meld)
 			switch {
 			// TODO add case for the end of the game like if opponents will coast out
 			case ai.bidAmount < 15:
@@ -632,19 +673,20 @@ func (ai *AI) Tell(action *sdz.Action) {
 				ai.action = sdz.CreateTrump(ai.trump, ai.Playerid())
 			}
 		} else {
-			//Log("Player %d was told trump", ai.Playerid())
 			ai.trump = action.Trump
+			Log(ai.Playerid(), "Trump is %s", ai.trump)
 		}
 	case "Throwin":
-		Log("Player %d saw that player %d threw in", ai.Playerid(), action.Playerid)
+		Log(ai.Playerid(), "Player %d saw that player %d threw in", ai.Playerid(), action.Playerid)
 	case "Deal":
 		ai.hand = &action.Hand
 		ai.Id = action.Playerid
-		Log("Setting playerid to %d", ai.Id)
+		Log(ai.Playerid(), "Set playerid")
+		Log(ai.Playerid(), "Dealt Hand = %s", ai.hand.String())
+		ai.populate()
 		ai.highBid = 20
 		ai.highBid = action.Dealer
 		ai.numBidders = 0
-		ai.ht = NewHandTracker(ai.Id, *ai.hand)
 		ai.trick = NewTrick()
 		ai.trick.playCount = 0
 	case "Meld":
@@ -662,16 +704,16 @@ func (ai *AI) Tell(action *sdz.Action) {
 		}
 	case "Message": // nothing to do here, no one to read it
 	case "Trick": // nothing to do here, nothing to display
-		sdz.Log("playedCards=%v", ai.ht.playedCards)
+		Log(ai.Playerid(), "playedCards=%v", ai.ht.playedCards)
 		ai.trick = NewTrick()
 	case "Score": // TODO: save score to use for future bidding techniques
 	default:
-		Log("Received an action I didn't understand - %v", action)
+		Log(ai.Playerid(), "Received an action I didn't understand - %v", action)
 	}
 }
 
 func (a *AI) Listen() (action *sdz.Action, open bool) {
-	Log("Listen for playerid %d returning %+v", a.Playerid(), a.action)
+	Log(a.Playerid(), "Listen for playerid %d returning %+v", a.Playerid(), a.action)
 	return a.action, true
 }
 
@@ -703,7 +745,7 @@ func (h Human) Close() {
 
 func (h *Human) Tell(action *sdz.Action) {
 	jsonData, _ := json.Marshal(action)
-	Log("--> %s", jsonData)
+	Log(h.Playerid(), "--> %s", jsonData)
 	err := websocket.JSON.Send(h.conn, action)
 	if err != nil {
 		sdz.Log("Error in Send - %v", err)
@@ -721,7 +763,7 @@ func (h *Human) Listen() (action *sdz.Action, open bool) {
 	}
 	action.Playerid = h.Id
 	jsonData, _ := json.Marshal(action)
-	Log("<-- %s", jsonData)
+	Log(h.Playerid(), "<-- %s", jsonData)
 	return action, true
 }
 
@@ -793,7 +835,7 @@ func (cp *ConnectionPool) Pop() *Human {
 }
 
 func setupGame(net *websocket.Conn, cp *ConnectionPool) {
-	Log("Connection received")
+	Log(4, "Connection received")
 	human := createHuman(net)
 	for {
 		for {
