@@ -458,9 +458,8 @@ func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	ai.trick.certain = true
 	//sdz.Log("htcardset - Player%d is calculating", ai.Playerid())
 	//sdz.Log("Before rankCard as player %d", ai.Playerid())
-	ai.trick = rankCard(ai.Playerid(), ai.ht, ai.trick, ai.trump)
 	//sdz.Log("Playerid %d choosing card %s", ai.Playerid(), ai.trick.played[ai.Playerid()])
-	return ai.trick.played[ai.Playerid()]
+	return rankCard(ai.Playerid(), ai.ht, ai.trick, ai.trump).played[ai.Playerid()]
 }
 
 //// returns 2 if it will win
@@ -648,33 +647,24 @@ func (ai *AI) Tell(action *sdz.Action) {
 	case "Play":
 		Log(ai.Playerid(), "Trick = %#v", ai.trick)
 		if action.Playerid == ai.Playerid() {
-			action = sdz.CreatePlay(ai.findCardToPlay(action), ai.Playerid())
-			sdz.Log("Player%d is playing %s", ai.Playerid(), action.PlayedCard)
-			if ai.trick.leadSuit() == sdz.NASuit || ai.trick.winningCard() == sdz.NACard {
-				ai.trick.lead = ai.Playerid()
-				ai.trick.winningPlayer = ai.Playerid()
-				Log(ai.Playerid(), "Set lead to %s", ai.trick.leadSuit())
+			ai.action = sdz.CreatePlay(ai.findCardToPlay(action), ai.Playerid())
+			action.PlayedCard = ai.action.PlayedCard
+		}
+		sdz.Log("Player%d is playing %s", ai.Playerid(), action.PlayedCard)
+		ai.trick.played[action.Playerid] = action.PlayedCard
+		if ai.trick.leadSuit() == sdz.NASuit || ai.trick.winningCard() == sdz.NACard {
+			ai.trick.lead = action.Playerid
+			ai.trick.winningPlayer = action.Playerid
+			Log(ai.Playerid(), "Set lead to %s", ai.trick.leadSuit())
+		}
+		ai.PlayCard(action.PlayedCard, action.Playerid)
+		if action.Playerid != ai.Playerid() && action.PlayedCard.Suit() != ai.trick.leadSuit() {
+			Log(ai.Playerid(), "nofollow - nosuit on Player%d on suit %s with trick %#v", action.Playerid, ai.trick.leadSuit(), ai.trick)
+			ai.noSuit(action.Playerid, ai.trick.leadSuit())
+			if ai.trick.leadSuit() != ai.trump && action.PlayedCard.Suit() != ai.trump {
+				Log(ai.Playerid(), "notrump - nosuit on Player%d on suit %s", action.Playerid, ai.trump)
+				ai.noSuit(action.Playerid, ai.trump)
 			}
-			ai.PlayCard(action.PlayedCard, ai.Playerid())
-			ai.action = action
-		} else {
-			ai.trick.played[action.Playerid] = action.PlayedCard
-			if ai.trick.leadSuit() == sdz.NASuit || ai.trick.winningCard() == sdz.NACard {
-				ai.trick.lead = action.Playerid
-				ai.trick.winningPlayer = action.Playerid
-				Log(ai.Playerid(), "Set lead to %s", ai.trick.leadSuit())
-			}
-			ai.PlayCard(action.PlayedCard, action.Playerid)
-			if action.PlayedCard.Suit() != ai.trick.leadSuit() {
-				Log(ai.Playerid(), "nofollow - nosuit on Player%d on suit %s with trick %#v", action.Playerid, ai.trick.leadSuit(), ai.trick)
-				ai.noSuit(action.Playerid, ai.trick.leadSuit())
-				if ai.trick.leadSuit() != ai.trump && action.PlayedCard.Suit() != ai.trump {
-					Log(ai.Playerid(), "notrump - nosuit on Player%d on suit %s", action.Playerid, ai.trump)
-					ai.noSuit(action.Playerid, ai.trump)
-				}
-			}
-			// TODO: find all the cards that can beat the lead card and set those in the HandTracker
-			// received someone else's play
 		}
 	case "Trump":
 		if action.Playerid == ai.Playerid() {
