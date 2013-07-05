@@ -496,7 +496,12 @@ func (game *Game) Go(players []Player) {
 		switch response.Type {
 		case "Throwin":
 			game.Broadcast(response, response.Playerid)
-			// TODO: adjust the score
+			game.Score[game.HighPlayer%2] -= game.HighBid
+			game.BroadcastAll(CreateMessage(fmt.Sprintf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], handsPlayed)))
+			Log("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], handsPlayed)
+			game.Dealer = (game.Dealer + 1) % 4
+			Log("-----------------------------------------------------------------------------")
+			continue
 		case "Trump":
 			game.Trump = response.Trump
 			Log("Trump is set to %s", game.Trump)

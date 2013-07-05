@@ -318,12 +318,138 @@ func (t *testSuite) TestWorth() {
 
 }
 
-func (t *testSuite) TestFail() {
+func (t *testSuite) TestHands() {
 	p1 := createAI()
 	p2 := createAI()
 	p3 := createAI()
 	p0 := createAI()
 	game := &sdz.Game{Players: []sdz.Player{p0, p1, p2, p3}}
+	game.MeldHands = make([]sdz.Hand, len(game.Players))
+	game.Meld = make([]int, len(game.Players))
+	p1.SetHand(sdz.Hand{C("AD"), C("QD"), C("JD"), C("9D"), C("AH"), C("TH"), C("KH"), C("KH"), C("JH"), C("KS"), C("JS"), C("JS")}, 0, 1)
+	p2.SetHand(sdz.Hand{C("TD"), C("KD"), C("QC"), C("QC"), C("9C"), C("TH"), C("QH"), C("9H"), C("9H"), C("AS"), C("TS"), C("QS")}, 0, 2)
+	p3.SetHand(sdz.Hand{C("KD"), C("QD"), C("JD"), C("AC"), C("AC"), C("TC"), C("TC"), C("JC"), C("AH"), C("JH"), C("AS"), C("KS")}, 0, 3)
+	p0.SetHand(sdz.Hand{C("AD"), C("TD"), C("9D"), C("KC"), C("KC"), C("JC"), C("9C"), C("QH"), C("TS"), C("QS"), C("9S"), C("9S")}, 0, 0)
+	game.Broadcast(sdz.CreateBid(21, 3), 3)
+	game.BroadcastAll(sdz.CreateTrump(sdz.Clubs, 3))
+	p1.trump = sdz.Clubs
+	p2.trump = sdz.Clubs
+	p3.trump = sdz.Clubs
+	p0.trump = sdz.Clubs
+	for x := 0; x < len(game.Players); x++ {
+		game.Meld[x], game.MeldHands[x] = game.Players[x].Hand().Meld(game.Trump)
+		meldAction := sdz.CreateMeld(game.MeldHands[x], game.Meld[x], x)
+		game.BroadcastAll(meldAction)
+	}
+	next := 1
+	for trick := 0; trick < 12; trick++ {
+		var winningCard sdz.Card
+		var cardPlayed sdz.Card
+		var leadSuit sdz.Suit
+		winningPlayer := next
+		counters := 0
+		for x := 0; x < 4; x++ {
+			Log(1, "*******************************************************************************NEXT CARD")
+			Log(1, "WinningCard = %s", winningCard)
+			Log(1, "LeadSuit = %s", leadSuit)
+			// play the hand
+			// TODO: handle possible throwin
+			action := sdz.CreatePlayRequest(winningCard, leadSuit, game.Trump, next, game.Players[next].Hand())
+			game.Players[next].Tell(action)
+			action, open := game.Players[next].Listen()
+			if !open {
+				game.Broadcast(sdz.CreateMessage("Player disconnected"), next)
+				return
+			}
+			cardPlayed = action.PlayedCard
+			game.Players[next].Hand().Remove(cardPlayed)
+			if x == 0 {
+				winningCard = cardPlayed
+				leadSuit = cardPlayed.Suit()
+			} else {
+				if cardPlayed.Beats(winningCard, game.Trump) {
+					winningCard = cardPlayed
+					winningPlayer = next
+				}
+			}
+			game.Broadcast(action, next)
+			next = (next + 1) % 4
+		}
+		next = winningPlayer
+		game.BroadcastAll(sdz.CreateMessage(fmt.Sprintf("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)))
+		game.BroadcastAll(sdz.CreateTrick(winningPlayer))
+		Log(1, "*******************************************************************************NEXT TRICK")
+		//Log("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)
+	}
+
+	p1 = createAI()
+	p2 = createAI()
+	p3 = createAI()
+	p0 = createAI()
+	game = &sdz.Game{Players: []sdz.Player{p0, p1, p2, p3}}
+	game.MeldHands = make([]sdz.Hand, len(game.Players))
+	game.Meld = make([]int, len(game.Players))
+	p1.SetHand(sdz.Hand{C("AD"), C("QD"), C("JD"), C("9D"), C("AH"), C("TH"), C("KH"), C("KH"), C("JH"), C("KS"), C("JS"), C("JS")}, 0, 1)
+	p2.SetHand(sdz.Hand{C("TD"), C("KD"), C("QC"), C("QC"), C("9C"), C("TH"), C("QH"), C("9H"), C("9H"), C("AS"), C("TS"), C("QS")}, 0, 2)
+	p3.SetHand(sdz.Hand{C("KD"), C("QD"), C("JD"), C("AC"), C("AC"), C("TC"), C("TC"), C("JC"), C("AH"), C("JH"), C("AS"), C("KS")}, 0, 3)
+	p0.SetHand(sdz.Hand{C("AD"), C("TD"), C("9D"), C("KC"), C("KC"), C("JC"), C("9C"), C("QH"), C("TS"), C("QS"), C("9S"), C("9S")}, 0, 0)
+	game.Broadcast(sdz.CreateBid(21, 3), 3)
+	game.BroadcastAll(sdz.CreateTrump(sdz.Clubs, 3))
+	p1.trump = sdz.Clubs
+	p2.trump = sdz.Clubs
+	p3.trump = sdz.Clubs
+	p0.trump = sdz.Clubs
+	for x := 0; x < len(game.Players); x++ {
+		game.Meld[x], game.MeldHands[x] = game.Players[x].Hand().Meld(game.Trump)
+		meldAction := sdz.CreateMeld(game.MeldHands[x], game.Meld[x], x)
+		game.BroadcastAll(meldAction)
+	}
+	next = 1
+	for trick := 0; trick < 12; trick++ {
+		var winningCard sdz.Card
+		var cardPlayed sdz.Card
+		var leadSuit sdz.Suit
+		winningPlayer := next
+		counters := 0
+		for x := 0; x < 4; x++ {
+			Log(1, "*******************************************************************************NEXT CARD")
+			Log(1, "WinningCard = %s", winningCard)
+			Log(1, "LeadSuit = %s", leadSuit)
+			// play the hand
+			// TODO: handle possible throwin
+			action := sdz.CreatePlayRequest(winningCard, leadSuit, game.Trump, next, game.Players[next].Hand())
+			game.Players[next].Tell(action)
+			action, open := game.Players[next].Listen()
+			if !open {
+				game.Broadcast(sdz.CreateMessage("Player disconnected"), next)
+				return
+			}
+			cardPlayed = action.PlayedCard
+			game.Players[next].Hand().Remove(cardPlayed)
+			if x == 0 {
+				winningCard = cardPlayed
+				leadSuit = cardPlayed.Suit()
+			} else {
+				if cardPlayed.Beats(winningCard, game.Trump) {
+					winningCard = cardPlayed
+					winningPlayer = next
+				}
+			}
+			game.Broadcast(action, next)
+			next = (next + 1) % 4
+		}
+		next = winningPlayer
+		game.BroadcastAll(sdz.CreateMessage(fmt.Sprintf("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)))
+		game.BroadcastAll(sdz.CreateTrick(winningPlayer))
+		Log(1, "*******************************************************************************NEXT TRICK")
+		//Log("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)
+	}
+
+	p1 = createAI()
+	p2 = createAI()
+	p3 = createAI()
+	p0 = createAI()
+	game = &sdz.Game{Players: []sdz.Player{p0, p1, p2, p3}}
 	game.MeldHands = make([]sdz.Hand, len(game.Players))
 	game.Meld = make([]int, len(game.Players))
 	p1.SetHand(sdz.Hand{C("AD"), C("TD"), C("KD"), C("KD"), C("QD"), C("JD"), C("AC"), C("QC"), C("9C"), C("QH"), C("9H"), C("KS")}, 0, 1)
@@ -341,7 +467,7 @@ func (t *testSuite) TestFail() {
 		meldAction := sdz.CreateMeld(game.MeldHands[x], game.Meld[x], x)
 		game.BroadcastAll(meldAction)
 	}
-	next := 1
+	next = 1
 	for trick := 0; trick < 12; trick++ {
 		var winningCard sdz.Card
 		var cardPlayed sdz.Card
