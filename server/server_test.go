@@ -211,7 +211,9 @@ func (t *testSuite) TestRankCard() {
 	ht.cards[2][C("TD")] = 1
 	ht.cards[2][C("QS")] = 1
 	ht.cards[3][C("KD")] = 1
-	ai.calculate()
+	for _, card := range []sdz.Card{C("AD"), C("TD"), C("QD"), C("KD"), C("QS")} {
+		ai.calculateCard(card)
+	}
 
 	trick := NewTrick()
 	trick.playCount = 3
@@ -351,6 +353,9 @@ func (t *testSuite) TestFail() {
 		winningPlayer := next
 		counters := 0
 		for x := 0; x < 4; x++ {
+			Log(1, "*******************************************************************************NEXT CARD")
+			Log(1, "WinningCard = %s", winningCard)
+			Log(1, "LeadSuit = %s", leadSuit)
 			// play the hand
 			// TODO: handle possible throwin
 			action := sdz.CreatePlayRequest(winningCard, leadSuit, game.Trump, next, game.Players[next].Hand())
@@ -377,6 +382,7 @@ func (t *testSuite) TestFail() {
 		next = winningPlayer
 		game.BroadcastAll(sdz.CreateMessage(fmt.Sprintf("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)))
 		game.BroadcastAll(sdz.CreateTrick(winningPlayer))
+		Log(1, "*******************************************************************************NEXT TRICK")
 		//Log("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)
 	}
 }
@@ -389,7 +395,7 @@ func (t *testSuite) TestAITracking() {
 	ai.Tell(sdz.CreateMeld(sdz.Hand{C("JD"), C("QS"), C("KD"), C("QD")}, 6, 1))
 	ai.Tell(sdz.CreateMeld(sdz.Hand{C("JD"), C("QS")}, 4, 2))
 	ai.Tell(sdz.CreateMeld(sdz.Hand{}, 0, 3))
-	ai.calculate()
+	//ai.calculate()
 	t.Equal(1, ai.ht.cards[1][C("JD")])
 	t.Equal(1, ai.ht.cards[1][C("QS")])
 	t.Equal(1, ai.ht.cards[2][C("JD")])
@@ -410,7 +416,7 @@ func (t *testSuite) TestAITracking() {
 	val, ok := ai.ht.cards[1][C("JD")]
 	t.True(ok)
 	t.Equal(0, val)
-	ai.calculate()
+	//ai.calculate()
 	val, ok = ai.ht.cards[1][C("JD")]
 	t.True(ok)
 	t.Equal(0, val)
@@ -439,7 +445,7 @@ func (t *testSuite) TestAITracking() {
 	ai.Tell(sdz.CreateMeld(sdz.Hand{}, 0, 1))
 	ai.Tell(sdz.CreateMeld(sdz.Hand{}, 0, 2))
 	ai.Tell(sdz.CreateMeld(sdz.Hand{}, 0, 3))
-	ai.calculate()
+	//ai.calculate()
 	ai.trick.lead = 1
 
 	ai.Tell(sdz.CreatePlay(C("JD"), 1))
@@ -463,7 +469,7 @@ func (t *testSuite) TestAITracking() {
 	ai.Tell(sdz.CreateMeld(sdz.Hand{C("JD"), C("JD"), C("QS"), C("QS"), C("KD"), C("QD")}, 32, 1))
 	ai.Tell(sdz.CreateMeld(sdz.Hand{}, 0, 2))
 	ai.Tell(sdz.CreateMeld(sdz.Hand{}, 0, 3))
-	ai.calculate()
+	//ai.calculate()
 	t.Equal(0, ai.ht.cards[0][C("JD")])
 	t.Equal(2, ai.ht.cards[1][C("JD")])
 	t.Equal(0, ai.ht.cards[2][C("JD")])
@@ -475,8 +481,8 @@ func (t *testSuite) TestNoSuit() {
 	ai.hand = &sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AD"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
 	ai.populate()
 	ai.ht.cards[1][C("9D")] = 1
-	ai.ht.noSuit(1, sdz.Diamonds)
-	ai.calculate()
+	ai.noSuit(1, sdz.Diamonds)
+
 	t.Equal(0, ai.ht.cards[1][C("9D")])
 	t.Equal(0, ai.ht.cards[1][C("JD")])
 	t.Equal(0, ai.ht.cards[1][C("QD")])
@@ -490,6 +496,7 @@ func (t *testSuite) TestCalculate() {
 	hand := sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AD"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
 	sort.Sort(hand)
 	ai := createAI()
+	// dealer 0, playerid 1
 	ai.SetHand(hand, 0, 1)
 	for x := 0; x < 4; x++ {
 		if x == 1 {
@@ -522,9 +529,12 @@ func (t *testSuite) TestCalculate() {
 	ai.ht.cards[2][C("JS")] = 0
 	ai.ht.playedCards[C("QS")] = 0
 	ai.ht.cards[0][C("QS")] = 0
+	ai.ht.cards[1][C("QS")] = 0
 	ai.ht.cards[2][C("QS")] = 0
 
-	ai.calculate()
+	for _, card := range []sdz.Card{C("QD"), C("KH"), C("KD"), C("9S"), C("TS"), C("JS"), C("QS")} {
+		ai.calculateCard(card)
+	}
 
 	t.Equal(1, ai.ht.cards[3][C("JS")])
 	t.Equal(2, ai.ht.cards[3][C("QS")])
@@ -545,4 +555,21 @@ func (t *testSuite) TestCalculate() {
 		_, ok = ai.ht.cards[x][C("TS")]
 		t.True(ok, "All TS cards should have been found")
 	}
+
+	ai.ht.playedCards[C("JD")] = 0
+	ai.ht.cards[0][C("JD")] = 1
+	ai.ht.cards[1][C("JD")] = 0
+	ai.ht.cards[2][C("JD")] = 0
+	ai.calculateCard(C("JD"))
+	val, ok := ai.ht.cards[0][C("JD")]
+	t.Equal(1, val)
+	t.True(ok)
+	val, ok = ai.ht.cards[1][C("JD")]
+	t.Equal(0, val)
+	t.True(ok)
+	val, ok = ai.ht.cards[2][C("JD")]
+	t.Equal(0, val)
+	t.True(ok)
+	val, ok = ai.ht.cards[3][C("JD")]
+	t.False(ok)
 }

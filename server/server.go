@@ -84,7 +84,6 @@ func (ai *AI) PlayCard(c sdz.Card, playerid int) {
 	Log(ai.Playerid(), "In ht.PlayCard for %d-%s on player %d", playerid, c, ai.Playerid())
 	Log(ai.Playerid(), "ht.playedCards = %v", HTString(ai.ht.playedCards))
 	for x := 0; x < 4; x++ {
-		Log(ai.Playerid(), "Player%d - %v", x, ai.ht.cards[x])
 		Log(ai.Playerid(), "Player%d - %s", x, HTString(ai.ht.cards[x]))
 	}
 	if ai.ht.playedCards[c] >= 2 {
@@ -118,18 +117,22 @@ func (ai *AI) populate() {
 	}
 	for _, card := range *ai.hand {
 		ai.ht.cards[ai.Playerid()][card]++
+		ai.calculateCard(card)
 	}
-	ai.calculate()
 }
 
-func (ht *HandTracker) noSuit(playerid int, suit sdz.Suit) {
+func (ai *AI) noSuit(playerid int, suit sdz.Suit) {
+	Log(ai.Playerid(), "No suit start")
 	for _, face := range sdz.Faces() {
-		ht.cards[playerid][sdz.CreateCard(suit, face)] = 0
+		card := sdz.CreateCard(suit, face)
+		ai.ht.cards[playerid][card] = 0
+		ai.calculateCard(card)
 	}
+	Log(ai.Playerid(), "No suit end")
 }
 
 func (ai *AI) calculateCard(c sdz.Card) {
-	if ai.Playerid() == 1 && c == "TD" {
+	if ai.Playerid() == 1 && c == "TC" {
 		Log(ai.Playerid(), "FLAG")
 	}
 	sum := ai.ht.playedCards[c]
@@ -165,7 +168,15 @@ func (ai *AI) calculateCard(c sdz.Card) {
 			}
 		}
 		if unknown != -1 {
-			ai.ht.cards[unknown][c] = 2 - sum
+			if ai.ht.playedCards[c] > 0 || ai.ht.cards[ai.Playerid()][c] == 1 {
+				if unknown != -1 {
+					Log(4, "1")
+					ai.ht.cards[unknown][c] = 2 - sum
+				}
+			} else if sum == 0 {
+				Log(4, "2")
+				ai.ht.cards[unknown][c] = 2
+			}
 		}
 	}
 	Log(ai.Playerid(), "TT[%s]=%d", c, ai.ht.playedCards[c])
@@ -174,25 +185,28 @@ func (ai *AI) calculateCard(c sdz.Card) {
 			Log(ai.Playerid(), "P%d[%s]=%d", x, c, ai.ht.cards[x][c])
 		}
 	}
+	if ai.Playerid() == 1 && c == "TC" {
+		Log(ai.Playerid(), "Stack is: %s", debug.Stack())
+	}
 }
 
-func (ai *AI) calculate() {
-	//Log(ai.Playerid(), "Starting calculate() - %v", HTString(ai.ht.playedCards))
-	for x := 0; x < 4; x++ {
-		//Log(ai.Playerid(), "Player%d - %v", x, HTString(ai.ht.cards[x]))
-	}
-	for _, suit := range sdz.Suits() {
-		for _, face := range sdz.Faces() {
-			card := sdz.CreateCard(suit, face)
-			ai.calculateCard(card)
-		}
-	}
-	//Log(ai.Playerid(), "After calculate() - %v", HTString(ai.ht.playedCards))
-	for x := 0; x < 4; x++ {
-		Log(ai.Playerid(), "Player%d - %s", x, HTString(ai.ht.cards[x]))
-	}
+//func (ai *AI) calculate() {
+//	//Log(ai.Playerid(), "Starting calculate() - %v", HTString(ai.ht.playedCards))
+//	for x := 0; x < 4; x++ {
+//		//Log(ai.Playerid(), "Player%d - %v", x, HTString(ai.ht.cards[x]))
+//	}
+//	for _, suit := range sdz.Suits() {
+//		for _, face := range sdz.Faces() {
+//			card := sdz.CreateCard(suit, face)
+//			ai.calculateCard(card)
+//		}
+//	}
+//	//Log(ai.Playerid(), "After calculate() - %v", HTString(ai.ht.playedCards))
+//	for x := 0; x < 4; x++ {
+//		Log(ai.Playerid(), "Player%d - %s", x, HTString(ai.ht.cards[x]))
+//	}
 
-}
+//}
 
 type AI struct {
 	hand       *sdz.Hand
@@ -446,7 +460,6 @@ func rankCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) *Tric
 func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	ai.trick.certain = true
 	//sdz.Log("htcardset - Player%d is calculating", ai.Playerid())
-	ai.calculate() // make sure we're making a decision based on the most up-to-date information
 	//sdz.Log("Before rankCard as player %d", ai.Playerid())
 	ai.trick = rankCard(ai.Playerid(), ai.ht, ai.trick, ai.trump)
 	//sdz.Log("Playerid %d choosing card %s", ai.Playerid(), ai.trick.played[ai.Playerid()])
@@ -602,7 +615,7 @@ func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Su
 //}
 
 func (ai *AI) Tell(action *sdz.Action) {
-	//Log(ai.Playerid(), "Action received by player %d with hand %s - %+v", ai.Playerid(), ai.hand, action)
+	Log(ai.Playerid(), "Action received by player %d  - %+v", ai.Playerid(), action)
 	switch action.Type {
 	case "Bid":
 		if action.Playerid == ai.Playerid() {
@@ -636,26 +649,32 @@ func (ai *AI) Tell(action *sdz.Action) {
 			ai.numBidders++
 		}
 	case "Play":
+		Log(ai.Playerid(), "Trick = %#v", ai.trick)
 		if action.Playerid == ai.Playerid() {
 			action = sdz.CreatePlay(ai.findCardToPlay(action), ai.Playerid())
 			sdz.Log("Player%d is playing %s", ai.Playerid(), action.PlayedCard)
+			if ai.trick.leadSuit() == sdz.NASuit || ai.trick.winningCard() == sdz.NACard {
+				ai.trick.lead = ai.Playerid()
+				ai.trick.winningPlayer = ai.Playerid()
+				Log(ai.Playerid(), "Set lead to %s", ai.trick.leadSuit())
+			}
 			ai.PlayCard(action.PlayedCard, ai.Playerid())
 			ai.action = action
 		} else {
+			ai.trick.playCount++
+			ai.trick.played[action.Playerid] = action.PlayedCard
 			if ai.trick.leadSuit() == sdz.NASuit || ai.trick.winningCard() == sdz.NACard {
 				ai.trick.lead = action.Playerid
 				ai.trick.winningPlayer = action.Playerid
-				sdz.Log("Player%d - Set lead to %s", ai.Playerid(), ai.trick.leadSuit())
+				Log(ai.Playerid(), "Set lead to %s", ai.trick.leadSuit())
 			}
-			ai.trick.playCount++
-			ai.trick.played[action.Playerid] = action.PlayedCard
 			ai.PlayCard(action.PlayedCard, action.Playerid)
 			if action.PlayedCard.Suit() != ai.trick.leadSuit() {
-				ai.ht.noSuit(action.Playerid, ai.trick.leadSuit())
-				sdz.Log("nofollow - Player%d calling nosuit on Player%d on suit %s", ai.Playerid(), action.Playerid, ai.trick.leadSuit())
+				Log(ai.Playerid(), "nofollow - nosuit on Player%d on suit %s with trick %#v", action.Playerid, ai.trick.leadSuit(), ai.trick)
+				ai.noSuit(action.Playerid, ai.trick.leadSuit())
 				if ai.trick.leadSuit() != ai.trump && action.PlayedCard.Suit() != ai.trump {
-					sdz.Log("notrump - Player%d calling nosuit on Player%d on suit %s", ai.Playerid(), action.Playerid, ai.trick.leadSuit())
-					ai.ht.noSuit(action.Playerid, ai.trump)
+					Log(ai.Playerid(), "notrump - nosuit on Player%d on suit %s", action.Playerid, ai.trump)
+					ai.noSuit(action.Playerid, ai.trump)
 				}
 			}
 			// TODO: find all the cards that can beat the lead card and set those in the HandTracker
