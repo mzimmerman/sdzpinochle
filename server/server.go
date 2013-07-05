@@ -234,6 +234,7 @@ func createAI() (a *AI) {
 			a.ht.playedCards[sdz.CreateCard(suit, face)] = 0
 		}
 	}
+	a.trick = NewTrick()
 	return a
 }
 
@@ -315,12 +316,11 @@ type Trick struct {
 	played        map[int]sdz.Card
 	winningPlayer int
 	certain       bool
-	playCount     int
 	lead          int
 }
 
 func (t *Trick) String() string {
-	return fmt.Sprintf("[%s %s %s %s] playCount=%d Winning=%s Lead=%s certain=%v", t.played[0], t.played[1], t.played[2], t.played[3], t.playCount, t.winningCard(), t.leadSuit(), t.certain)
+	return fmt.Sprintf("[%s %s %s %s] Winning=%s Lead=%s certain=%v", t.played[0], t.played[1], t.played[2], t.played[3], t.winningCard(), t.leadSuit(), t.certain)
 }
 
 func NewTrick() *Trick {
@@ -355,10 +355,7 @@ func (trick *Trick) counters() (counters int) {
 
 func (trick *Trick) worth(playerid int, trump sdz.Suit) (worth int) {
 	if len(trick.played) != 4 {
-		for x := range trick.played {
-			sdz.Log("[%d]=%s", x, trick.played[x])
-		}
-		debug.PrintStack()
+		sdz.Log("Trick = %s", trick)
 		panic("worth should only be called at the theoretical end of the trick")
 	}
 	for x := range trick.played {
@@ -431,26 +428,26 @@ func rankCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) *Tric
 			}
 		}
 		tempTrick.played[playerid] = card
-		if tempTrick.playCount < 3 {
-			tempTrick.playCount++
+		if len(tempTrick.played) < 4 {
 			tempTrick = rankCard(nextPlayer, ht, tempTrick, trump)
 		}
 		//sdz.Log("Playerid = %d - Top = %s, Temp = %s", playerid, topTrick, tempTrick)
 		if topTrick == nil {
 			topTrick = tempTrick
-		}
-		topWorth := topTrick.worth(playerid, trump)
-		tempWorth := tempTrick.worth(playerid, trump)
-		switch {
-		case topWorth < tempWorth:
-			topTrick = tempTrick
-		case !topTrick.certain && !tempTrick.certain && (topWorth == tempWorth) && (card.Face().Less(topTrick.played[playerid].Face())):
-			topTrick = tempTrick
-		case topWorth == tempWorth && topTrick.played[playerid].Face().Less(card.Face()):
-			topTrick = tempTrick
-		}
-		if topWorth < tempWorth || (topWorth == tempWorth && topTrick.played[playerid].Face().Less(card.Face())) {
-			topTrick = tempTrick
+		} else {
+			topWorth := topTrick.worth(playerid, trump)
+			tempWorth := tempTrick.worth(playerid, trump)
+			switch {
+			case topWorth < tempWorth:
+				topTrick = tempTrick
+			case !topTrick.certain && !tempTrick.certain && (topWorth == tempWorth) && (card.Face().Less(topTrick.played[playerid].Face())):
+				topTrick = tempTrick
+			case topWorth == tempWorth && topTrick.played[playerid].Face().Less(card.Face()):
+				topTrick = tempTrick
+			}
+			if topWorth < tempWorth || (topWorth == tempWorth && topTrick.played[playerid].Face().Less(card.Face())) {
+				topTrick = tempTrick
+			}
 		}
 	}
 	//sdz.Log("Returning worth %d - %s", topTrick.worth(playerid, trump), topTrick)
@@ -661,7 +658,6 @@ func (ai *AI) Tell(action *sdz.Action) {
 			ai.PlayCard(action.PlayedCard, ai.Playerid())
 			ai.action = action
 		} else {
-			ai.trick.playCount++
 			ai.trick.played[action.Playerid] = action.PlayedCard
 			if ai.trick.leadSuit() == sdz.NASuit || ai.trick.winningCard() == sdz.NACard {
 				ai.trick.lead = action.Playerid
@@ -707,7 +703,6 @@ func (ai *AI) Tell(action *sdz.Action) {
 		ai.highBid = action.Dealer
 		ai.numBidders = 0
 		ai.trick = NewTrick()
-		ai.trick.playCount = 0
 	case "Meld":
 		sdz.Log("Received meld action - %#v", action)
 		if action.Playerid == ai.Playerid() {

@@ -189,7 +189,6 @@ func (t *testSuite) TestFindCardToPlay() {
 	ai.ht.cards[1][C("9H")] = 1
 	ai.ht.cards[2][C("KD")] = 1
 	ai.ht.cards[2][C("QD")] = 1
-	ai.trick.playCount = 0
 	action := sdz.CreatePlayRequest(sdz.NACard, sdz.NASuit, sdz.Hearts, 3, ai.Hand())
 	card := ai.findCardToPlay(action)
 	sdz.Log("card = %v", card)
@@ -216,7 +215,6 @@ func (t *testSuite) TestRankCard() {
 	}
 
 	trick := NewTrick()
-	trick.playCount = 3
 	trick.played[0] = C("AD")
 	trick.played[1] = C("AD")
 	trick.played[2] = C("KD")
@@ -231,7 +229,6 @@ func (t *testSuite) TestRankCard() {
 	t.Equal(-32, victim.worth(3, sdz.Diamonds))
 
 	trick = NewTrick()
-	trick.playCount = 2
 	trick.played[0] = C("AD")
 	trick.played[1] = C("AD")
 	trick.winningPlayer = 0
@@ -246,7 +243,6 @@ func (t *testSuite) TestRankCard() {
 	t.Equal(32, victim.worth(2, sdz.Diamonds))
 
 	trick = NewTrick()
-	trick.playCount = 2
 	trick.played[0] = C("TD")
 	trick.played[1] = C("AD")
 	trick.winningPlayer = 1
