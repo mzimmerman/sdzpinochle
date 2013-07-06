@@ -10,10 +10,9 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
-	"runtime/debug"
 	"sort"
 	"strconv"
-	"time"
+	//"time"
 )
 
 const (
@@ -30,6 +29,7 @@ const (
 )
 
 func Log(playerid int, m string, v ...interface{}) {
+	return
 	if playerid == 4 {
 		fmt.Printf("NP - "+m+"\n", v...)
 	} else {
@@ -92,7 +92,7 @@ func (ai *AI) PlayCard(c sdz.Card, playerid int) {
 	}
 	ai.ht.playedCards[c]++
 	if val, ok := ai.ht.cards[playerid][c]; ok {
-		if val != 0 {
+		if val > 0 {
 			ai.ht.cards[playerid][c]--
 		} else {
 			Log(ai.Playerid(), "Player %d has card %s", playerid, c)
@@ -132,9 +132,6 @@ func (ai *AI) noSuit(playerid int, suit sdz.Suit) {
 }
 
 func (ai *AI) calculateCard(c sdz.Card) {
-	if ai.Playerid() == 1 && c == "TC" {
-		Log(ai.Playerid(), "FLAG")
-	}
 	sum := ai.ht.playedCards[c]
 	Log(ai.Playerid(), "htcardset - Sum for %s is %d", c, sum)
 	for x := 0; x < 4; x++ {
@@ -145,7 +142,10 @@ func (ai *AI) calculateCard(c sdz.Card) {
 	}
 	if sum > 2 || sum < 0 {
 		sdz.Log("htcardset - Card=%s,sum=%d", c, sum)
-		debug.PrintStack()
+		Log(ai.Playerid(), "ht.playedCards = %v", HTString(ai.ht.playedCards))
+		for x := 0; x < 4; x++ {
+			Log(ai.Playerid(), "Player%d - %s", x, HTString(ai.ht.cards[x]))
+		}
 		panic("Cannot have more cards than 2 or less than 0 - " + string(sum))
 	}
 	if sum == 2 {
@@ -170,11 +170,9 @@ func (ai *AI) calculateCard(c sdz.Card) {
 		if unknown != -1 {
 			if ai.ht.playedCards[c] > 0 || ai.ht.cards[ai.Playerid()][c] == 1 {
 				if unknown != -1 {
-					Log(4, "1")
 					ai.ht.cards[unknown][c] = 2 - sum
 				}
 			} else if sum == 0 {
-				Log(4, "2")
 				ai.ht.cards[unknown][c] = 2
 			}
 		}
@@ -185,28 +183,7 @@ func (ai *AI) calculateCard(c sdz.Card) {
 			Log(ai.Playerid(), "P%d[%s]=%d", x, c, ai.ht.cards[x][c])
 		}
 	}
-	if ai.Playerid() == 1 && c == "TC" {
-		Log(ai.Playerid(), "Stack is: %s", debug.Stack())
-	}
 }
-
-//func (ai *AI) calculate() {
-//	//Log(ai.Playerid(), "Starting calculate() - %v", HTString(ai.ht.playedCards))
-//	for x := 0; x < 4; x++ {
-//		//Log(ai.Playerid(), "Player%d - %v", x, HTString(ai.ht.cards[x]))
-//	}
-//	for _, suit := range sdz.Suits() {
-//		for _, face := range sdz.Faces() {
-//			card := sdz.CreateCard(suit, face)
-//			ai.calculateCard(card)
-//		}
-//	}
-//	//Log(ai.Playerid(), "After calculate() - %v", HTString(ai.ht.playedCards))
-//	for x := 0; x < 4; x++ {
-//		Log(ai.Playerid(), "Player%d - %s", x, HTString(ai.ht.cards[x]))
-//	}
-
-//}
 
 type AI struct {
 	hand       *sdz.Hand
@@ -222,8 +199,7 @@ type AI struct {
 	trick *Trick
 }
 
-func createAI() (a *AI) {
-	a = new(AI)
+func (a *AI) reset() {
 	a.ht = new(HandTracker)
 	for x := 0; x < 4; x++ {
 		a.ht.cards[x] = make(map[sdz.Card]int)
@@ -235,6 +211,11 @@ func createAI() (a *AI) {
 		}
 	}
 	a.trick = NewTrick()
+}
+
+func createAI() (a *AI) {
+	a = new(AI)
+	a.reset()
 	return a
 }
 
@@ -287,13 +268,13 @@ func (ai AI) calculateBid() (amount int, trump sdz.Suit, show sdz.Hand) {
 		if bids[trump] < bids[suit] {
 			trump = suit
 		} else if bids[trump] == bids[suit] {
-			rand.Seed(time.Now().UnixNano())
+			//rand.Seed(time.Now().UnixNano())
 			if rand.Intn(2) == 0 { // returns one in the set of [0,2)
 				trump = suit
 			} // else - stay with trump as it was
 		}
 	}
-	rand.Seed(time.Now().UnixNano())
+	//rand.Seed(time.Now().UnixNano())
 	bids[trump] += rand.Intn(3) // adds 0, 1, or 2 for a little spontanaeity
 	return bids[trump], trump, show
 }
@@ -320,7 +301,17 @@ type Trick struct {
 }
 
 func (t *Trick) String() string {
-	return fmt.Sprintf("[%s %s %s %s] Winning=%s Lead=%s certain=%v", t.played[0], t.played[1], t.played[2], t.played[3], t.winningCard(), t.leadSuit(), t.certain)
+	var str = "-"
+	for x := 0; x < 4; x++ {
+		if t.lead == x {
+			str += "s"
+		}
+		if t.winningPlayer == x {
+			str += "w"
+		}
+		str += string(t.played[x]) + "-"
+	}
+	return fmt.Sprintf("%s Winning=%s Lead=%s certain=%v", str, t.winningCard(), t.leadSuit(), t.certain)
 }
 
 func NewTrick() *Trick {
@@ -394,20 +385,19 @@ func (trick *Trick) worth(playerid int, trump sdz.Suit) (worth int) {
 }
 
 func CardBeatsTrick(card sdz.Card, trick *Trick, trump sdz.Suit) bool {
-	winningCard, ok := trick.played[trick.winningPlayer]
-	if !ok {
-		return true
-	}
-	return card.Beats(winningCard, trump)
+	return card.Beats(trick.winningCard(), trump)
 }
 
 // PRE Condition: Initial call, trick.certain should be "true" - the cards have already been played
 func rankCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) *Trick {
-	//sdz.Log("Player%d rankCard on trick %s", playerid, trick)
+	//sdz.Log("calling Player%d rankCard on trick %s", playerid, trick)
 	decisionMap := potentialCards(playerid, ht, trick.winningCard(), trick.leadSuit(), trump)
 	if len(decisionMap) == 0 {
-		debug.PrintStack()
-		sdz.Log("%#v", ht)
+		Log(4, "playerid = %d", playerid)
+		Log(4, "ht.playedCards = %v", HTString(ht.playedCards))
+		for x := 0; x < 4; x++ {
+			Log(4, "Player%d -------- %s", x, HTString(ht.cards[x]))
+		}
 		panic("decisionMap should not be empty")
 	}
 	//sdz.Log("Player%d - Potential cards to play - %v", playerid, decisionMap)
@@ -421,13 +411,17 @@ func rankCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) *Tric
 		for x := range tempTrick.played { // now copy the map
 			trick.played[x] = tempTrick.played[x]
 		}
+		tempTrick.played[playerid] = card
+		if tempTrick.leadSuit() == sdz.NASuit || tempTrick.winningCard() == sdz.NACard {
+			tempTrick.lead = playerid
+			tempTrick.winningPlayer = playerid
+		}
 		if CardBeatsTrick(card, tempTrick, trump) {
 			tempTrick.winningPlayer = playerid
 			if _, ok := ht.cards[playerid][card]; !ok {
 				tempTrick.certain = false
 			}
 		}
-		tempTrick.played[playerid] = card
 		if len(tempTrick.played) < 4 {
 			tempTrick = rankCard(nextPlayer, ht, tempTrick, trump)
 		}
@@ -461,43 +455,6 @@ func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	//sdz.Log("Playerid %d choosing card %s", ai.Playerid(), ai.trick.played[ai.Playerid()])
 	return rankCard(ai.Playerid(), ai.ht, ai.trick, ai.trump).played[ai.Playerid()]
 }
-
-//// returns 2 if it will win
-//// returns 1 if it will possibly win
-//// returns 0 for not winning
-//func rankCard(partner bool, playerid, playCount int, ht *HandTracker, winning, selected sdz.Card, lead, trump sdz.Suit) int {
-//	message := fmt.Sprintf(" - Evaluated %s - player=%d, playCount=%d,winning=%s,lead=%s,trump=%s", selected, playerid, playCount, winning, lead, trump)
-//	returnVal := 2
-//	if _, ok := ht.cards[playerid][selected]; !ok {
-//		returnVal = 1 // a fuzzy estimate
-//	} else if partner {
-//		returnVal = 0
-//	}
-//	if !selected.Beats(winning, trump) {
-//		sdz.Log("2 - Returning %d - %s", returnVal, message)
-//		return returnVal
-//	}
-//	if playCount == 3 {
-//		sdz.Log("3 - Returning %d - %s", returnVal, message)
-//		return returnVal
-//	}
-//	nextPlayer := (playerid + 1) % 4
-//	playCount++
-//	potCards := potentialCards(nextPlayer, ht, selected, lead, trump)
-//	//sdz.Log("potCards = %v", potCards)
-//	for card := range potCards {
-//		if playCount == 1 {
-//			lead = selected.Suit()
-//		}
-//		if partner {
-//			returnVal = max(returnVal, rankCard(!partner, nextPlayer, playCount, ht, selected, card, lead, trump))
-//		} else {
-//			returnVal = min(returnVal, rankCard(!partner, nextPlayer, playCount, ht, selected, card, lead, trump))
-//		}
-//	}
-//	sdz.Log("5 - Returning %d - %s", returnVal, message)
-//	return returnVal
-//}
 
 func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Suit, trump sdz.Suit) map[sdz.Card]bool {
 	//sdz.Log("PotentialCards called with %d,winning=%s,lead=%s,trump=%s", playerid, winning, lead, trump)
@@ -534,84 +491,8 @@ func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Su
 	return decisionMap
 }
 
-//func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
-//	ai.ht.calculate() // make sure our knowledge is updated
-//	decisionMap := potentialCards(ai.Playerid(), ai.ht, action.WinningCard, action.Lead, action.Trump)
-//	for card := range decisionMap {
-//		decisionMap[card] = rankCard(true, ai.Playerid(), ai.playCount, ai.ht, action.WinningCard, card, action.Lead, action.Trump)
-//		sdz.Log("First result=%d - evaluated %s - player=%d, playCount=%d,winning=%s,lead=%s,trump=%s", decisionMap[card], card, ai.Playerid(), ai.playCount, action.WinningCard, action.Lead, action.Trump)
-//		if decisionMap[card] == 2 {
-//			willWin = true
-//			canWin = true
-//		} else if decisionMap[card] == 1 {
-//			canWin = true
-//		}
-//	}
-//	sdz.Log("willWin = %v, canWin = %v", willWin, canWin)
-//	sdz.Log("RankedDecisionMap = %v", decisionMap)
-//	var selection sdz.Card
-//	for card := range decisionMap {
-//		if selection == "" {
-//			selection = card
-//		}
-//		if (willWin && decisionMap[card] < 2) || (canWin && decisionMap[card] < 1) {
-//			delete(decisionMap, card)
-//			//decisionMap[card] -= 50
-//			continue
-//		}
-//		if willWin {
-//			switch card.Face() {
-//			case sdz.Ace:
-//				decisionMap[card] = 0
-//			case sdz.Ten:
-//				decisionMap[card] = 1
-//			case sdz.King:
-//				decisionMap[card] = 2
-//			case sdz.Queen:
-//				decisionMap[card] = 3
-//			case sdz.Jack:
-//				decisionMap[card] = 4
-//			case sdz.Nine:
-//				decisionMap[card] = 5
-//			}
-//		} else if canWin {
-//			switch card.Face() {
-//			case sdz.Ace:
-//				decisionMap[card] = 5
-//			case sdz.Ten:
-//				decisionMap[card] = 1 // if we're not sure if it wins, we don't want to play it and lose it
-//			case sdz.King:
-//				decisionMap[card] = 0
-//			case sdz.Queen:
-//				decisionMap[card] = 4 // playing a queen first (if it wins) then we'll know that our king and 10 are good too)
-//			case sdz.Jack:
-//				decisionMap[card] = 3
-//			case sdz.Nine:
-//				decisionMap[card] = 2
-//			}
-//		}
-//		if ai.playCount > 0 && action.WinningPlayer%2 == ai.Playerid()%2 {
-//			if card.Counter() && rankCard(true, ai.Playerid(), 0, ai.ht, "", card, "", action.Trump) < 2 { // don't throw winners as counters
-//				decisionMap[card] += 5
-//			} else {
-//				decisionMap[card] -= 5
-//			}
-//		} else {
-//			// rankCard anticipates my partner winning the trick, so canWin or willWin will be set for that case
-//			if ai.hand.Lowest(card) {
-//				decisionMap[card]++
-//			}
-//		}
-//		if decisionMap[card] > decisionMap[selection] {
-//			selection = card
-//		}
-//	}
-//	Log("%d - Playing %s - Decision map = %v", ai.Playerid(), selection, decisionMap)
-//	return selection
-//}
-
 func (ai *AI) Tell(action *sdz.Action) {
-	Log(ai.Playerid(), "Action received by player %d  - %+v", ai.Playerid(), action)
+	Log(ai.Playerid(), "Action received - %+v", action)
 	switch action.Type {
 	case "Bid":
 		if action.Playerid == ai.Playerid() {
@@ -645,17 +526,18 @@ func (ai *AI) Tell(action *sdz.Action) {
 			ai.numBidders++
 		}
 	case "Play":
-		Log(ai.Playerid(), "Trick = %#v", ai.trick)
+		Log(ai.Playerid(), "Trick = %s", ai.trick)
 		if action.Playerid == ai.Playerid() {
 			ai.action = sdz.CreatePlay(ai.findCardToPlay(action), ai.Playerid())
 			action.PlayedCard = ai.action.PlayedCard
 		}
-		sdz.Log("Player%d is playing %s", ai.Playerid(), action.PlayedCard)
 		ai.trick.played[action.Playerid] = action.PlayedCard
 		if ai.trick.leadSuit() == sdz.NASuit || ai.trick.winningCard() == sdz.NACard {
 			ai.trick.lead = action.Playerid
 			ai.trick.winningPlayer = action.Playerid
 			Log(ai.Playerid(), "Set lead to %s", ai.trick.leadSuit())
+		} else if action.PlayedCard.Beats(ai.trick.winningCard(), ai.trump) {
+			ai.trick.winningPlayer = action.Playerid
 		}
 		ai.PlayCard(action.PlayedCard, action.Playerid)
 		if action.Playerid != ai.Playerid() && action.PlayedCard.Suit() != ai.trick.leadSuit() {
@@ -684,17 +566,16 @@ func (ai *AI) Tell(action *sdz.Action) {
 	case "Throwin":
 		Log(ai.Playerid(), "Player %d saw that player %d threw in", ai.Playerid(), action.Playerid)
 	case "Deal":
+		ai.reset()
 		ai.hand = &action.Hand
-		ai.Id = action.Playerid
 		Log(ai.Playerid(), "Set playerid")
 		Log(ai.Playerid(), "Dealt Hand = %s", ai.hand.String())
 		ai.populate()
 		ai.highBid = 20
 		ai.highBid = action.Dealer
 		ai.numBidders = 0
-		ai.trick = NewTrick()
 	case "Meld":
-		sdz.Log("Received meld action - %#v", action)
+		Log(ai.Playerid(), "Received meld action - %#v", action)
 		if action.Playerid == ai.Playerid() {
 			return // seeing our own meld, we don't care
 		}
@@ -726,6 +607,7 @@ func (a *AI) Hand() *sdz.Hand {
 }
 
 func (a *AI) SetHand(h sdz.Hand, dealer, playerid int) {
+	a.Id = playerid
 	hand := make(sdz.Hand, len(h))
 	copy(hand, h)
 	a.Tell(sdz.CreateDeal(hand, playerid, dealer))

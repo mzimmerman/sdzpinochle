@@ -468,7 +468,6 @@ func (game *Game) Go(players []Player) {
 		for x := 0; x < 4; x++ {
 			var bidAction *Action
 			next = (next + 1) % 4
-
 			if !(next == game.Dealer && game.HighBid == 20) { // no need to ask the dealer to bid if they've already won
 				game.Players[next].Tell(CreateBid(0, next))
 				var open bool
@@ -523,6 +522,7 @@ func (game *Game) Go(players []Player) {
 			winningPlayer := next
 			counters := 0
 			for x := 0; x < 4; x++ {
+				//Log("*******************************************************************************NEXT CARD")
 				// play the hand
 				// TODO: handle possible throwin
 				var action *Action
@@ -574,6 +574,7 @@ func (game *Game) Go(players []Player) {
 			game.BroadcastAll(CreateTrick(winningPlayer))
 			Log("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)
 			game.Counters[game.Players[winningPlayer].Team()] += counters
+			//Log("*******************************************************************************NEXT TRICK")
 		}
 		game.Meld[0] += game.Meld[2]
 		game.Counters[0] += game.Counters[2]
