@@ -18,7 +18,7 @@ func TestFoo(t *testing.T) {
 	)
 }
 
-func checkForDupes(h []Hand, t *testSuite) {
+func checkForDupes(h []Hand, t *testSuite) bool {
 	check := map[Card]int{}
 	for x := 0; x < 4; x++ {
 		for y := 0; y < len(h[x]); y++ {
@@ -28,6 +28,7 @@ func checkForDupes(h []Hand, t *testSuite) {
 	for _, value := range check {
 		t.Equal(value, 2)
 	}
+	return !t.Failed()
 }
 
 func fakeDeal(d *Deck) (h []Hand) {
@@ -43,20 +44,20 @@ func (t *testSuite) TestDeal() {
 	var h []Hand
 	h = fakeDeal(&deck)
 	//	fmt.Println("Deck Created")
-	checkForDupes(h, t)
+	t.True(checkForDupes(h, t))
 	deck.Shuffle()
 	//	fmt.Println("Deck Shuffled")
 	h = fakeDeal(&deck)
-	checkForDupes(h, t)
+	t.True(checkForDupes(h, t))
 	h = deck.Deal()
 	//	fmt.Println("Deck Dealt")
-	checkForDupes(h, t)
+	t.True(checkForDupes(h, t))
 	sort.Sort(h[0])
 	sort.Sort(h[1])
 	sort.Sort(h[2])
 	sort.Sort(h[3])
 	//	fmt.Println("Hands Sorted")
-	checkForDupes(h, t)
+	t.True(checkForDupes(h, t))
 }
 
 func (t *testSuite) TestMin() {
@@ -110,7 +111,7 @@ func (t *testSuite) TestValidPlay() {
 	t.True(ValidPlay(C("JD"), C("KD"), Clubs, &hand, Diamonds))
 	hand.Remove(C("QS"))
 	t.True(ValidPlay(C("JD"), C("9S"), Spades, &hand, Clubs))
-	t.False(ValidPlay(C("9S"), NACard, NASuit, &hand, Clubs))
+	t.True(ValidPlay(C("9S"), NACard, NASuit, &hand, Clubs))
 	t.True(ValidPlay(C("9D"), NACard, NASuit, &hand, Clubs))
 }
 
