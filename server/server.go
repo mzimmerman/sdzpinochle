@@ -304,49 +304,49 @@ func min(a, b int) int {
 }
 
 type Trick struct {
-	played        map[int]sdz.Card
-	winningPlayer int
-	certain       bool
-	lead          int
+	Played        map[int]sdz.Card
+	WinningPlayer int
+	certain       bool // only the AI uses this to determine what card to play, not relevant for the server
+	Lead          int
 }
 
 func (t *Trick) String() string {
 	var str = "-"
 	for x := 0; x < 4; x++ {
-		if t.lead == x {
+		if t.Lead == x {
 			str += "s"
 		}
-		if t.winningPlayer == x {
+		if t.WinningPlayer == x {
 			str += "w"
 		}
-		str += string(t.played[x]) + "-"
+		str += string(t.Played[x]) + "-"
 	}
 	return fmt.Sprintf("%s Winning=%s Lead=%s certain=%v", str, t.winningCard(), t.leadSuit(), t.certain)
 }
 
 func NewTrick() *Trick {
 	trick := new(Trick)
-	trick.played = make(map[int]sdz.Card)
+	trick.Played = make(map[int]sdz.Card)
 	trick.certain = true
 	return trick
 }
 
 func (trick *Trick) leadSuit() sdz.Suit {
-	if leadCard, ok := trick.played[trick.lead]; ok {
+	if leadCard, ok := trick.Played[trick.Lead]; ok {
 		return leadCard.Suit()
 	}
 	return sdz.NASuit
 }
 
 func (trick *Trick) winningCard() sdz.Card {
-	if winningCard, ok := trick.played[trick.winningPlayer]; ok {
+	if winningCard, ok := trick.Played[trick.WinningPlayer]; ok {
 		return winningCard
 	}
 	return sdz.NACard
 }
 
 func (trick *Trick) counters() (counters int) {
-	for _, card := range trick.played {
+	for _, card := range trick.Played {
 		if card.Counter() {
 			counters++
 		}
@@ -355,26 +355,26 @@ func (trick *Trick) counters() (counters int) {
 }
 
 func (trick *Trick) worth(playerid int, trump sdz.Suit) (worth int) {
-	if len(trick.played) != 4 {
+	if len(trick.Played) != 4 {
 		sdz.Log("Trick = %s", trick)
 		panic("worth should only be called at the theoretical end of the trick")
 	}
-	for x := range trick.played {
+	for x := range trick.Played {
 		if playerid%2 == x%2 {
-			if trick.played[x].Suit() == trump {
+			if trick.Played[x].Suit() == trump {
 				worth--
 			}
-			switch trick.played[x].Face() {
+			switch trick.Played[x].Face() {
 			case sdz.Ace:
 				worth -= 2
 			case sdz.Ten:
 				worth--
 			}
 		} else {
-			if trick.played[x].Suit() == trump {
+			if trick.Played[x].Suit() == trump {
 				worth++
 			}
-			switch trick.played[x].Face() {
+			switch trick.Played[x].Face() {
 			case sdz.Ace:
 				worth += 2
 			case sdz.Ten:
@@ -383,7 +383,7 @@ func (trick *Trick) worth(playerid int, trump sdz.Suit) (worth int) {
 
 		}
 	}
-	if trick.winningPlayer%2 == playerid%2 {
+	if trick.WinningPlayer%2 == playerid%2 {
 		worth += trick.counters() * 4
 	} else {
 		worth -= trick.counters() * 4
@@ -417,22 +417,22 @@ func rankCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) *Tric
 	for _, card := range Decision(decisionMap).Sort() {
 		tempTrick := new(Trick)
 		*tempTrick = *trick // make a copy
-		trick.played = make(map[int]sdz.Card)
-		for x := range tempTrick.played { // now copy the map
-			trick.played[x] = tempTrick.played[x]
+		trick.Played = make(map[int]sdz.Card)
+		for x := range tempTrick.Played { // now copy the map
+			trick.Played[x] = tempTrick.Played[x]
 		}
-		tempTrick.played[playerid] = card
+		tempTrick.Played[playerid] = card
 		if tempTrick.leadSuit() == sdz.NASuit || tempTrick.winningCard() == sdz.NACard {
-			tempTrick.lead = playerid
-			tempTrick.winningPlayer = playerid
+			tempTrick.Lead = playerid
+			tempTrick.WinningPlayer = playerid
 		}
 		if CardBeatsTrick(card, tempTrick, trump) {
-			tempTrick.winningPlayer = playerid
+			tempTrick.WinningPlayer = playerid
 			if _, ok := ht.cards[playerid][card]; !ok {
 				tempTrick.certain = false
 			}
 		}
-		if len(tempTrick.played) < 4 {
+		if len(tempTrick.Played) < 4 {
 			tempTrick = rankCard(nextPlayer, ht, tempTrick, trump)
 		}
 		//sdz.Log("Playerid = %d - Top = %s, Temp = %s", playerid, topTrick, tempTrick)
@@ -444,12 +444,12 @@ func rankCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) *Tric
 			switch {
 			case topWorth < tempWorth:
 				topTrick = tempTrick
-			case !topTrick.certain && !tempTrick.certain && (topWorth == tempWorth) && (card.Face().Less(topTrick.played[playerid].Face())):
+			case !topTrick.certain && !tempTrick.certain && (topWorth == tempWorth) && (card.Face().Less(topTrick.Played[playerid].Face())):
 				topTrick = tempTrick
-			case topWorth == tempWorth && topTrick.played[playerid].Face().Less(card.Face()):
+			case topWorth == tempWorth && topTrick.Played[playerid].Face().Less(card.Face()):
 				topTrick = tempTrick
 			}
-			if topWorth < tempWorth || (topWorth == tempWorth && topTrick.played[playerid].Face().Less(card.Face())) {
+			if topWorth < tempWorth || (topWorth == tempWorth && topTrick.Played[playerid].Face().Less(card.Face())) {
 				topTrick = tempTrick
 			}
 		}
@@ -463,7 +463,7 @@ func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	//sdz.Log("htcardset - Player%d is calculating", ai.Playerid())
 	//sdz.Log("Before rankCard as player %d", ai.Playerid())
 	//sdz.Log("Playerid %d choosing card %s", ai.Playerid(), ai.trick.played[ai.Playerid()])
-	return rankCard(ai.Playerid(), ai.ht, ai.trick, ai.trump).played[ai.Playerid()]
+	return rankCard(ai.Playerid(), ai.ht, ai.trick, ai.trump).Played[ai.Playerid()]
 }
 
 func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Suit, trump sdz.Suit) map[sdz.Card]bool {
@@ -541,13 +541,13 @@ func (ai *AI) Tell(action *sdz.Action) *sdz.Action {
 			ai.action = sdz.CreatePlay(ai.findCardToPlay(action), ai.Playerid())
 			action.PlayedCard = ai.action.PlayedCard
 		}
-		ai.trick.played[action.Playerid] = action.PlayedCard
+		ai.trick.Played[action.Playerid] = action.PlayedCard
 		if ai.trick.leadSuit() == sdz.NASuit || ai.trick.winningCard() == sdz.NACard {
-			ai.trick.lead = action.Playerid
-			ai.trick.winningPlayer = action.Playerid
+			ai.trick.Lead = action.Playerid
+			ai.trick.WinningPlayer = action.Playerid
 			Log(ai.Playerid(), "Set lead to %s", ai.trick.leadSuit())
 		} else if action.PlayedCard.Beats(ai.trick.winningCard(), ai.trump) {
-			ai.trick.winningPlayer = action.Playerid
+			ai.trick.WinningPlayer = action.Playerid
 		}
 		ai.PlayCard(action.PlayedCard, action.Playerid)
 		if action.Playerid != ai.Playerid() && action.PlayedCard.Suit() != ai.trick.leadSuit() {
@@ -1124,28 +1124,28 @@ func (game *Game) processAction(c appengine.Context, action *sdz.Action) {
 			// TODO: check for throw in
 			if sdz.ValidPlay(action.PlayedCard, game.Trick.winningCard(), game.Trick.leadSuit(), game.Players[game.Next].Hand(), game.Trump) &&
 				game.Players[game.Next].Hand().Remove(action.PlayedCard) {
-				game.Trick.played[game.Next] = action.PlayedCard
+				game.Trick.Played[game.Next] = action.PlayedCard
 				game.Broadcast(action, game.Next)
-				if len(game.Trick.played) == 1 {
-					game.Trick.lead = game.Next
+				if len(game.Trick.Played) == 1 {
+					game.Trick.Lead = game.Next
 				}
-				if game.Trick.played[game.Next].Beats(game.Trick.winningCard(), game.Trump) {
-					game.Trick.winningPlayer = game.Next
+				if game.Trick.Played[game.Next].Beats(game.Trick.winningCard(), game.Trump) {
+					game.Trick.WinningPlayer = game.Next
 				}
 			}
-			if len(game.Trick.played) == len(game.Players) {
-				for _, card := range game.Trick.played {
+			if len(game.Trick.Played) == len(game.Players) {
+				for _, card := range game.Trick.Played {
 					if card.Counter() {
-						game.Counters[game.Trick.winningPlayer%2]++
+						game.Counters[game.Trick.WinningPlayer%2]++
 					}
 				}
-				game.CountMeld[game.Trick.winningPlayer%2] = true
-				game.Next = game.Trick.winningPlayer
-				game.BroadcastAll(sdz.CreateMessage(fmt.Sprintf("Player %d wins trick with %s", game.Trick.winningPlayer, game.Trick.winningCard())))
-				game.BroadcastAll(sdz.CreateTrick(game.Trick.winningPlayer))
-				Log(4, "Player %d wins trick with %s", game.Trick.winningPlayer, game.Trick.winningCard())
+				game.CountMeld[game.Trick.WinningPlayer%2] = true
+				game.Next = game.Trick.WinningPlayer
+				game.BroadcastAll(sdz.CreateMessage(fmt.Sprintf("Player %d wins trick with %s", game.Trick.WinningPlayer, game.Trick.winningCard())))
+				game.BroadcastAll(sdz.CreateTrick(game.Trick.WinningPlayer))
+				Log(4, "Player %d wins trick with %s", game.Trick.WinningPlayer, game.Trick.winningCard())
 				if len(*game.Players[0].Hand()) == 0 {
-					game.Counters[game.Trick.winningPlayer%2]++ // last trick
+					game.Counters[game.Trick.WinningPlayer%2]++ // last trick
 					// end of hand
 					game.HandsPlayed++
 					if game.HighBid <= game.Meld[game.HighPlayer%2]+game.Counters[game.HighPlayer%2] {

@@ -211,38 +211,38 @@ func (t *testSuite) TestRankCard() {
 	}
 
 	trick := NewTrick()
-	trick.played[0] = C("AD")
-	trick.played[1] = C("AD")
-	trick.played[2] = C("KD")
-	trick.winningPlayer = 0
-	trick.lead = 0
+	trick.Played[0] = C("AD")
+	trick.Played[1] = C("AD")
+	trick.Played[2] = C("KD")
+	trick.WinningPlayer = 0
+	trick.Lead = 0
 	// 3 has options of KD
 	victim := rankCard(3, ht, trick, sdz.Diamonds)
-	t.Equal(C("AD"), victim.played[0])
-	t.Equal(C("AD"), victim.played[1])
-	t.Equal(C("KD"), victim.played[2])
-	t.Equal(C("KD"), victim.played[3])
+	t.Equal(C("AD"), victim.Played[0])
+	t.Equal(C("AD"), victim.Played[1])
+	t.Equal(C("KD"), victim.Played[2])
+	t.Equal(C("KD"), victim.Played[3])
 	t.Equal(-32, victim.worth(3, sdz.Diamonds))
 
 	trick = NewTrick()
-	trick.played[0] = C("AD")
-	trick.played[1] = C("AD")
-	trick.winningPlayer = 0
-	trick.lead = 0
+	trick.Played[0] = C("AD")
+	trick.Played[1] = C("AD")
+	trick.WinningPlayer = 0
+	trick.Lead = 0
 	// 2 has real options of KD, TD, QD
 	// 3 has real options of KD
 	victim = rankCard(2, ht, trick, sdz.Diamonds)
-	t.Equal(C("AD"), victim.played[0])
-	t.Equal(C("AD"), victim.played[1])
-	t.Equal(C("KD"), victim.played[2])
-	t.Equal(C("KD"), victim.played[3])
+	t.Equal(C("AD"), victim.Played[0])
+	t.Equal(C("AD"), victim.Played[1])
+	t.Equal(C("KD"), victim.Played[2])
+	t.Equal(C("KD"), victim.Played[3])
 	t.Equal(32, victim.worth(2, sdz.Diamonds))
 
 	trick = NewTrick()
-	trick.played[0] = C("TD")
-	trick.played[1] = C("AD")
-	trick.winningPlayer = 1
-	trick.lead = 0
+	trick.Played[0] = C("TD")
+	trick.Played[1] = C("AD")
+	trick.WinningPlayer = 1
+	trick.Lead = 0
 	ht.cards[2][C("9D")] = 0
 	// 2 has real options of KD, TD, QD and no option of a 9D
 	ht.cards[3][C("KD")] = 1
@@ -252,20 +252,20 @@ func (t *testSuite) TestRankCard() {
 	ht.cards[3][C("QD")] = 1
 	// 3 has options of KD, TD, AD, 9D, and QD
 	victim = rankCard(2, ht, trick, sdz.Diamonds)
-	t.Equal(C("TD"), victim.played[0])
-	t.Equal(C("AD"), victim.played[1])
-	t.Equal(C("JD"), victim.played[2])
-	t.Equal(C("KD"), victim.played[3])
+	t.Equal(C("TD"), victim.Played[0])
+	t.Equal(C("AD"), victim.Played[1])
+	t.Equal(C("JD"), victim.Played[2])
+	t.Equal(C("KD"), victim.Played[3])
 
 }
 
 func (t *testSuite) TestWorth() {
 	trick := NewTrick()
-	trick.played[0] = C("AS")
-	trick.played[1] = C("9S")
-	trick.played[2] = C("KS")
-	trick.played[3] = C("QS")
-	trick.winningPlayer = 0
+	trick.Played[0] = C("AS")
+	trick.Played[1] = C("9S")
+	trick.Played[2] = C("KS")
+	trick.Played[3] = C("QS")
+	trick.WinningPlayer = 0
 	t.Equal(12, trick.worth(0, sdz.Diamonds))
 	t.Equal(12, trick.worth(2, sdz.Diamonds))
 	t.Equal(-12, trick.worth(1, sdz.Diamonds))
@@ -280,11 +280,11 @@ func (t *testSuite) TestWorth() {
 	t.Equal(-6, trick.worth(1, sdz.Spades))
 	t.Equal(-6, trick.worth(3, sdz.Spades))
 
-	trick.played[0] = C("9S")
-	trick.played[1] = C("AS")
-	trick.played[2] = C("KS")
-	trick.played[3] = C("TS")
-	trick.winningPlayer = 1
+	trick.Played[0] = C("9S")
+	trick.Played[1] = C("AS")
+	trick.Played[2] = C("KS")
+	trick.Played[3] = C("TS")
+	trick.WinningPlayer = 1
 	trick.certain = false
 	t.Equal(-9, trick.worth(0, sdz.Diamonds))
 	t.Equal(-9, trick.worth(2, sdz.Diamonds))
@@ -295,17 +295,17 @@ func (t *testSuite) TestWorth() {
 	t.Equal(9, trick.worth(1, sdz.Spades))
 	t.Equal(9, trick.worth(3, sdz.Spades))
 
-	trick.played[0] = C("9S")
-	trick.played[1] = C("AS")
-	trick.played[2] = C("JD")
-	trick.played[3] = C("TS")
-	trick.winningPlayer = 2
+	trick.Played[0] = C("9S")
+	trick.Played[1] = C("AS")
+	trick.Played[2] = C("JD")
+	trick.Played[3] = C("TS")
+	trick.WinningPlayer = 2
 	trick.certain = false
 	t.Equal(10, trick.worth(0, sdz.Diamonds))
 	t.Equal(10, trick.worth(2, sdz.Diamonds))
 	t.Equal(-10, trick.worth(1, sdz.Diamonds))
 	t.Equal(-10, trick.worth(3, sdz.Diamonds))
-	trick.winningPlayer = 1
+	trick.WinningPlayer = 1
 	t.Equal(-4, trick.worth(0, sdz.Spades))
 	t.Equal(-4, trick.worth(2, sdz.Spades))
 	t.Equal(4, trick.worth(1, sdz.Spades))
@@ -570,7 +570,7 @@ func (t *testSuite) TestAITracking() {
 	t.Equal(0, ai.ht.cards[3][C("QD")])
 	t.Equal(1, ai.ht.cards[1][C("KD")])
 
-	ai.trick.lead = 1
+	ai.trick.Lead = 1
 	ai.Tell(sdz.CreatePlay(C("JD"), 1))
 	ai.Tell(sdz.CreatePlay(C("KD"), 2))
 	ai.Tell(sdz.CreatePlay(C("AD"), 3))
@@ -590,7 +590,7 @@ func (t *testSuite) TestAITracking() {
 	t.Equal(1, ai.ht.playedCards[C("KD")])
 	t.Equal(1, ai.ht.playedCards[C("AD")])
 
-	ai.trick.lead = 1
+	ai.trick.Lead = 1
 	ai.Tell(sdz.CreatePlay(C("QD"), 1))
 	ai.Tell(sdz.CreatePlay(C("9H"), 2))
 	ai.Tell(sdz.CreatePlay(C("9H"), 3))
@@ -607,7 +607,7 @@ func (t *testSuite) TestAITracking() {
 	ai.Tell(sdz.CreateMeld(sdz.Hand{}, 0, 2))
 	ai.Tell(sdz.CreateMeld(sdz.Hand{}, 0, 3))
 	//ai.calculate()
-	ai.trick.lead = 1
+	ai.trick.Lead = 1
 
 	ai.Tell(sdz.CreatePlay(C("JD"), 1))
 	ai.Tell(sdz.CreatePlay(C("JD"), 2))
