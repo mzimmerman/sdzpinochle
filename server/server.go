@@ -2,30 +2,40 @@
 package main
 
 import (
+	"appengine"
+	//"appengine/datastore"
+	"appengine/mail"
 	"code.google.com/p/go.net/websocket"
 	"encoding/json"
+	"errors"
 	"fmt"
 	sdz "github.com/mzimmerman/sdzpinochle"
-	"html/template"
+	//"html/template"
 	"math/rand"
-	"net"
-	"net/http"
+	//"net"
+	//"net/http"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	//"time"
 )
 
 const (
-	ace      = "A"
-	ten      = "T"
-	king     = "K"
-	queen    = "Q"
-	jack     = "J"
-	nine     = "9"
-	spades   = "S"
-	hearts   = "H"
-	clubs    = "C"
-	diamonds = "D"
+	ace       = "A"
+	ten       = "T"
+	king      = "K"
+	queen     = "Q"
+	jack      = "J"
+	nine      = "9"
+	spades    = "S"
+	hearts    = "H"
+	clubs     = "C"
+	diamonds  = "D"
+	StateDeal = iota
+	StateBid
+	StateTrump
+	StateMeld
+	StatePlay
 )
 
 func Log(playerid int, m string, v ...interface{}) {
@@ -491,7 +501,7 @@ func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Su
 	return decisionMap
 }
 
-func (ai *AI) Tell(action *sdz.Action) {
+func (ai *AI) Tell(action *sdz.Action) *sdz.Action {
 	Log(ai.Playerid(), "Action received - %+v", action)
 	switch action.Type {
 	case "Bid":
@@ -516,7 +526,7 @@ func (ai *AI) Tell(action *sdz.Action) {
 			}
 			meld, _ := ai.hand.Meld(ai.trump)
 			Log(ai.Playerid(), "------------------Player %d bid %d over %d with recommendation of %d and %d meld", ai.Playerid(), ai.bidAmount, ai.highBid, bidAmountOld, meld)
-			ai.action = sdz.CreateBid(ai.bidAmount, ai.Playerid())
+			return sdz.CreateBid(ai.bidAmount, ai.Playerid())
 		} else {
 			// received someone else's bid value'
 			if ai.highBid < action.Bid {
@@ -548,6 +558,7 @@ func (ai *AI) Tell(action *sdz.Action) {
 				ai.noSuit(action.Playerid, ai.trump)
 			}
 		}
+		return ai.action
 	case "Trump":
 		if action.Playerid == ai.Playerid() {
 			meld, _ := ai.hand.Meld(ai.trump)
@@ -555,9 +566,9 @@ func (ai *AI) Tell(action *sdz.Action) {
 			switch {
 			// TODO add case for the end of the game like if opponents will coast out
 			case ai.bidAmount < 15:
-				ai.action = sdz.CreateThrowin(ai.Playerid())
+				return sdz.CreateThrowin(ai.Playerid())
 			default:
-				ai.action = sdz.CreateTrump(ai.trump, ai.Playerid())
+				return sdz.CreateTrump(ai.trump, ai.Playerid())
 			}
 		} else {
 			ai.trump = action.Trump
@@ -577,7 +588,7 @@ func (ai *AI) Tell(action *sdz.Action) {
 	case "Meld":
 		Log(ai.Playerid(), "Received meld action - %#v", action)
 		if action.Playerid == ai.Playerid() {
-			return // seeing our own meld, we don't care
+			return nil // seeing our own meld, we don't care
 		}
 		for _, card := range action.Hand {
 			val, ok := ai.ht.cards[action.Playerid][card]
@@ -595,6 +606,7 @@ func (ai *AI) Tell(action *sdz.Action) {
 	default:
 		Log(ai.Playerid(), "Received an action I didn't understand - %v", action)
 	}
+	return nil
 }
 
 func (a *AI) Listen() (action *sdz.Action, open bool) {
@@ -629,15 +641,15 @@ func (h Human) Close() {
 	(*h.conn).Close()
 }
 
-func (h *Human) Tell(action *sdz.Action) {
+func (h *Human) Tell(action *sdz.Action) *sdz.Action {
 	jsonData, _ := json.Marshal(action)
 	Log(h.Playerid(), "--> %s", jsonData)
 	err := websocket.JSON.Send(h.conn, action)
 	if err != nil {
 		sdz.Log("Error in Send - %v", err)
 		h.Close()
-		return
 	}
+	return nil
 }
 
 func (h *Human) Listen() (action *sdz.Action, open bool) {
@@ -665,175 +677,564 @@ func (a *Human) SetHand(h sdz.Hand, dealer, playerid int) {
 	a.Tell(sdz.CreateDeal(hand, a.Playerid(), dealer))
 }
 
-func (h *Human) createGame(option int, cp *ConnectionPool) {
-	game := new(sdz.Game)
-	players := make([]sdz.Player, 4)
-	// connect players
-	players[0] = h
-	switch option {
-	case 1:
-		// Option 1 - Play against three AI players and start immediately
-		for x := 1; x < 4; x++ {
-			players[x] = createAI()
-		}
-	case 2:
-		// Option 2 - Play with a human partner against two AI players
-		players[1] = createAI()
-		players[2] = cp.Pop()
-		players[3] = createAI()
-	case 3:
-		// Option 3 - Play with a human partner against one AI players and 1 Human
-		players[1] = createAI()
-		players[2] = cp.Pop()
-		players[3] = cp.Pop()
+//func (h *Human) createGame(option int, cp *ConnectionPool) {
+//	game := new(Game)
+//	players := make([]sdz.Player, 4)
+//	// connect players
+//	players[0] = h
+//	switch option {
+//	case 1:
+//		// Option 1 - Play against three AI players and start immediately
+//		for x := 1; x < 4; x++ {
+//			players[x] = createAI()
+//		}
+//	case 2:
+//		// Option 2 - Play with a human partner against two AI players
+//		players[1] = createAI()
+//		players[2] = cp.Pop()
+//		players[3] = createAI()
+//	case 3:
+//		// Option 3 - Play with a human partner against one AI players and 1 Human
+//		players[1] = createAI()
+//		players[2] = cp.Pop()
+//		players[3] = cp.Pop()
 
-	case 4:
-		// Option 4 - Play with a human partner against two humans
-		for x := 1; x < 4; x++ {
-			players[x] = cp.Pop()
+//	case 4:
+//		// Option 4 - Play with a human partner against two humans
+//		for x := 1; x < 4; x++ {
+//			players[x] = cp.Pop()
+//		}
+//	case 5:
+//		// Option 5 - Play against a human with AI partners
+//		players[1] = cp.Pop()
+//		players[2] = createAI()
+//		players[3] = createAI()
+//	}
+//	game.KickOff()
+//}
+
+//type ConnectionPool struct {
+//	connections chan *Human
+//}
+
+//func (cp *ConnectionPool) Push(h *Human) {
+//	cp.connections <- h
+//	return
+//}
+
+//func (cp *ConnectionPool) Pop() *Human {
+//	return <-cp.connections
+//}
+
+//func setupGame(net *websocket.Conn, cp *ConnectionPool) {
+//	Log(4, "Connection received")
+//	human := createHuman(net)
+//	for {
+//		for {
+//			human.Tell(sdz.CreateMessage("Do you want to join a game, create a new game, or quit? (join, create, quit)"))
+//			action := sdz.CreateHello("")
+//			human.Tell(action)
+//			action, open := human.Listen()
+//			if !open {
+//				return
+//			}
+//			if action.Message == "create" {
+//				break
+//			} else if action.Message == "join" {
+//				human.Tell(sdz.CreateMessage("Waiting on a game to be started that you can join..."))
+//				cp.Push(human)
+//				<-human.finished // this will block to keep the websocket open
+//				continue
+//			} else if action.Message == "quit" {
+//				human.Tell(sdz.CreateMessage("Ok, bye bye!"))
+//				human.Close()
+//				return
+//			}
+//		}
+//		for {
+//			human.Tell(sdz.CreateMessage("Option 1 - Play against three AI players and start immediately"))
+//			human.Tell(sdz.CreateMessage("Option 2 - Play with a human partner against two AI players"))
+//			human.Tell(sdz.CreateMessage("Option 3 - Play with a human partner against one AI players and 1 Human"))
+//			human.Tell(sdz.CreateMessage("Option 4 - Play with a human partner against two humans"))
+//			human.Tell(sdz.CreateMessage("Option 5 - Play against a human with AI partners"))
+//			human.Tell(sdz.CreateMessage("Option 6 - Go back"))
+//			human.Tell(sdz.CreateGame(0))
+//			action, open := human.Listen()
+//			if !open {
+//				return
+//			}
+//			switch action.Option {
+//			case 1:
+//				fallthrough
+//			case 2:
+//				fallthrough
+//			case 3:
+//				fallthrough
+//			case 4:
+//				fallthrough
+//			case 5:
+//				human.createGame(action.Option, cp)
+//			case 6:
+//				break
+//			default:
+//				human.Tell(sdz.CreateMessage("Not a valid option"))
+//			}
+//			break // after their game is over, let's set them up again'
+//		}
+//	}
+//}
+
+//func wshandler(ws *websocket.Conn) {
+//	//cookie, err := ws.Request().Cookie("pinochle")
+//	//if err != nil {
+//	//	Log("Could not get cookie - %v", err)
+//	//	return
+//	//}
+//	setupGame(ws, cp)
+//}
+
+func logError(c appengine.Context, err error) bool {
+	if err != nil {
+		if appengine.IsOverQuota(err) {
+			mail.SendToAdmins(c, &mail.Message{
+				Sender:  "mzimmerman@gmail.com",
+				Subject: "SDZPinochle is over quota!",
+				Body:    fmt.Sprintf("SDZPinochle is over quota.  The error is:\n\n%#v", err),
+			})
 		}
-	case 5:
-		// Option 5 - Play against a human with AI partners
-		players[1] = cp.Pop()
-		players[2] = createAI()
-		players[3] = createAI()
+		c.Errorf("Error - %v", err)
+		c.Debugf("Stack = %s", debug.Stack())
+		return true
 	}
-	game.Go(players)
-	//h.finished <- true
-	for x := 1; x < 4; x++ {
-		if th, ok := players[x].(*Human); ok {
-			th.finished <- true
+	return false
+}
+
+type Game struct {
+	Trick       *Trick
+	Deck        sdz.Deck
+	Players     []sdz.Player
+	Dealer      int
+	Score       []int
+	Meld        []int
+	CountMeld   []bool
+	Counters    []int
+	HighBid     int
+	HighPlayer  int
+	Trump       sdz.Suit
+	State       int
+	Next        int
+	Hands       []sdz.Hand
+	HandsPlayed int
+}
+
+func NewGame(players int) *Game {
+	game := new(Game)
+	game.Players = make([]sdz.Player, players)
+	game.Score = make([]int, players/2)
+	game.Deck = sdz.CreateDeck()
+	return game
+}
+
+// PRE : Players are already created and set
+func (game *Game) NextHand(c appengine.Context) {
+	game.Meld = make([]int, len(game.Players)/2)
+	game.Trick = NewTrick()
+	game.CountMeld = make([]bool, len(game.Players)/2)
+	game.Counters = make([]int, len(game.Players)/2)
+	game.HighBid = 20
+	game.HighPlayer = game.Dealer
+	game.State = StateBid
+	game.Next = game.Dealer
+	game.Deck.Shuffle()
+	Log(4, "Dealer is %d", game.Dealer)
+	hands := game.Deck.Deal()
+	for x := 0; x < len(game.Players); x++ {
+		game.Next = game.inc()
+		sort.Sort(hands[x])
+		game.Players[game.Next].SetHand(hands[x], game.Dealer, game.Next)
+		Log(4, "Dealing player %d hand %s", game.Next, game.Players[game.Next].Hand())
+	}
+	game.Next = game.inc() // increment so that Dealer + 1 is asked to bid first
+	game.processAction(c, game.Players[game.Next].Tell(sdz.CreateBid(0, game.Next)))
+	// processAction will write the game to the datastore when it's done processing the action(s)
+}
+
+func (game *Game) inc() int {
+	return (game.Next + 1) % len(game.Players)
+}
+
+//func (game *Game) Go(players []Player) {
+//	game.Deck = CreateDeck()
+//	game.Players = players
+//	game.Score = make([]int, 2)
+//	handsPlayed := 0
+//	game.Dealer = 0
+//	for {
+//		handsPlayed++
+//		// shuffle & deal
+//		game.Deck.Shuffle()
+//		hands := game.Deck.Deal()
+//		next := game.Dealer
+//		game.Meld = make([]int, len(game.Players))
+//		game.MeldHands = make([]Hand, len(game.Players))
+//		game.Counters = make([]int, len(game.Players))
+//		for x := 0; x < len(game.Players); x++ {
+//			next = (next + 1) % 4
+//			sort.Sort(hands[x])
+//			game.Players[next].SetHand(hands[x], game.Dealer, next)
+//			//Log("Dealing player %d hand %s", next, game.Players[next].Hand())
+//		}
+//		// ask players to bid
+//		game.HighBid = 20
+//		game.HighPlayer = game.Dealer
+//		next = game.Dealer
+//		for x := 0; x < 4; x++ {
+//			var bidAction *Action
+//			next = (next + 1) % 4
+//			if !(next == game.Dealer && game.HighBid == 20) { // no need to ask the dealer to bid if they've already won
+//				game.Players[next].Tell(CreateBid(0, next))
+//				var open bool
+//				bidAction, open = game.Players[next].Listen()
+//				if !open {
+//					game.Broadcast(CreateMessage("Player disconnected"), next)
+//					return
+//				}
+//			} else {
+//				bidAction = CreateBid(game.HighBid, game.Dealer)
+//			}
+//			game.Broadcast(bidAction, next)
+//			if bidAction.Bid > game.HighBid {
+//				game.HighBid = bidAction.Bid
+//				game.HighPlayer = next
+//			}
+//		}
+//		// ask trump
+//		game.Players[game.HighPlayer].Tell(CreateTrump(*new(Suit), game.HighPlayer))
+//		response, open := game.Players[game.HighPlayer].Listen()
+//		if !open {
+//			game.Broadcast(CreateMessage("Player disconnected"), game.HighPlayer)
+//			return
+//		}
+//		switch response.Type {
+//		case "Throwin":
+//			game.Broadcast(response, response.Playerid)
+//			game.Score[game.HighPlayer%2] -= game.HighBid
+//			game.BroadcastAll(CreateMessage(fmt.Sprintf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], handsPlayed)))
+//			Log("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], handsPlayed)
+//			game.Dealer = (game.Dealer + 1) % 4
+//			Log("-----------------------------------------------------------------------------")
+//			continue
+//		case "Trump":
+//			game.Trump = response.Trump
+//			Log("Trump is set to %s", game.Trump)
+//			game.Broadcast(response, game.HighPlayer)
+//		default:
+//			panic("Didn't receive either expected response")
+//		}
+//		for x := 0; x < len(game.Players); x++ {
+//			game.Meld[x], game.MeldHands[x] = game.Players[x].Hand().Meld(game.Trump)
+//			meldAction := CreateMeld(game.MeldHands[x], game.Meld[x], x)
+//			game.BroadcastAll(meldAction)
+//		}
+//		next = game.HighPlayer
+//		countMeld := make([]bool, 2)
+//		for trick := 0; trick < 12; trick++ {
+//			var winningCard Card
+//			var cardPlayed Card
+//			var leadSuit Suit
+//			winningPlayer := next
+//			counters := 0
+//			for x := 0; x < 4; x++ {
+//				//Log("*******************************************************************************NEXT CARD")
+//				// play the hand
+//				// TODO: handle possible throwin
+//				var action *Action
+//				for {
+//					action = CreatePlayRequest(winningCard, leadSuit, game.Trump, next, game.Players[next].Hand())
+//					game.Players[next].Tell(action)
+//					action, open = game.Players[next].Listen()
+//					if !open {
+//						game.Broadcast(CreateMessage("Player disconnected"), next)
+//						return
+//					}
+//					cardPlayed = action.PlayedCard
+//					if x > 0 {
+//						if ValidPlay(cardPlayed, winningCard, leadSuit, game.Players[next].Hand(), game.Trump) &&
+//							game.Players[next].Hand().Remove(cardPlayed) {
+//							// playedCard, winningCard Card, leadSuit Suit, hand Hand, trump Suit
+//							break
+//						}
+//					} else if game.Players[next].Hand().Remove(cardPlayed) {
+//						break
+//					}
+//				}
+//				switch cardPlayed.Face() {
+//				case Ace:
+//					fallthrough
+//				case Ten:
+//					fallthrough
+//				case King:
+//					counters++
+//				}
+//				if x == 0 {
+//					winningCard = cardPlayed
+//					leadSuit = cardPlayed.Suit()
+//				} else {
+//					if cardPlayed.Beats(winningCard, game.Trump) {
+//						winningCard = cardPlayed
+//						winningPlayer = next
+//					}
+//				}
+//				game.Broadcast(action, next)
+//				next = (next + 1) % 4
+//			}
+//			next = winningPlayer
+//			if trick == 11 {
+//				counters++
+//			}
+//			countMeld[winningPlayer%2] = true
+//			game.BroadcastAll(CreateMessage(fmt.Sprintf("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)))
+//			game.BroadcastAll(CreateTrick(winningPlayer))
+//			Log("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)
+//			game.Counters[game.Players[winningPlayer].Team()] += counters
+//			//Log("*******************************************************************************NEXT TRICK")
+//		}
+//		game.Meld[0] += game.Meld[2]
+//		game.Counters[0] += game.Counters[2]
+//		game.Meld[1] += game.Meld[3]
+//		game.Counters[1] += game.Counters[3]
+//		if game.HighBid <= game.Meld[game.HighPlayer%2]+game.Counters[game.HighPlayer%2] {
+//			game.Score[game.HighPlayer%2] += game.Meld[game.HighPlayer%2] + game.Counters[game.HighPlayer%2]
+//		} else {
+//			game.Score[game.HighPlayer%2] -= game.HighBid
+//		}
+//		if countMeld[(game.HighPlayer+1)%2] {
+//			game.Score[(game.HighPlayer+1)%2] += game.Meld[(game.HighPlayer+1)%2] + game.Counters[(game.HighPlayer+1)%2]
+//		}
+//		// check the score for a winner
+//		game.BroadcastAll(CreateMessage(fmt.Sprintf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], handsPlayed)))
+//		Log("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], handsPlayed)
+//		win := make([]bool, 2)
+//		gameOver := false
+//		if game.Score[game.HighPlayer%2] >= 120 {
+//			win[game.HighPlayer%2] = true
+//			gameOver = true
+//		} else if game.Score[(game.HighPlayer+1)%2] >= 120 {
+//			win[(game.HighPlayer+1)%2] = true
+//			gameOver = true
+//		}
+//		for x := 0; x < len(game.Players); x++ {
+//			game.Players[x].Tell(CreateScore(x, game.Score, gameOver, win[x%2]))
+//		}
+//		if gameOver {
+//			return
+//		}
+//		game.Dealer = (game.Dealer + 1) % 4
+//		Log("-----------------------------------------------------------------------------")
+//	}
+//	for x := 0; x < 4; x++ {
+//		game.Players[x].Close()
+//	}
+//}
+
+func (g Game) Broadcast(a *sdz.Action, p int) {
+	for x, player := range g.Players {
+		if p != x {
+			player.Tell(a)
 		}
 	}
 }
 
-type ConnectionPool struct {
-	connections chan *Human
+func (g Game) BroadcastAll(a *sdz.Action) {
+	g.Broadcast(a, -1)
 }
 
-func (cp *ConnectionPool) Push(h *Human) {
-	cp.connections <- h
-	return
-}
+//func gameAction(w http.ResponseWriter, r *http.Request) {
+//	c := appengine.NewContext(r)
+//	game := new(Game)
+//	err := datastore.Get("id", game)
+//	action := new(sdz.Action)
+//	logError(c, err)
+//}
 
-func (cp *ConnectionPool) Pop() *Human {
-	return <-cp.connections
-}
-
-func setupGame(net *websocket.Conn, cp *ConnectionPool) {
-	Log(4, "Connection received")
-	human := createHuman(net)
+func (game *Game) processAction(c appengine.Context, action *sdz.Action) {
 	for {
-		for {
-			human.Tell(sdz.CreateMessage("Do you want to join a game, create a new game, or quit? (join, create, quit)"))
-			action := sdz.CreateHello("")
-			human.Tell(action)
-			action, open := human.Listen()
-			if !open {
-				return
-			}
-			if action.Message == "create" {
-				break
-			} else if action.Message == "join" {
-				human.Tell(sdz.CreateMessage("Waiting on a game to be started that you can join..."))
-				cp.Push(human)
-				<-human.finished // this will block to keep the websocket open
+		if action == nil {
+			// waiting on a human, save the state and exit
+			return
+		}
+		switch game.State {
+		case StateBid:
+			if action.Type != "Bid" {
+				logError(c, errors.New("Received non bid action"))
+				action = nil
 				continue
-			} else if action.Message == "quit" {
-				human.Tell(sdz.CreateMessage("Ok, bye bye!"))
-				human.Close()
-				return
 			}
-		}
-		for {
-			human.Tell(sdz.CreateMessage("Option 1 - Play against three AI players and start immediately"))
-			human.Tell(sdz.CreateMessage("Option 2 - Play with a human partner against two AI players"))
-			human.Tell(sdz.CreateMessage("Option 3 - Play with a human partner against one AI players and 1 Human"))
-			human.Tell(sdz.CreateMessage("Option 4 - Play with a human partner against two humans"))
-			human.Tell(sdz.CreateMessage("Option 5 - Play against a human with AI partners"))
-			human.Tell(sdz.CreateMessage("Option 6 - Go back"))
-			human.Tell(sdz.CreateGame(0))
-			action, open := human.Listen()
-			if !open {
-				return
+			if action.Playerid != game.Next {
+				logError(c, errors.New("It's not your turn!"))
+				action = nil
+				continue
 			}
-			switch action.Option {
-			case 1:
-				fallthrough
-			case 2:
-				fallthrough
-			case 3:
-				fallthrough
-			case 4:
-				fallthrough
-			case 5:
-				human.createGame(action.Option, cp)
-			case 6:
-				break
-			default:
-				human.Tell(sdz.CreateMessage("Not a valid option"))
+			game.Broadcast(action, game.Next)
+			if action.Bid > game.HighBid {
+				game.HighBid = action.Bid
+				game.HighPlayer = game.Next
 			}
-			break // after their game is over, let's set them up again'
-		}
-	}
-}
-
-func wshandler(ws *websocket.Conn) {
-	//cookie, err := ws.Request().Cookie("pinochle")
-	//if err != nil {
-	//	Log("Could not get cookie - %v", err)
-	//	return
-	//}
-	setupGame(ws, cp)
-}
-
-func serveGame(w http.ResponseWriter, r *http.Request) {
-	listTmpl, err := template.New("tempate").ParseGlob("*.html")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	err = listTmpl.ExecuteTemplate(w, "game", nil)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-}
-
-var cp *ConnectionPool
-
-func listenForFlash() {
-	response := []byte("<cross-domain-policy><allow-access-from domain=\"*\" to-ports=\"*\" /></cross-domain-policy>")
-	ln, err := net.Listen("tcp", ":843")
-	if err != nil {
-		sdz.Log("Cannot listen on port 843 for flash policy file, will not serve non WebSocket clients, check permissions or run as root - " + err.Error())
-		return
-	}
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			// handle error
+			if game.HighPlayer == game.Dealer && game.inc() == game.Dealer { // dealer was stuck, tell everyone
+				game.Broadcast(sdz.CreateBid(game.HighBid, game.Dealer), game.Dealer)
+				game.Next = game.inc()
+			}
+			if game.Next == game.Dealer { // the bidding is done
+				game.State = StateTrump
+				game.Next = game.HighPlayer
+				action = game.Players[game.HighPlayer].Tell(sdz.CreateTrump(sdz.NASuit, game.HighPlayer))
+				continue
+			}
+			game.Next = game.inc()
+			action = game.Players[game.Next].Tell(sdz.CreateBid(0, game.Next))
+			continue
+		case StateTrump:
+			switch action.Type {
+			case "Throwin":
+				game.Broadcast(action, action.Playerid)
+				game.Score[game.HighPlayer%2] -= game.HighBid
+				game.BroadcastAll(sdz.CreateMessage(fmt.Sprintf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)))
+				Log(4, "Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)
+				game.Dealer = (game.Dealer + 1) % 4
+				Log(4, "-----------------------------------------------------------------------------")
+				game.NextHand(c)
+				continue
+			case "Trump":
+				game.Trump = action.Trump
+				Log(4, "Trump is set to %s", game.Trump)
+				game.Broadcast(action, game.HighPlayer)
+				for x := 0; x < len(game.Players); x++ {
+					meld, meldHand := game.Players[x].Hand().Meld(game.Trump)
+					meldAction := sdz.CreateMeld(meldHand, meld, x)
+					game.BroadcastAll(meldAction)
+					game.Meld[x%2] += meld
+				}
+				game.Next = game.HighPlayer
+				game.Counters = make([]int, 2)
+				game.State = StatePlay
+				action = game.Players[game.Next].Tell(sdz.CreatePlayRequest(game.Trick.winningCard(), game.Trick.leadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
+				continue
+			}
+		case StatePlay:
+			// TODO: check for throw in
+			if sdz.ValidPlay(action.PlayedCard, game.Trick.winningCard(), game.Trick.leadSuit(), game.Players[game.Next].Hand(), game.Trump) &&
+				game.Players[game.Next].Hand().Remove(action.PlayedCard) {
+				game.Trick.played[game.Next] = action.PlayedCard
+				game.Broadcast(action, game.Next)
+				if len(game.Trick.played) == 1 {
+					game.Trick.lead = game.Next
+				}
+				if game.Trick.played[game.Next].Beats(game.Trick.winningCard(), game.Trump) {
+					game.Trick.winningPlayer = game.Next
+				}
+			}
+			if len(game.Trick.played) == len(game.Players) {
+				for _, card := range game.Trick.played {
+					if card.Counter() {
+						game.Counters[game.Trick.winningPlayer%2]++
+					}
+				}
+				game.CountMeld[game.Trick.winningPlayer%2] = true
+				game.Next = game.Trick.winningPlayer
+				game.BroadcastAll(sdz.CreateMessage(fmt.Sprintf("Player %d wins trick with %s", game.Trick.winningPlayer, game.Trick.winningCard())))
+				game.BroadcastAll(sdz.CreateTrick(game.Trick.winningPlayer))
+				Log(4, "Player %d wins trick with %s", game.Trick.winningPlayer, game.Trick.winningCard())
+				if len(*game.Players[0].Hand()) == 0 {
+					game.Counters[game.Trick.winningPlayer%2]++ // last trick
+					// end of hand
+					game.HandsPlayed++
+					if game.HighBid <= game.Meld[game.HighPlayer%2]+game.Counters[game.HighPlayer%2] {
+						game.Score[game.HighPlayer%2] += game.Meld[game.HighPlayer%2] + game.Counters[game.HighPlayer%2]
+					} else {
+						game.Score[game.HighPlayer%2] -= game.HighBid
+					}
+					if game.CountMeld[(game.HighPlayer+1)%2] {
+						game.Score[(game.HighPlayer+1)%2] += game.Meld[(game.HighPlayer+1)%2] + game.Counters[(game.HighPlayer+1)%2]
+					}
+					// check the score for a winner
+					game.BroadcastAll(sdz.CreateMessage(fmt.Sprintf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)))
+					Log(4, "Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)
+					win := make([]bool, 2)
+					gameOver := false
+					if game.Score[game.HighPlayer%2] >= 120 {
+						win[game.HighPlayer%2] = true
+						gameOver = true
+					} else if game.Score[(game.HighPlayer+1)%2] >= 120 {
+						win[(game.HighPlayer+1)%2] = true
+						gameOver = true
+					}
+					for x := 0; x < len(game.Players); x++ {
+						game.Players[x].Tell(sdz.CreateScore(x, game.Score, gameOver, win[x%2]))
+					}
+					if gameOver {
+						return // game over
+					}
+					game.Dealer = (game.Dealer + 1) % 4
+					Log(4, "-----------------------------------------------------------------------------")
+					game.NextHand(c)
+					continue
+				}
+				game.Trick = NewTrick()
+			}
+			game.Next = game.inc()
+			action = game.Players[game.Next].Tell(sdz.CreatePlayRequest(game.Trick.winningCard(), game.Trick.leadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
 			continue
 		}
-		conn.Write(response)
-		conn.Close()
 	}
 }
 
-func main() {
-	go listenForFlash()
-	cp = &ConnectionPool{connections: make(chan *Human, 100)}
-	http.Handle("/connect", websocket.Handler(wshandler))
-	http.Handle("/cards/", http.StripPrefix("/cards/", http.FileServer(http.Dir("cards"))))
-	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("js"))))
-	http.Handle("/web-socket-js/", http.StripPrefix("/web-socket-js/", http.FileServer(http.Dir("web-socket-js"))))
-	http.HandleFunc("/", serveGame)
-	err := http.ListenAndServe(":80", nil)
-	if err != nil {
-		sdz.Log("Cannot listen on port 80, check permissions or run as root - " + err.Error())
-	}
-	err = http.ListenAndServe(":1080", nil)
-	if err != nil {
-		panic("Cannot listen for http requests - " + err.Error())
-	}
-}
+//func serveGame(w http.ResponseWriter, r *http.Request) {
+//	listTmpl, err := template.New("tempate").ParseGlob("*.html")
+//	if err != nil {
+//		http.Error(w, err.Error(), http.StatusInternalServerError)
+//		return
+//	}
+//	err = listTmpl.ExecuteTemplate(w, "game", nil)
+//	if err != nil {
+//		http.Error(w, err.Error(), http.StatusInternalServerError)
+//		return
+//	}
+//}
+
+//var cp *ConnectionPool
+
+//func listenForFlash() {
+//	response := []byte("<cross-domain-policy><allow-access-from domain=\"*\" to-ports=\"*\" /></cross-domain-policy>")
+//	ln, err := net.Listen("tcp", ":843")
+//	if err != nil {
+//		sdz.Log("Cannot listen on port 843 for flash policy file, will not serve non WebSocket clients, check permissions or run as root - " + err.Error())
+//		return
+//	}
+//	for {
+//		conn, err := ln.Accept()
+//		if err != nil {
+//			// handle error
+//			continue
+//		}
+//		conn.Write(response)
+//		conn.Close()
+//	}
+//}
+
+//func main() {
+//	go listenForFlash()
+//	cp = &ConnectionPool{connections: make(chan *Human, 100)}
+//	http.Handle("/connect", websocket.Handler(wshandler))
+//	http.Handle("/cards/", http.StripPrefix("/cards/", http.FileServer(http.Dir("cards"))))
+//	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("js"))))
+//	http.Handle("/web-socket-js/", http.StripPrefix("/web-socket-js/", http.FileServer(http.Dir("web-socket-js"))))
+//	http.HandleFunc("/", serveGame)
+//	err := http.ListenAndServe(":80", nil)
+//	if err != nil {
+//		sdz.Log("Cannot listen on port 80, check permissions or run as root - " + err.Error())
+//	}
+//	err = http.ListenAndServe(":1080", nil)
+//	if err != nil {
+//		panic("Cannot listen for http requests - " + err.Error())
+//	}
+//}

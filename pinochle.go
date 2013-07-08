@@ -334,8 +334,7 @@ func CreateScore(playerid int, score []int, gameOver, win bool) *Action {
 }
 
 type Player interface {
-	Tell(*Action)
-	Listen() (*Action, bool)
+	Tell(*Action) *Action // returns the response if known immediately
 	Hand() *Hand
 	SetHand(Hand, int, int)
 	Close()
@@ -359,19 +358,6 @@ func (p PlayerImpl) IsPartner(player int) bool {
 	return p.Playerid()%2 == player%2
 }
 
-type Game struct {
-	Deck       Deck
-	Players    []Player
-	Dealer     int
-	Score      []int
-	Meld       []int
-	Counters   []int
-	MeldHands  []Hand
-	HighBid    int
-	HighPlayer int
-	Trump      Suit
-}
-
 // Used to determine if the leader of the trick made a valid play
 func IsCardInHand(card Card, hand Hand) bool {
 	for _, hc := range hand {
@@ -384,6 +370,9 @@ func IsCardInHand(card Card, hand Hand) bool {
 
 // playedCard, winningCard Card, leadSuit Suit, hand Hand, trump Suit
 func ValidPlay(playedCard, winningCard Card, leadSuit Suit, hand *Hand, trump Suit) bool {
+	if winningCard == NACard || leadSuit == NASuit {
+		return true
+	}
 	// hand is sorted
 	// 1 - Have to follow suit
 	// 2 - Can't follow suit, play trump
@@ -438,192 +427,6 @@ func ValidPlay(playedCard, winningCard Card, leadSuit Suit, hand *Hand, trump Su
 		}
 	} // else { // we can't follow suit and we don't have trump - anything's legal
 	return true
-}
-
-func (game *Game) Go(players []Player) {
-	game.Deck = CreateDeck()
-	game.Players = players
-	game.Score = make([]int, 2)
-	handsPlayed := 0
-	game.Dealer = 0
-	for {
-		handsPlayed++
-		// shuffle & deal
-		game.Deck.Shuffle()
-		hands := game.Deck.Deal()
-		next := game.Dealer
-		game.Meld = make([]int, len(game.Players))
-		game.MeldHands = make([]Hand, len(game.Players))
-		game.Counters = make([]int, len(game.Players))
-		for x := 0; x < len(game.Players); x++ {
-			next = (next + 1) % 4
-			sort.Sort(hands[x])
-			game.Players[next].SetHand(hands[x], game.Dealer, next)
-			//Log("Dealing player %d hand %s", next, game.Players[next].Hand())
-		}
-		// ask players to bid
-		game.HighBid = 20
-		game.HighPlayer = game.Dealer
-		next = game.Dealer
-		for x := 0; x < 4; x++ {
-			var bidAction *Action
-			next = (next + 1) % 4
-			if !(next == game.Dealer && game.HighBid == 20) { // no need to ask the dealer to bid if they've already won
-				game.Players[next].Tell(CreateBid(0, next))
-				var open bool
-				bidAction, open = game.Players[next].Listen()
-				if !open {
-					game.Broadcast(CreateMessage("Player disconnected"), next)
-					return
-				}
-			} else {
-				bidAction = CreateBid(game.HighBid, game.Dealer)
-			}
-			game.Broadcast(bidAction, next)
-			if bidAction.Bid > game.HighBid {
-				game.HighBid = bidAction.Bid
-				game.HighPlayer = next
-			}
-		}
-		// ask trump
-		game.Players[game.HighPlayer].Tell(CreateTrump(*new(Suit), game.HighPlayer))
-		response, open := game.Players[game.HighPlayer].Listen()
-		if !open {
-			game.Broadcast(CreateMessage("Player disconnected"), game.HighPlayer)
-			return
-		}
-		switch response.Type {
-		case "Throwin":
-			game.Broadcast(response, response.Playerid)
-			game.Score[game.HighPlayer%2] -= game.HighBid
-			game.BroadcastAll(CreateMessage(fmt.Sprintf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], handsPlayed)))
-			Log("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], handsPlayed)
-			game.Dealer = (game.Dealer + 1) % 4
-			Log("-----------------------------------------------------------------------------")
-			continue
-		case "Trump":
-			game.Trump = response.Trump
-			Log("Trump is set to %s", game.Trump)
-			game.Broadcast(response, game.HighPlayer)
-		default:
-			panic("Didn't receive either expected response")
-		}
-		for x := 0; x < len(game.Players); x++ {
-			game.Meld[x], game.MeldHands[x] = game.Players[x].Hand().Meld(game.Trump)
-			meldAction := CreateMeld(game.MeldHands[x], game.Meld[x], x)
-			game.BroadcastAll(meldAction)
-		}
-		next = game.HighPlayer
-		countMeld := make([]bool, 2)
-		for trick := 0; trick < 12; trick++ {
-			var winningCard Card
-			var cardPlayed Card
-			var leadSuit Suit
-			winningPlayer := next
-			counters := 0
-			for x := 0; x < 4; x++ {
-				//Log("*******************************************************************************NEXT CARD")
-				// play the hand
-				// TODO: handle possible throwin
-				var action *Action
-				for {
-					action = CreatePlayRequest(winningCard, leadSuit, game.Trump, next, game.Players[next].Hand())
-					game.Players[next].Tell(action)
-					action, open = game.Players[next].Listen()
-					if !open {
-						game.Broadcast(CreateMessage("Player disconnected"), next)
-						return
-					}
-					cardPlayed = action.PlayedCard
-					if x > 0 {
-						if ValidPlay(cardPlayed, winningCard, leadSuit, game.Players[next].Hand(), game.Trump) &&
-							game.Players[next].Hand().Remove(cardPlayed) {
-							// playedCard, winningCard Card, leadSuit Suit, hand Hand, trump Suit
-							break
-						}
-					} else if game.Players[next].Hand().Remove(cardPlayed) {
-						break
-					}
-				}
-				switch cardPlayed.Face() {
-				case Ace:
-					fallthrough
-				case Ten:
-					fallthrough
-				case King:
-					counters++
-				}
-				if x == 0 {
-					winningCard = cardPlayed
-					leadSuit = cardPlayed.Suit()
-				} else {
-					if cardPlayed.Beats(winningCard, game.Trump) {
-						winningCard = cardPlayed
-						winningPlayer = next
-					}
-				}
-				game.Broadcast(action, next)
-				next = (next + 1) % 4
-			}
-			next = winningPlayer
-			if trick == 11 {
-				counters++
-			}
-			countMeld[winningPlayer%2] = true
-			game.BroadcastAll(CreateMessage(fmt.Sprintf("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)))
-			game.BroadcastAll(CreateTrick(winningPlayer))
-			Log("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)
-			game.Counters[game.Players[winningPlayer].Team()] += counters
-			//Log("*******************************************************************************NEXT TRICK")
-		}
-		game.Meld[0] += game.Meld[2]
-		game.Counters[0] += game.Counters[2]
-		game.Meld[1] += game.Meld[3]
-		game.Counters[1] += game.Counters[3]
-		if game.HighBid <= game.Meld[game.HighPlayer%2]+game.Counters[game.HighPlayer%2] {
-			game.Score[game.HighPlayer%2] += game.Meld[game.HighPlayer%2] + game.Counters[game.HighPlayer%2]
-		} else {
-			game.Score[game.HighPlayer%2] -= game.HighBid
-		}
-		if countMeld[(game.HighPlayer+1)%2] {
-			game.Score[(game.HighPlayer+1)%2] += game.Meld[(game.HighPlayer+1)%2] + game.Counters[(game.HighPlayer+1)%2]
-		}
-		// check the score for a winner
-		game.BroadcastAll(CreateMessage(fmt.Sprintf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], handsPlayed)))
-		Log("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], handsPlayed)
-		win := make([]bool, 2)
-		gameOver := false
-		if game.Score[game.HighPlayer%2] >= 120 {
-			win[game.HighPlayer%2] = true
-			gameOver = true
-		} else if game.Score[(game.HighPlayer+1)%2] >= 120 {
-			win[(game.HighPlayer+1)%2] = true
-			gameOver = true
-		}
-		for x := 0; x < len(game.Players); x++ {
-			game.Players[x].Tell(CreateScore(x, game.Score, gameOver, win[x%2]))
-		}
-		if gameOver {
-			return
-		}
-		game.Dealer = (game.Dealer + 1) % 4
-		Log("-----------------------------------------------------------------------------")
-	}
-	for x := 0; x < 4; x++ {
-		game.Players[x].Close()
-	}
-}
-
-func (g Game) Broadcast(a *Action, p int) {
-	for x, player := range g.Players {
-		if p != x {
-			player.Tell(a)
-		}
-	}
-}
-
-func (g Game) BroadcastAll(a *Action) {
-	g.Broadcast(a, -1)
 }
 
 func (h *Hand) Remove(card Card) bool {
