@@ -333,29 +333,20 @@ func CreateScore(playerid int, score []int, gameOver, win bool) *Action {
 	return &Action{Type: "Score", Playerid: playerid, Score: score, Win: win, GameOver: gameOver}
 }
 
-type Player interface {
-	Tell(*Action) *Action // returns the response if known immediately
-	Hand() *Hand
-	SetHand(Hand, int, int)
-	Close()
-	Playerid() int
-	Team() int
-}
-
 type PlayerImpl struct {
-	Id int
+	Playerid int
 }
 
-func (p PlayerImpl) Playerid() int {
-	return p.Id
+func (p PlayerImpl) PlayerID() int {
+	return p.Playerid
 }
 
 func (p PlayerImpl) Team() int {
-	return p.Playerid() % 2
+	return p.Playerid % 2
 }
 
 func (p PlayerImpl) IsPartner(player int) bool {
-	return p.Playerid()%2 == player%2
+	return p.Playerid%2 == player%2
 }
 
 // Used to determine if the leader of the trick made a valid play
