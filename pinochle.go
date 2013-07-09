@@ -254,6 +254,11 @@ type Action struct {
 	WinningPlayer           int
 }
 
+func (action *Action) String() string {
+	data, _ := action.MarshalJSON()
+	return string(data)
+}
+
 func (action *Action) MarshalJSON() ([]byte, error) {
 	data := make(map[string]interface{})
 	typ := reflect.TypeOf(*action)

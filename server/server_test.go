@@ -1,5 +1,5 @@
 // server_test.go
-package main
+package sdzpinochleserver
 
 import (
 	"github.com/icub3d/appenginetesting"
