@@ -2,6 +2,7 @@
 package main
 
 import (
+	"github.com/icub3d/appenginetesting"
 	sdz "github.com/mzimmerman/sdzpinochle"
 	pt "github.com/remogatto/prettytest"
 	"sort"
@@ -48,11 +49,15 @@ func (t *testSuite) TestBidding() {
 }
 
 func (t *testSuite) TestFullGame() {
+	c, err := appenginetesting.NewContext(&appenginetesting.Options{Debug: "critical"})
+	t.Equal(nil, err, "Could not get a context")
+	defer c.Close()
+
 	game := NewGame(4)
 	for x := 0; x < len(game.Players); x++ {
 		game.Players[x] = createAI()
 	}
-	game.NextHand(nil)
+	game.NextHand(c)
 }
 
 func (t *testSuite) TestPotentialCards() {

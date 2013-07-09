@@ -226,6 +226,7 @@
 				socket.onmessage = onMessage;
 //				socket.onerror = onError;
 //				socket.onclose = onClose;
+				$.get("/connected");
 			});
 			timer = setInterval(processQueue,500);
 

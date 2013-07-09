@@ -44,11 +44,34 @@ var store = sessions.NewCookieStore([]byte("sdzpinochle"))
 
 func init() {
 	http.HandleFunc("/connect", connect)
+	http.HandleFunc("/connected", connected)
 	http.HandleFunc("/receive", receive)
 	store.Options = &sessions.Options{
 		Path:   "/",
 		MaxAge: 3600, // keep the cookie for one hour
 	}
+}
+
+func connected(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	g := goon.FromContext(c)
+	human := new(Human)
+	cookie, _ := store.Get(r, cookieName)
+	var ok bool
+	var err error
+	human.Id, ok = cookie.Values["DataId"].(int64)
+	if ok && human.Id != 0 {
+		err = g.Get(human)
+		if logError(c, err) {
+			return
+		}
+	} else {
+		logError(c, errors.New("User does not have a token"))
+		return
+	}
+	human.Tell(c, sdz.CreateMessage("Do you want to join a game, create a new game, or quit? (join, create, quit)"))
+	human.Tell(c, sdz.CreateHello("Hello!"))
+	fmt.Fprintf(w, "Success")
 }
 
 func connect(w http.ResponseWriter, r *http.Request) {
@@ -91,7 +114,6 @@ func connect(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	human.Tell(c, sdz.CreateHello("Hello!"))
 }
 
 func receive(w http.ResponseWriter, r *http.Request) {
@@ -117,13 +139,25 @@ func receive(w http.ResponseWriter, r *http.Request) {
 	if logError(c, err) {
 		return
 	}
-	switch action.Type {
-	case "Hello":
-	}
-	//processAction(c, action)
 	c.Debugf("Received %#v", action)
+	game := StubGame(human)
+	game.Id, ok = cookie.Values["Gameid"].(int64)
+	if ok && game.Id != 0 {
+		err = g.Get(game)
+		if logError(c, err) {
+			return
+		}
+	}
+	game = game.processAction(c, action)
+	_, err = g.Put(game)
+	if logError(c, err) {
+		return // unable to store game!
+	}
+	if game.Id != cookie.Values["Gameid"].(int64) {
+		cookie.Values["Gameid"] = game.Id
+		cookie.Save(r, w)
+	}
 	fmt.Fprintf(w, "Success")
-
 }
 
 func Log(playerid int, m string, v ...interface{}) {
@@ -871,6 +905,7 @@ func logError(c appengine.Context, err error) bool {
 }
 
 type Game struct {
+	Id          int64 `datastore:"-" goon:"id"`
 	Trick       *Trick
 	Deck        sdz.Deck
 	Players     []Player
@@ -888,6 +923,12 @@ type Game struct {
 	HandsPlayed int
 }
 
+func StubGame(human *Human) *Game {
+	game := new(Game)
+	game.Players = []Player{human}
+	return game
+}
+
 func NewGame(players int) *Game {
 	game := new(Game)
 	game.Players = make([]Player, players)
@@ -897,7 +938,7 @@ func NewGame(players int) *Game {
 }
 
 // PRE : Players are already created and set
-func (game *Game) NextHand(c appengine.Context) {
+func (game *Game) NextHand(c appengine.Context) *Game {
 	game.Meld = make([]int, len(game.Players)/2)
 	game.Trick = NewTrick()
 	game.CountMeld = make([]bool, len(game.Players)/2)
@@ -916,7 +957,7 @@ func (game *Game) NextHand(c appengine.Context) {
 		Log(4, "Dealing player %d hand %s", game.Next, game.Players[game.Next].Hand())
 	}
 	game.Next = game.inc() // increment so that Dealer + 1 is asked to bid first
-	game.processAction(c, game.Players[game.Next].Tell(c, sdz.CreateBid(0, game.Next)))
+	return game.processAction(c, game.Players[game.Next].Tell(c, sdz.CreateBid(0, game.Next)))
 	// processAction will write the game to the datastore when it's done processing the action(s)
 }
 
@@ -1118,11 +1159,69 @@ func (g Game) BroadcastAll(c appengine.Context, a *sdz.Action) {
 //	logError(c, err)
 //}
 
-func (game *Game) processAction(c appengine.Context, action *sdz.Action) {
+func (game *Game) processAction(c appengine.Context, action *sdz.Action) *Game {
 	for {
 		if action == nil {
 			// waiting on a human, save the state and exit
-			return
+			g := goon.FromContext(c)
+			_, err := g.Put(game)
+			logError(c, err)
+			return game
+		}
+		if game.Id == 0 {
+			human := game.Players[0]
+			switch action.Type {
+			case "Hello":
+				if action.Message == "create" {
+					human.Tell(c, sdz.CreateMessage("Option 1 - Play against three AI players and start immediately"))
+					human.Tell(c, sdz.CreateMessage("Option 2 - Play with a human partner against two AI players"))
+					human.Tell(c, sdz.CreateMessage("Option 3 - Play with a human partner against one AI players and 1 Human"))
+					human.Tell(c, sdz.CreateMessage("Option 4 - Play with a human partner against two humans"))
+					human.Tell(c, sdz.CreateMessage("Option 5 - Play against a human with AI partners"))
+					human.Tell(c, sdz.CreateMessage("Option 6 - Go back"))
+					human.Tell(c, sdz.CreateGame(0))
+					continue
+				} else if action.Message == "join" {
+					human.Tell(c, sdz.CreateMessage("Waiting on a game to be started that you can join..."))
+					continue
+				} else if action.Message == "quit" {
+					human.Tell(c, sdz.CreateMessage("Ok, bye bye!"))
+					//human.Close()
+					continue
+				}
+			case "Game":
+				game = NewGame(4)
+				game.Players[0] = human
+				switch action.Option {
+				case 1:
+					// Option 1 - Play against three AI players and start immediately
+					for x := 1; x < 4; x++ {
+						game.Players[x] = createAI()
+					}
+				case 2:
+					// Option 2 - Play with a human partner against two AI players
+					game.Players[1] = createAI()
+					//game.Players[2] = cp.Pop()
+					game.Players[3] = createAI()
+				case 3:
+					// Option 3 - Play with a human partner against one AI players and 1 Human
+					game.Players[1] = createAI()
+					//game.Players[2] = cp.Pop()
+					//game.Players[3] = cp.Pop()
+
+				case 4:
+					// Option 4 - Play with a human partner against two humans
+					for x := 1; x < 4; x++ {
+						//game.Players[x] = cp.Pop()
+					}
+				case 5:
+					// Option 5 - Play against a human with AI partners
+					//game.Players[1] = cp.Pop()
+					game.Players[2] = createAI()
+					game.Players[3] = createAI()
+				}
+				return game.NextHand(c) // this runs processAction after setting up the initial hand
+			}
 		}
 		switch game.State {
 		case StateBid:
@@ -1229,12 +1328,16 @@ func (game *Game) processAction(c appengine.Context, action *sdz.Action) {
 						game.Players[x].Tell(c, sdz.CreateScore(x, game.Score, gameOver, win[x%2]))
 					}
 					if gameOver {
-						return // game over
+						g := goon.FromContext(c)
+						key := g.Key(game)
+						if key != nil {
+							logError(c, g.Delete(key))
+						}
+						return nil // game over
 					}
 					game.Dealer = (game.Dealer + 1) % 4
 					Log(4, "-----------------------------------------------------------------------------")
-					game.NextHand(c)
-					continue
+					return game.NextHand(c)
 				}
 				game.Trick = NewTrick()
 			}
@@ -1299,7 +1402,6 @@ type Player interface {
 	Tell(appengine.Context, *sdz.Action) *sdz.Action // returns the response if known immediately
 	Hand() *sdz.Hand
 	SetHand(appengine.Context, sdz.Hand, int, int)
-	Close()
 	PlayerID() int
 	Team() int
 }
