@@ -44,7 +44,7 @@ var store = sessions.NewCookieStore([]byte("sdzpinochle"))
 
 func init() {
 	http.HandleFunc("/connect", connect)
-	http.HandleFunc("/connected", connected)
+	http.HandleFunc("/_ah/channel/connected/", connected)
 	http.HandleFunc("/receive", receive)
 	store.Options = &sessions.Options{
 		Path:   "/",
@@ -54,21 +54,11 @@ func init() {
 
 func connected(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	g := goon.FromContext(c)
-	human := new(Human)
-	cookie, _ := store.Get(r, cookieName)
-	var ok bool
-	var err error
-	human.Id, ok = cookie.Values["DataId"].(int64)
-	if ok && human.Id != 0 {
-		err = g.Get(human)
-		if logError(c, err) {
-			return
-		}
-	} else {
-		logError(c, errors.New("User does not have a token"))
+	id, err := strconv.Atoi(r.FormValue("from"))
+	if logError(c, err) {
 		return
 	}
+	human := StubHuman(int64(id))
 	human.Tell(c, sdz.CreateMessage("Do you want to join a game, create a new game, or quit? (join, create, quit)"))
 	human.Tell(c, sdz.CreateHello("Hello!"))
 	fmt.Fprintf(w, "Success")
@@ -748,6 +738,10 @@ type Human struct {
 	Id    int64 `datastore:"-" goon:"id"`
 	sdz.PlayerImpl
 	changed bool // set to true if the state of Human has changed and it needs to be written
+}
+
+func StubHuman(id int64) *Human {
+	return &Human{Id: id}
 }
 
 func (h *Human) Tell(c appengine.Context, action *sdz.Action) *sdz.Action {
