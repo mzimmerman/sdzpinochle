@@ -1346,6 +1346,9 @@ func (game *Game) processAction(c appengine.Context, action *sdz.Action) *Game {
 				if game.Trick.Played[game.Next].Beats(game.Trick.winningCard(), game.Trump) {
 					game.Trick.WinningPlayer = game.Next
 				}
+			} else {
+				action = game.Players[game.Next].Tell(c, sdz.CreatePlayRequest(game.Trick.winningCard(), game.Trick.leadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
+				continue
 			}
 			if len(game.Trick.Played) == len(game.Players) {
 				game.Counters[game.Trick.WinningPlayer%2] += game.Trick.counters()
