@@ -62,7 +62,7 @@ func (t *testSuite) TestFullGame() {
 
 func (t *testSuite) TestPotentialCards() {
 	ai := createAI()
-	ht := ai.ht
+	ht := ai.HT
 	for _, card := range sdz.AllCards() {
 		ht.Cards[0][card] = 0
 	}
@@ -105,7 +105,7 @@ func (t *testSuite) TestPotentialCards() {
 	t.False(potentials[C("TS")])
 
 	ai = createAI()
-	ht = ai.ht
+	ht = ai.HT
 	for _, card := range sdz.AllCards() {
 		ht.Cards[0][card] = 0
 	}
@@ -124,7 +124,7 @@ func (t *testSuite) TestPotentialCards() {
 	t.Equal(11, len(potentials))
 
 	ai = createAI()
-	ht = ai.ht
+	ht = ai.HT
 	for _, card := range sdz.AllCards() {
 		ht.Cards[0][card] = 0
 	}
@@ -150,7 +150,7 @@ func (t *testSuite) TestPotentialCards() {
 	//Player2 - map[TH:0 JH:0 JD:1 KS:0 QS:0 9C:0 JS:1 AD:0 QD:1 TS:0 9H:0 AS:0 KD:0 TD:1 KC:0 TC:0 9S:0 AH:0 9D:2 JC:0 QH:0 AC:0 QC:0 KH:0]
 	//Player3 - map[JH:0 AH:0 KD:0 9C:0 JS:0 KC:1 TD:0 AC:0 9H:0 QC:1 9D:0]
 	ai = createAI()
-	ht = ai.ht
+	ht = ai.HT
 	for _, card := range sdz.AllCards() {
 		ht.Cards[0][card] = 0
 	}
@@ -186,11 +186,11 @@ func (t *testSuite) TestFindCardToPlay() {
 	//func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	ai := createAI()
 	ai.SetHand(nil, sdz.Hand{C("AD"), C("AD"), C("TD"), C("JD"), C("TC"), C("KC"), C("QC"), C("TH"), C("JH"), C("9H"), C("KS"), C("QS")}, 0, 3)
-	ai.ht.Cards[0][C("KH")] = 1
-	ai.ht.Cards[0][C("QH")] = 1
-	ai.ht.Cards[1][C("9H")] = 1
-	ai.ht.Cards[2][C("KD")] = 1
-	ai.ht.Cards[2][C("QD")] = 1
+	ai.HT.Cards[0][C("KH")] = 1
+	ai.HT.Cards[0][C("QH")] = 1
+	ai.HT.Cards[1][C("9H")] = 1
+	ai.HT.Cards[2][C("KD")] = 1
+	ai.HT.Cards[2][C("QD")] = 1
 	action := sdz.CreatePlayRequest(sdz.NACard, sdz.NASuit, sdz.Hearts, 3, ai.Hand())
 	card := ai.findCardToPlay(action)
 	t.True(card == C("TD"))
@@ -199,7 +199,7 @@ func (t *testSuite) TestFindCardToPlay() {
 func (t *testSuite) TestRankCard() {
 	//func rankCard(playerid int, ht *HandTracker, trick *Trick, lead, trump sdz.Suit) *Trick {
 	ai := createAI()
-	ht := ai.ht
+	ht := ai.HT
 	for _, card := range sdz.AllCards() {
 		ht.Cards[3][card] = 0
 	}
@@ -557,103 +557,103 @@ func (t *testSuite) TestAITracking() {
 	ai := createAI()
 	hand := sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AD"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
 	ai.SetHand(nil, hand, 0, 0)
-	ai.trump = sdz.Spades
+	ai.Trump = sdz.Spades
 	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{C("JD"), C("QS"), C("KD"), C("QD")}, 6, 1))
 	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{C("JD"), C("QS")}, 4, 2))
 	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{}, 0, 3))
 	//ai.calculate()
-	t.Equal(1, ai.ht.Cards[1][C("JD")])
-	t.Equal(1, ai.ht.Cards[1][C("QS")])
-	t.Equal(1, ai.ht.Cards[2][C("JD")])
-	t.Equal(1, ai.ht.Cards[2][C("QS")])
-	t.Equal(0, ai.ht.Cards[3][C("QS")])
-	t.Equal(0, ai.ht.PlayedCards[C("JD")])
-	t.Equal(0, ai.ht.PlayedCards[C("QS")])
-	t.Equal(0, ai.ht.PlayedCards[C("QD")])
-	t.Equal(1, ai.ht.Cards[1][C("QD")])
-	t.Equal(0, ai.ht.Cards[2][C("QD")])
-	t.Equal(0, ai.ht.Cards[3][C("QD")])
-	t.Equal(1, ai.ht.Cards[1][C("KD")])
+	t.Equal(1, ai.HT.Cards[1][C("JD")])
+	t.Equal(1, ai.HT.Cards[1][C("QS")])
+	t.Equal(1, ai.HT.Cards[2][C("JD")])
+	t.Equal(1, ai.HT.Cards[2][C("QS")])
+	t.Equal(0, ai.HT.Cards[3][C("QS")])
+	t.Equal(0, ai.HT.PlayedCards[C("JD")])
+	t.Equal(0, ai.HT.PlayedCards[C("QS")])
+	t.Equal(0, ai.HT.PlayedCards[C("QD")])
+	t.Equal(1, ai.HT.Cards[1][C("QD")])
+	t.Equal(0, ai.HT.Cards[2][C("QD")])
+	t.Equal(0, ai.HT.Cards[3][C("QD")])
+	t.Equal(1, ai.HT.Cards[1][C("KD")])
 
-	ai.trick.Lead = 1
+	ai.Trick.Lead = 1
 	ai.Tell(nil, sdz.CreatePlay(C("JD"), 1))
 	ai.Tell(nil, sdz.CreatePlay(C("KD"), 2))
 	ai.Tell(nil, sdz.CreatePlay(C("AD"), 3))
-	val, ok := ai.ht.Cards[1][C("JD")]
+	val, ok := ai.HT.Cards[1][C("JD")]
 	t.True(ok)
 	t.Equal(0, val)
 	//ai.calculate()
-	val, ok = ai.ht.Cards[1][C("JD")]
+	val, ok = ai.HT.Cards[1][C("JD")]
 	t.True(ok)
 	t.Equal(0, val)
-	t.Equal(1, ai.ht.Cards[1][C("QS")])
-	t.Equal(1, ai.ht.Cards[2][C("JD")])
-	t.Equal(1, ai.ht.Cards[2][C("QS")])
-	t.Equal(0, ai.ht.Cards[3][C("QS")])
-	t.Equal(1, ai.ht.PlayedCards[C("JD")])
-	t.Equal(0, ai.ht.PlayedCards[C("QS")])
-	t.Equal(1, ai.ht.PlayedCards[C("KD")])
-	t.Equal(1, ai.ht.PlayedCards[C("AD")])
+	t.Equal(1, ai.HT.Cards[1][C("QS")])
+	t.Equal(1, ai.HT.Cards[2][C("JD")])
+	t.Equal(1, ai.HT.Cards[2][C("QS")])
+	t.Equal(0, ai.HT.Cards[3][C("QS")])
+	t.Equal(1, ai.HT.PlayedCards[C("JD")])
+	t.Equal(0, ai.HT.PlayedCards[C("QS")])
+	t.Equal(1, ai.HT.PlayedCards[C("KD")])
+	t.Equal(1, ai.HT.PlayedCards[C("AD")])
 
-	ai.trick.Lead = 1
+	ai.Trick.Lead = 1
 	ai.Tell(nil, sdz.CreatePlay(C("QD"), 1))
 	ai.Tell(nil, sdz.CreatePlay(C("9H"), 2))
 	ai.Tell(nil, sdz.CreatePlay(C("9H"), 3))
-	val, ok = ai.ht.Cards[1][C("QD")]
+	val, ok = ai.HT.Cards[1][C("QD")]
 	t.True(ok)
 	t.Equal(0, val)
 
 	ai = createAI()
 	hand = sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AS"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
 	ai.SetHand(nil, hand, 0, 0)
-	ai.trump = sdz.Spades
+	ai.Trump = sdz.Spades
 	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{}, 0, 0))
 	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{}, 0, 1))
 	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{}, 0, 2))
 	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{}, 0, 3))
 	//ai.calculate()
-	ai.trick.Lead = 1
+	ai.Trick.Lead = 1
 
 	ai.Tell(nil, sdz.CreatePlay(C("JD"), 1))
 	ai.Tell(nil, sdz.CreatePlay(C("JD"), 2))
 	ai.Tell(nil, sdz.CreatePlay(C("KD"), 3))
-	play := ai.Tell(nil, sdz.CreatePlayRequest(ai.trick.winningCard(), ai.trick.leadSuit(), ai.trump, ai.PlayerID(), &sdz.Hand{}))
+	play := ai.Tell(nil, sdz.CreatePlayRequest(ai.Trick.winningCard(), ai.Trick.leadSuit(), ai.Trump, ai.PlayerID(), &sdz.Hand{}))
 	t.Equal(C("TD"), play.PlayedCard)
 	ai.Tell(nil, sdz.CreateTrick(0))
 	ai.Tell(nil, sdz.CreatePlay(C("QD"), 1))
 	ai.Tell(nil, sdz.CreatePlay(C("KD"), 2))
 	ai.Tell(nil, sdz.CreatePlay(C("KH"), 3))
-	play = ai.Tell(nil, sdz.CreatePlayRequest(ai.trick.winningCard(), ai.trick.leadSuit(), ai.trump, ai.PlayerID(), &sdz.Hand{}))
+	play = ai.Tell(nil, sdz.CreatePlayRequest(ai.Trick.winningCard(), ai.Trick.leadSuit(), ai.Trump, ai.PlayerID(), &sdz.Hand{}))
 	t.Equal(C("TD"), play.PlayedCard)
 
 	ai = createAI()
 	hand = sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AD"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
 	ai.SetHand(nil, hand, 0, 0)
-	ai.trump = sdz.Spades
+	ai.Trump = sdz.Spades
 	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{C("JD"), C("JD"), C("QS"), C("QS"), C("KD"), C("QD")}, 32, 1))
 	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{}, 0, 2))
 	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{}, 0, 3))
 	//ai.calculate()
-	t.Equal(0, ai.ht.Cards[0][C("JD")])
-	t.Equal(2, ai.ht.Cards[1][C("JD")])
-	t.Equal(0, ai.ht.Cards[2][C("JD")])
-	t.Equal(0, ai.ht.Cards[3][C("JD")])
+	t.Equal(0, ai.HT.Cards[0][C("JD")])
+	t.Equal(2, ai.HT.Cards[1][C("JD")])
+	t.Equal(0, ai.HT.Cards[2][C("JD")])
+	t.Equal(0, ai.HT.Cards[3][C("JD")])
 }
 
 func (t *testSuite) TestNoSuit() {
 	ai := createAI()
-	ai.hand = &sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AD"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
+	ai.RealHand = &sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AD"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
 	ai.populate()
-	ai.ht.Cards[1][C("9D")] = 1
+	ai.HT.Cards[1][C("9D")] = 1
 	ai.noSuit(1, sdz.Diamonds)
 
-	t.Equal(0, ai.ht.Cards[1][C("9D")])
-	t.Equal(0, ai.ht.Cards[1][C("JD")])
-	t.Equal(0, ai.ht.Cards[1][C("QD")])
-	t.Equal(0, ai.ht.Cards[1][C("KD")])
-	t.Equal(0, ai.ht.Cards[1][C("TD")])
-	t.Equal(0, ai.ht.Cards[1][C("AD")])
-	t.Equal(0, ai.ht.Cards[1][C("AS")])
+	t.Equal(0, ai.HT.Cards[1][C("9D")])
+	t.Equal(0, ai.HT.Cards[1][C("JD")])
+	t.Equal(0, ai.HT.Cards[1][C("QD")])
+	t.Equal(0, ai.HT.Cards[1][C("KD")])
+	t.Equal(0, ai.HT.Cards[1][C("TD")])
+	t.Equal(0, ai.HT.Cards[1][C("AD")])
+	t.Equal(0, ai.HT.Cards[1][C("AS")])
 }
 
 func (t *testSuite) TestCalculate() {
@@ -664,76 +664,76 @@ func (t *testSuite) TestCalculate() {
 	ai.SetHand(nil, hand, 0, 1)
 	for x := 0; x < 4; x++ {
 		if x == 1 {
-			t.Equal(ai.ht.Cards[x][C("9D")], 2)
+			t.Equal(ai.HT.Cards[x][C("9D")], 2)
 		} else {
-			t.Equal(ai.ht.Cards[x][C("9D")], 0)
+			t.Equal(ai.HT.Cards[x][C("9D")], 0)
 		}
-		_, ok := ai.ht.Cards[x][C("QD")]
+		_, ok := ai.HT.Cards[x][C("QD")]
 		if x == 1 {
 			t.True(ok, "Should have a record of 1 for QD")
 		} else {
 			t.Not(t.True(ok), "Should not have a record for QD")
 		}
-		_, ok = ai.ht.Cards[x][C("KH")]
+		_, ok = ai.HT.Cards[x][C("KH")]
 		if x == 1 {
 			t.True(ok, "Should have a record of a KH")
 		} else {
 			t.True(!ok, "Should not have a record of a KH")
 		}
 	}
-	ai.ht.Cards[2][C("QD")] = 1
-	ai.ht.Cards[2][C("KH")] = 1
-	ai.ht.Cards[3][C("KH")] = 1
-	ai.ht.Cards[3][C("KD")] = 1
-	ai.ht.Cards[0][C("9S")] = 1
-	ai.ht.PlayedCards[C("9S")] = 1
-	ai.ht.PlayedCards[C("TS")] = 2
-	ai.ht.PlayedCards[C("JS")] = 1
-	ai.ht.Cards[0][C("JS")] = 0
-	ai.ht.Cards[2][C("JS")] = 0
-	ai.ht.PlayedCards[C("QS")] = 0
-	ai.ht.Cards[0][C("QS")] = 0
-	ai.ht.Cards[1][C("QS")] = 0
-	ai.ht.Cards[2][C("QS")] = 0
+	ai.HT.Cards[2][C("QD")] = 1
+	ai.HT.Cards[2][C("KH")] = 1
+	ai.HT.Cards[3][C("KH")] = 1
+	ai.HT.Cards[3][C("KD")] = 1
+	ai.HT.Cards[0][C("9S")] = 1
+	ai.HT.PlayedCards[C("9S")] = 1
+	ai.HT.PlayedCards[C("TS")] = 2
+	ai.HT.PlayedCards[C("JS")] = 1
+	ai.HT.Cards[0][C("JS")] = 0
+	ai.HT.Cards[2][C("JS")] = 0
+	ai.HT.PlayedCards[C("QS")] = 0
+	ai.HT.Cards[0][C("QS")] = 0
+	ai.HT.Cards[1][C("QS")] = 0
+	ai.HT.Cards[2][C("QS")] = 0
 
 	for _, card := range []sdz.Card{C("QD"), C("KH"), C("KD"), C("9S"), C("TS"), C("JS"), C("QS")} {
 		ai.calculateCard(card)
 	}
 
-	t.Equal(1, ai.ht.Cards[3][C("JS")])
-	t.Equal(2, ai.ht.Cards[3][C("QS")])
+	t.Equal(1, ai.HT.Cards[3][C("JS")])
+	t.Equal(2, ai.HT.Cards[3][C("QS")])
 
 	for x := 0; x < 4; x++ {
-		_, ok := ai.ht.Cards[x][C("QD")]
+		_, ok := ai.HT.Cards[x][C("QD")]
 		t.True(ok, "Value should be true for player "+strconv.Itoa(x)+" with QD")
-		_, ok = ai.ht.Cards[x][C("KH")]
+		_, ok = ai.HT.Cards[x][C("KH")]
 		t.True(ok, "Value should be true for player "+strconv.Itoa(x)+" with KH")
-		_, ok = ai.ht.Cards[x][C("KD")]
+		_, ok = ai.HT.Cards[x][C("KD")]
 		if x == 3 || x == 1 {
 			t.True(ok, "Value should be true for player "+strconv.Itoa(x)+" with KD")
 		} else {
 			t.Not(t.True(ok), "Value should be false for player "+strconv.Itoa(x)+" with KD")
 		}
-		_, ok = ai.ht.Cards[x][C("9S")]
+		_, ok = ai.HT.Cards[x][C("9S")]
 		t.True(ok, "All 9S cards should have been found")
-		_, ok = ai.ht.Cards[x][C("TS")]
+		_, ok = ai.HT.Cards[x][C("TS")]
 		t.True(ok, "All TS cards should have been found")
 	}
 
-	ai.ht.PlayedCards[C("JD")] = 0
-	ai.ht.Cards[0][C("JD")] = 1
-	ai.ht.Cards[1][C("JD")] = 0
-	ai.ht.Cards[2][C("JD")] = 0
+	ai.HT.PlayedCards[C("JD")] = 0
+	ai.HT.Cards[0][C("JD")] = 1
+	ai.HT.Cards[1][C("JD")] = 0
+	ai.HT.Cards[2][C("JD")] = 0
 	ai.calculateCard(C("JD"))
-	val, ok := ai.ht.Cards[0][C("JD")]
+	val, ok := ai.HT.Cards[0][C("JD")]
 	t.Equal(1, val)
 	t.True(ok)
-	val, ok = ai.ht.Cards[1][C("JD")]
+	val, ok = ai.HT.Cards[1][C("JD")]
 	t.Equal(0, val)
 	t.True(ok)
-	val, ok = ai.ht.Cards[2][C("JD")]
+	val, ok = ai.HT.Cards[2][C("JD")]
 	t.Equal(0, val)
 	t.True(ok)
-	val, ok = ai.ht.Cards[3][C("JD")]
+	val, ok = ai.HT.Cards[3][C("JD")]
 	t.False(ok)
 }

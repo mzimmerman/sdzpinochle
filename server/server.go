@@ -95,7 +95,6 @@ func connect(w http.ResponseWriter, r *http.Request) {
 		if logError(c, err) {
 			return
 		}
-		human.changed = true
 	}
 	w.Header().Set("Content-type", " application/json")
 	rj, err := json.Marshal(human.Token)
@@ -103,11 +102,9 @@ func connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Fprintf(w, "%s", rj)
-	if human.changed {
-		_, err = g.Put(human)
-		if logError(c, err) {
-			return
-		}
+	_, err = g.Put(human)
+	if logError(c, err) {
+		return
 	}
 }
 
@@ -151,11 +148,6 @@ func receive(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	game = game.processAction(c, action)
-	c.Debugf("Returned processAction")
-	c.Debugf("Game.Next = %d", game.Next)
-	c.Debugf("Game.Dealer = %d", game.Dealer)
-	c.Debugf("Game.Players = %d", len(game.Players))
-
 	if game.Id != oldId {
 		cookie.Values["Gameid"] = game.Id
 		cookie.Save(r, w)
@@ -217,26 +209,26 @@ func (hts HTString) String() (output string) {
 
 func (ai *AI) PlayCard(c sdz.Card, playerid int) {
 	Log(ai.Playerid, "In ht.PlayCard for %d-%s on player %d", playerid, c, ai.Playerid)
-	Log(ai.Playerid, "ht.PlayedCards = %v", HTString(ai.ht.PlayedCards))
+	Log(ai.Playerid, "ht.PlayedCards = %v", HTString(ai.HT.PlayedCards))
 	for x := 0; x < 4; x++ {
-		Log(ai.Playerid, "Player%d - %s", x, HTString(ai.ht.Cards[x]))
+		Log(ai.Playerid, "Player%d - %s", x, HTString(ai.HT.Cards[x]))
 	}
-	if ai.ht.PlayedCards[c] >= 2 {
+	if ai.HT.PlayedCards[c] >= 2 {
 		Log(ai.Playerid, "Player %d has card %s", playerid, c)
 		panic("Played cards cannot be greater than 2")
 	}
-	ai.ht.PlayedCards[c]++
-	if val, ok := ai.ht.Cards[playerid][c]; ok {
+	ai.HT.PlayedCards[c]++
+	if val, ok := ai.HT.Cards[playerid][c]; ok {
 		if val > 0 {
-			ai.ht.Cards[playerid][c]--
+			ai.HT.Cards[playerid][c]--
 		} else {
 			Log(ai.Playerid, "Player %d has card %s", playerid, c)
 			panic("Player is supposed to have 0 cards, how can he have played it?!")
 		}
-		if val == 1 && ai.ht.PlayedCards[c] == 1 && playerid != ai.Playerid {
+		if val == 1 && ai.HT.PlayedCards[c] == 1 && playerid != ai.Playerid {
 			// Other player could have only shown one in meld, but has two - now we don't know who has the last one
 			Log(ai.Playerid, "htcardset - deleted card %s for player %d", c, playerid)
-			delete(ai.ht.Cards[playerid], c)
+			delete(ai.HT.Cards[playerid], c)
 		}
 	}
 	ai.calculateCard(c)
@@ -247,11 +239,11 @@ func (ai *AI) populate() {
 	for _, suit := range sdz.Suits() {
 		for _, face := range sdz.Faces() {
 			card := sdz.CreateCard(suit, face)
-			ai.ht.Cards[ai.Playerid][card] = 0
+			ai.HT.Cards[ai.Playerid][card] = 0
 		}
 	}
-	for _, card := range *ai.hand {
-		ai.ht.Cards[ai.Playerid][card]++
+	for _, card := range *ai.RealHand {
+		ai.HT.Cards[ai.Playerid][card]++
 		ai.calculateCard(card)
 	}
 }
@@ -260,39 +252,39 @@ func (ai *AI) noSuit(playerid int, suit sdz.Suit) {
 	Log(ai.Playerid, "No suit start")
 	for _, face := range sdz.Faces() {
 		card := sdz.CreateCard(suit, face)
-		ai.ht.Cards[playerid][card] = 0
+		ai.HT.Cards[playerid][card] = 0
 		ai.calculateCard(card)
 	}
 	Log(ai.Playerid, "No suit end")
 }
 
 func (ai *AI) calculateCard(c sdz.Card) {
-	sum := ai.ht.PlayedCards[c]
+	sum := ai.HT.PlayedCards[c]
 	Log(ai.Playerid, "htcardset - Sum for %s is %d", c, sum)
 	for x := 0; x < 4; x++ {
-		if val, ok := ai.ht.Cards[x][c]; ok {
+		if val, ok := ai.HT.Cards[x][c]; ok {
 			sum += val
 			Log(ai.Playerid, "htcardsetIterative%d - Sum for %s is now %d", x, c, sum)
 		}
 	}
 	if sum > 2 || sum < 0 {
 		sdz.Log("htcardset - Card=%s,sum=%d", c, sum)
-		Log(ai.Playerid, "ht.PlayedCards = %v", HTString(ai.ht.PlayedCards))
+		Log(ai.Playerid, "ht.PlayedCards = %v", HTString(ai.HT.PlayedCards))
 		for x := 0; x < 4; x++ {
-			Log(ai.Playerid, "Player%d - %s", x, HTString(ai.ht.Cards[x]))
+			Log(ai.Playerid, "Player%d - %s", x, HTString(ai.HT.Cards[x]))
 		}
 		panic("Cannot have more cards than 2 or less than 0 - " + string(sum))
 	}
 	if sum == 2 {
 		for x := 0; x < 4; x++ {
-			if _, ok := ai.ht.Cards[x][c]; !ok {
-				ai.ht.Cards[x][c] = 0
+			if _, ok := ai.HT.Cards[x][c]; !ok {
+				ai.HT.Cards[x][c] = 0
 			}
 		}
 	} else {
 		unknown := -1
 		for x := 0; x < 4; x++ {
-			if _, ok := ai.ht.Cards[x][c]; !ok {
+			if _, ok := ai.HT.Cards[x][c]; !ok {
 				if unknown == -1 {
 					unknown = x
 				} else {
@@ -303,49 +295,47 @@ func (ai *AI) calculateCard(c sdz.Card) {
 			}
 		}
 		if unknown != -1 {
-			if ai.ht.PlayedCards[c] > 0 || ai.ht.Cards[ai.Playerid][c] == 1 {
+			if ai.HT.PlayedCards[c] > 0 || ai.HT.Cards[ai.Playerid][c] == 1 {
 				if unknown != -1 {
-					ai.ht.Cards[unknown][c] = 2 - sum
+					ai.HT.Cards[unknown][c] = 2 - sum
 				}
 			} else if sum == 0 {
-				ai.ht.Cards[unknown][c] = 2
+				ai.HT.Cards[unknown][c] = 2
 			}
 		}
 	}
-	Log(ai.Playerid, "TT[%s]=%d", c, ai.ht.PlayedCards[c])
+	Log(ai.Playerid, "TT[%s]=%d", c, ai.HT.PlayedCards[c])
 	for x := 0; x < 4; x++ {
-		if _, ok := ai.ht.Cards[x][c]; ok {
-			Log(ai.Playerid, "P%d[%s]=%d", x, c, ai.ht.Cards[x][c])
+		if _, ok := ai.HT.Cards[x][c]; ok {
+			Log(ai.Playerid, "P%d[%s]=%d", x, c, ai.HT.Cards[x][c])
 		}
 	}
 }
 
 type AI struct {
-	Hand       *sdz.Hand
-	action     *sdz.Action
+	RealHand   *sdz.Hand
 	Trump      sdz.Suit
 	BidAmount  int
 	HighBid    int
 	HighBidder int
 	NumBidders int
-	Show       sdz.Hand
 	sdz.PlayerImpl
 	HT    *HandTracker
 	Trick *Trick
 }
 
 func (a *AI) reset() {
-	a.ht = new(HandTracker)
+	a.HT = new(HandTracker)
 	for x := 0; x < 4; x++ {
-		a.ht.Cards[x] = make(map[sdz.Card]int)
+		a.HT.Cards[x] = make(map[sdz.Card]int)
 	}
-	a.ht.PlayedCards = make(map[sdz.Card]int)
+	a.HT.PlayedCards = make(map[sdz.Card]int)
 	for _, suit := range sdz.Suits() {
 		for _, face := range sdz.Faces() {
-			a.ht.PlayedCards[sdz.CreateCard(suit, face)] = 0
+			a.HT.PlayedCards[sdz.CreateCard(suit, face)] = 0
 		}
 	}
-	a.trick = NewTrick()
+	a.Trick = NewTrick()
 }
 
 func createAI() (a *AI) {
@@ -357,7 +347,7 @@ func createAI() (a *AI) {
 func (ai AI) powerBid(suit sdz.Suit) (count int) {
 	count = 5 // your partner's good for at least this right?!?
 	suitMap := make(map[sdz.Suit]int)
-	for _, card := range *ai.hand {
+	for _, card := range *ai.RealHand {
 		suitMap[card.Suit()]++
 		if card.Suit() == suit {
 			switch card.Face() {
@@ -394,7 +384,7 @@ func (ai AI) powerBid(suit sdz.Suit) (count int) {
 func (ai AI) calculateBid() (amount int, trump sdz.Suit, show sdz.Hand) {
 	bids := make(map[sdz.Suit]int)
 	for _, suit := range sdz.Suits() {
-		bids[suit], show = ai.hand.Meld(suit)
+		bids[suit], show = ai.RealHand.Meld(suit)
 		bids[suit] = bids[suit] + ai.powerBid(suit)
 		//		Log("Could bid %d in %s", bids[suit], suit)
 		if bids[trump] < bids[suit] {
@@ -603,11 +593,11 @@ func rankCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) *Tric
 }
 
 func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
-	ai.trick.certain = true
+	ai.Trick.certain = true
 	//sdz.Log("htcardset - Player%d is calculating", ai.Playerid)
 	//sdz.Log("Before rankCard as player %d", ai.Playerid)
-	//sdz.Log("Playerid %d choosing card %s", ai.Playerid, ai.trick.played[ai.Playerid])
-	return rankCard(ai.Playerid, ai.ht, ai.trick, ai.trump).Played[ai.Playerid]
+	//sdz.Log("Playerid %d choosing card %s", ai.Playerid, ai.Trick.played[ai.Playerid])
+	return rankCard(ai.Playerid, ai.HT, ai.Trick, ai.Trump).Played[ai.Playerid]
 }
 
 func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Suit, trump sdz.Suit) map[sdz.Card]bool {
@@ -650,102 +640,103 @@ func (ai *AI) Tell(c appengine.Context, action *sdz.Action) *sdz.Action {
 	switch action.Type {
 	case "Bid":
 		if action.Playerid == ai.Playerid {
-			Log(ai.Playerid, "------------------Player %d asked to bid against player %d", ai.Playerid, ai.highBidder)
-			ai.bidAmount, ai.trump, ai.show = ai.calculateBid()
-			if ai.numBidders == 1 && ai.IsPartner(ai.highBidder) && ai.bidAmount < 21 && ai.bidAmount+5 > 20 {
+			Log(ai.Playerid, "------------------Player %d asked to bid against player %d", ai.Playerid, ai.HighBidder)
+			ai.BidAmount, ai.Trump, _ = ai.calculateBid()
+			if ai.NumBidders == 1 && ai.IsPartner(ai.HighBidder) && ai.BidAmount < 21 && ai.BidAmount+5 > 20 {
 				// save our parter
-				Log(ai.Playerid, "Saving our partner with a recommended bid of %d", ai.bidAmount)
-				ai.bidAmount = 21
+				Log(ai.Playerid, "Saving our partner with a recommended bid of %d", ai.BidAmount)
+				ai.BidAmount = 21
 			}
-			bidAmountOld := ai.bidAmount
+			bidAmountOld := ai.BidAmount
 			switch {
-			case ai.Playerid == ai.highBidder: // this should only happen if I was the dealer and I got stuck
-				ai.bidAmount = 20
-			case ai.highBid > ai.bidAmount:
-				ai.bidAmount = 0
-			case ai.highBid == ai.bidAmount && !ai.IsPartner(ai.highBidder): // if equal with an opponent, bid one over them for spite!
-				ai.bidAmount++
-			case ai.numBidders == 3: // I'm last to bid, but I want it
-				ai.bidAmount = ai.highBid + 1
+			case ai.Playerid == ai.HighBidder: // this should only happen if I was the dealer and I got stuck
+				ai.BidAmount = 20
+			case ai.HighBid > ai.BidAmount:
+				ai.BidAmount = 0
+			case ai.HighBid == ai.BidAmount && !ai.IsPartner(ai.HighBidder): // if equal with an opponent, bid one over them for spite!
+				ai.BidAmount++
+			case ai.NumBidders == 3: // I'm last to bid, but I want it
+				ai.BidAmount = ai.HighBid + 1
 			}
-			meld, _ := ai.hand.Meld(ai.trump)
-			Log(ai.Playerid, "------------------Player %d bid %d over %d with recommendation of %d and %d meld", ai.Playerid, ai.bidAmount, ai.highBid, bidAmountOld, meld)
-			return sdz.CreateBid(ai.bidAmount, ai.Playerid)
+			meld, _ := ai.RealHand.Meld(ai.Trump)
+			Log(ai.Playerid, "------------------Player %d bid %d over %d with recommendation of %d and %d meld", ai.Playerid, ai.BidAmount, ai.HighBid, bidAmountOld, meld)
+			return sdz.CreateBid(ai.BidAmount, ai.Playerid)
 		} else {
 			// received someone else's bid value'
-			if ai.highBid < action.Bid {
-				ai.highBid = action.Bid
-				ai.highBidder = action.Playerid
+			if ai.HighBid < action.Bid {
+				ai.HighBid = action.Bid
+				ai.HighBidder = action.Playerid
 			}
-			ai.numBidders++
+			ai.NumBidders++
 		}
 	case "Play":
-		Log(ai.Playerid, "Trick = %s", ai.trick)
+		Log(ai.Playerid, "Trick = %s", ai.Trick)
+		var response *sdz.Action
 		if action.Playerid == ai.Playerid {
-			ai.action = sdz.CreatePlay(ai.findCardToPlay(action), ai.Playerid)
-			action.PlayedCard = ai.action.PlayedCard
+			response = sdz.CreatePlay(ai.findCardToPlay(action), ai.Playerid)
+			action.PlayedCard = response.PlayedCard
 		}
-		ai.trick.Played[action.Playerid] = action.PlayedCard
-		if ai.trick.leadSuit() == sdz.NASuit || ai.trick.winningCard() == sdz.NACard {
-			ai.trick.Lead = action.Playerid
-			ai.trick.WinningPlayer = action.Playerid
-			Log(ai.Playerid, "Set lead to %s", ai.trick.leadSuit())
-		} else if action.PlayedCard.Beats(ai.trick.winningCard(), ai.trump) {
-			ai.trick.WinningPlayer = action.Playerid
+		ai.Trick.Played[action.Playerid] = action.PlayedCard
+		if ai.Trick.leadSuit() == sdz.NASuit || ai.Trick.winningCard() == sdz.NACard {
+			ai.Trick.Lead = action.Playerid
+			ai.Trick.WinningPlayer = action.Playerid
+			Log(ai.Playerid, "Set lead to %s", ai.Trick.leadSuit())
+		} else if action.PlayedCard.Beats(ai.Trick.winningCard(), ai.Trump) {
+			ai.Trick.WinningPlayer = action.Playerid
 		}
 		ai.PlayCard(action.PlayedCard, action.Playerid)
-		if action.Playerid != ai.Playerid && action.PlayedCard.Suit() != ai.trick.leadSuit() {
-			Log(ai.Playerid, "nofollow - nosuit on Player%d on suit %s with trick %#v", action.Playerid, ai.trick.leadSuit(), ai.trick)
-			ai.noSuit(action.Playerid, ai.trick.leadSuit())
-			if ai.trick.leadSuit() != ai.trump && action.PlayedCard.Suit() != ai.trump {
-				Log(ai.Playerid, "notrump - nosuit on Player%d on suit %s", action.Playerid, ai.trump)
-				ai.noSuit(action.Playerid, ai.trump)
+		if action.Playerid != ai.Playerid && action.PlayedCard.Suit() != ai.Trick.leadSuit() {
+			Log(ai.Playerid, "nofollow - nosuit on Player%d on suit %s with trick %#v", action.Playerid, ai.Trick.leadSuit(), ai.Trick)
+			ai.noSuit(action.Playerid, ai.Trick.leadSuit())
+			if ai.Trick.leadSuit() != ai.Trump && action.PlayedCard.Suit() != ai.Trump {
+				Log(ai.Playerid, "notrump - nosuit on Player%d on suit %s", action.Playerid, ai.Trump)
+				ai.noSuit(action.Playerid, ai.Trump)
 			}
 		}
-		return ai.action
+		return response
 	case "Trump":
 		if action.Playerid == ai.Playerid {
-			meld, _ := ai.hand.Meld(ai.trump)
-			Log(ai.Playerid, "Player %d being asked to name trump on hand %s and have %d meld", ai.Playerid, ai.hand, meld)
+			meld, _ := ai.RealHand.Meld(ai.Trump)
+			Log(ai.Playerid, "Player %d being asked to name trump on hand %s and have %d meld", ai.Playerid, ai.RealHand, meld)
 			switch {
 			// TODO add case for the end of the game like if opponents will coast out
-			case ai.bidAmount < 15:
+			case ai.BidAmount < 15:
 				return sdz.CreateThrowin(ai.Playerid)
 			default:
-				return sdz.CreateTrump(ai.trump, ai.Playerid)
+				return sdz.CreateTrump(ai.Trump, ai.Playerid)
 			}
 		} else {
-			ai.trump = action.Trump
-			Log(ai.Playerid, "Trump is %s", ai.trump)
+			ai.Trump = action.Trump
+			Log(ai.Playerid, "Trump is %s", ai.Trump)
 		}
 	case "Throwin":
 		Log(ai.Playerid, "Player %d saw that player %d threw in", ai.Playerid, action.Playerid)
 	case "Deal":
 		ai.reset()
-		ai.hand = &action.Hand
+		ai.RealHand = &action.Hand
 		Log(ai.Playerid, "Set playerid")
-		Log(ai.Playerid, "Dealt Hand = %s", ai.hand.String())
+		Log(ai.Playerid, "Dealt Hand = %s", ai.RealHand.String())
 		ai.populate()
-		ai.highBid = 20
-		ai.highBid = action.Dealer
-		ai.numBidders = 0
+		ai.HighBid = 20
+		ai.HighBidder = action.Dealer
+		ai.NumBidders = 0
 	case "Meld":
 		Log(ai.Playerid, "Received meld action - %#v", action)
 		if action.Playerid == ai.Playerid {
 			return nil // seeing our own meld, we don't care
 		}
 		for _, card := range action.Hand {
-			val, ok := ai.ht.Cards[action.Playerid][card]
+			val, ok := ai.HT.Cards[action.Playerid][card]
 			if !ok {
-				ai.ht.Cards[action.Playerid][card] = 1
+				ai.HT.Cards[action.Playerid][card] = 1
 			} else if val == 1 {
-				ai.ht.Cards[action.Playerid][card] = 2
+				ai.HT.Cards[action.Playerid][card] = 2
 			}
 		}
 	case "Message": // nothing to do here, no one to read it
 	case "Trick": // nothing to do here, nothing to display
-		Log(ai.Playerid, "playedCards=%v", ai.ht.PlayedCards)
-		ai.trick = NewTrick()
+		Log(ai.Playerid, "playedCards=%v", ai.HT.PlayedCards)
+		ai.Trick = NewTrick()
 	case "Score": // TODO: save score to use for future bidding techniques
 	default:
 		Log(ai.Playerid, "Received an action I didn't understand - %v", action)
@@ -754,7 +745,7 @@ func (ai *AI) Tell(c appengine.Context, action *sdz.Action) *sdz.Action {
 }
 
 func (a *AI) Hand() *sdz.Hand {
-	return a.hand
+	return a.RealHand
 }
 
 func (a *AI) SetHand(c appengine.Context, h sdz.Hand, dealer, playerid int) {
@@ -765,9 +756,9 @@ func (a *AI) SetHand(c appengine.Context, h sdz.Hand, dealer, playerid int) {
 }
 
 type Human struct {
-	Token    string // blank if no current Channel exists
-	RealHand *sdz.Hand
-	Id       int64 `datastore:"-" goon:"id"`
+	Token    string    // blank if no current Channel exists
+	RealHand *sdz.Hand `datastore:"-"`
+	Id       int64     `datastore:"-" goon:"id"`
 	sdz.PlayerImpl
 }
 
@@ -786,13 +777,13 @@ func (h *Human) Tell(c appengine.Context, action *sdz.Action) *sdz.Action {
 }
 
 func (h Human) Hand() *sdz.Hand {
-	return h.hand
+	return h.RealHand
 }
 
 func (a *Human) SetHand(c appengine.Context, h sdz.Hand, dealer, playerid int) {
 	hand := make(sdz.Hand, len(h))
 	copy(hand, h)
-	a.hand = &hand
+	a.RealHand = &hand
 	a.Playerid = playerid
 	a.Tell(c, sdz.CreateDeal(hand, a.Playerid, dealer))
 }
@@ -931,48 +922,55 @@ func logError(c appengine.Context, err error) bool {
 }
 
 type Game struct {
-	Id          int64 `datastore:"-" goon:"id"`
-	Trick       Trick
-	PlayerGob   []byte   `datastore:",noindex"`
-	Players     []Player `datastore:"-"`
-	Dealer      int
-	Score       []int
-	Meld        []int
-	CountMeld   []bool
-	Counters    []int
-	HighBid     int
-	HighPlayer  int
-	Trump       sdz.Suit
-	State       int
-	Next        int
-	Hands       []sdz.Hand
-	HandsPlayed int
+	Id          int64      `datastore:"-" goon:"id"`
+	Trick       Trick      `datastore:"-"`
+	PlayerGob   []byte     `datastore:",noindex"`
+	Players     []Player   `datastore:"-"`
+	Dealer      int        `datastore:"-"`
+	Score       []int      `datastore:"-"`
+	Meld        []int      `datastore:"-"`
+	CountMeld   []bool     `datastore:"-"`
+	Counters    []int      `datastore:"-"`
+	HighBid     int        `datastore:"-"`
+	HighPlayer  int        `datastore:"-"`
+	Trump       sdz.Suit   `datastore:"-"`
+	State       int        `datastore:"-"`
+	Next        int        `datastore:"-"`
+	Hands       []sdz.Hand `datastore:"-"`
+	HandsPlayed int        `datastore:"-"`
 }
 
 func (x *Game) Load(c <-chan datastore.Property) error {
-	if err := datastore.LoadStruct(x, c); err != nil {
-		return err
-	}
+	//if err := datastore.LoadStruct(x, c); err != nil {
+	//	return err
+	//}
 	//return json.NewDecoder(bytes.NewReader([]byte(x.PlayerGob))).Decode(&x.Players)
-	return gob.NewDecoder(bytes.NewReader(x.PlayerGob)).Decode(&x.Players)
+	prop := <-c
+	return gob.NewDecoder(bytes.NewReader(prop.Value.([]byte))).Decode(&x)
 }
 
 func (x *Game) Save(c chan<- datastore.Property) error {
 	//var err error
 	//x.PlayerGob, err = json.Marshal(x.Players)
 	//err := json.NewEncoder(bytes.NewBuffer(x.PlayerGob)).Encode(x.Players)
+	defer close(c)
 	var data bytes.Buffer
-	err := gob.NewEncoder(&data).Encode(x.Players)
+	err := gob.NewEncoder(&data).Encode(x)
 
 	//err := gob.NewEncoder(bytes.NewBuffer(x.PlayerGob)).Encode(x.Players)
 	if err != nil {
-		defer close(c)
 		return err
 	}
-	x.PlayerGob = data.Bytes()
-	log.Printf("json = %s", x.PlayerGob)
-	log.Printf("players = %#v", x.Players)
-	return datastore.SaveStruct(x, c)
+	c <- datastore.Property{
+		Name:    "GameGob",
+		Value:   data.Bytes(),
+		NoIndex: true,
+	}
+	return nil
+	//x.PlayerGob = data.Bytes()
+	//log.Printf("json = %s", x.PlayerGob)
+	//log.Printf("players = %#v", x.Players)
+	//return datastore.SaveStruct(x, c)
 }
 
 func StubGame(human *Human) *Game {
@@ -1212,16 +1210,10 @@ func (g Game) BroadcastAll(c appengine.Context, a *sdz.Action) {
 //}
 
 func (game *Game) processAction(c appengine.Context, action *sdz.Action) *Game {
-	count := 0
 	for {
-		count++
-		if count > 5 {
-			return game
-		}
 		c.Debugf("processAction on %s with game.Id = %d", action, game.Id)
 		if action == nil {
 			// waiting on a human, save the state and exit
-			c.Debugf("processAction is putting the game")
 			g := goon.FromContext(c)
 			_, err := g.Put(game)
 			logError(c, err)
@@ -1402,6 +1394,8 @@ func (game *Game) processAction(c appengine.Context, action *sdz.Action) *Game {
 					return game.NextHand(c)
 				}
 				game.Trick = *NewTrick()
+				action = game.Players[game.Next].Tell(c, sdz.CreatePlayRequest(game.Trick.winningCard(), game.Trick.leadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
+				continue
 			}
 			game.Next = game.inc()
 			action = game.Players[game.Next].Tell(c, sdz.CreatePlayRequest(game.Trick.winningCard(), game.Trick.leadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
