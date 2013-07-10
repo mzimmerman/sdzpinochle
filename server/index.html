@@ -70,13 +70,13 @@
 				background-position-x: 0%;
 			}
 			#trump.H {
-				background-position-x: 100%;
+				background-position-x: 33.3%;
 			}
 			#trump.S {
-				background-position-x: 200%;
+				background-position-x: 66.6%;
 			}
 			#trump.D {
-				background-position-x: 300%;
+				background-position-x: 100%;
 			}
 			.center {
 				text-align: center;
@@ -224,7 +224,7 @@
 				channel = new goog.appengine.Channel(data);
 				socket = channel.open();
 				socket.onmessage = onMessage;
-//				socket.onerror = onError;
+				socket.onerror = showError;
 //				socket.onclose = onClose;
 			});
 			timer = setInterval(processQueue,500);
@@ -286,9 +286,9 @@
 			action.Playerid = playerid
 			var text = JSON.stringify(action);
 			$.post("/receive",text).done(function (data) {
-				console.log("Response from action = " + data);
+				//console.log("Response from action = " + data);
 			});
-			console.log("Sent - " + text);
+			//console.log("Sent - " + text);
 		}
 		
 		function setTurn(id) {
