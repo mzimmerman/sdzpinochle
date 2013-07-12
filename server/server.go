@@ -1407,56 +1407,6 @@ func (game *Game) processAction(c appengine.Context, action *sdz.Action) *Game {
 	}
 }
 
-//func serveGame(w http.ResponseWriter, r *http.Request) {
-//	listTmpl, err := template.New("tempate").ParseGlob("*.html")
-//	if err != nil {
-//		http.Error(w, err.Error(), http.StatusInternalServerError)
-//		return
-//	}
-//	err = listTmpl.ExecuteTemplate(w, "game", nil)
-//	if err != nil {
-//		http.Error(w, err.Error(), http.StatusInternalServerError)
-//		return
-//	}
-//}
-
-//var cp *ConnectionPool
-
-//func listenForFlash() {
-//	response := []byte("<cross-domain-policy><allow-access-from domain=\"*\" to-ports=\"*\" /></cross-domain-policy>")
-//	ln, err := net.Listen("tcp", ":843")
-//	if err != nil {
-//		sdz.Log("Cannot listen on port 843 for flash policy file, will not serve non WebSocket clients, check permissions or run as root - " + err.Error())
-//		return
-//	}
-//	for {
-//		conn, err := ln.Accept()
-//		if err != nil {
-//			// handle error
-//			continue
-//		}
-//		conn.Write(response)
-//		conn.Close()
-//	}
-//}
-
-//func main() {
-//	go listenForFlash()
-//	cp = &ConnectionPool{connections: make(chan *Human, 100)}
-//	http.Handle("/connect", websocket.Handler(wshandler))
-//	http.Handle("/cards/", http.StripPrefix("/cards/", http.FileServer(http.Dir("cards"))))
-//	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(http.Dir("js"))))
-//	http.Handle("/web-socket-js/", http.StripPrefix("/web-socket-js/", http.FileServer(http.Dir("web-socket-js"))))
-//	http.HandleFunc("/", serveGame)
-//	err := http.ListenAndServe(":80", nil)
-//	if err != nil {
-//		sdz.Log("Cannot listen on port 80, check permissions or run as root - " + err.Error())
-//	}
-//	err = http.ListenAndServe(":1080", nil)
-//	if err != nil {
-//		panic("Cannot listen for http requests - " + err.Error())
-//	}
-//}
 type Player interface {
 	Tell(appengine.Context, *sdz.Action) *sdz.Action // returns the response if known immediately
 	Hand() *sdz.Hand
