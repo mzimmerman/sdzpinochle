@@ -54,29 +54,137 @@
 				margin-top: 4px;
 			}
 			.playingCard {
-				width: 100%;
+				background-size: contain;
+				background-repeat:no-repeat;
+				background-position: center center;
 				height: 100%;
-				background-image: url('cards/cards.svg');
-				background-size: 600%;
 			}
 			#trump {
-				width: 50%;
+				width: 100%;
 				height: 100%;
-				background-image:url('cards/suits.svg');
-				background-size: 400%;
-				background-repeat: no-repeat;
+				background-size: contain;
+				background-repeat:no-repeat;
+				background-position: center center;
+			}
+			.playingCard.card1 {
+				width: 100%;
+			}
+			.playingCard.card2 {
+				width: 50%;
+			}
+			.playingCard.card3 {
+				width: 33.3%;
+			}
+			.playingCard.card4 {
+				width: 25%;
+			}
+			.playingCard.card5 {
+				width: 20%;
+			}
+			.playingCard.card6 {
+				width: 16.66%;
+			}
+			.playingCard.card7 {
+				width: 14.25%;
+			}
+			.playingCard.card8 {
+				width: 12.5%;
+			}
+			.playingCard.card9 {
+				width: 11.1%;
+			}
+			.playingCard.card10 {
+				width: 10%;
+			}
+			.playingCard.card11 {
+				width: 9%;
+			}
+			.playingCard.card12 {
+				width: 8.3%;
+			}
+			.playingCard.cardAS {
+				background-image:url('cards/png/AS.png');
+			}
+			.playingCard.cardTS {
+				background-image:url('cards/png/TS.png');
+			}
+			.playingCard.cardKS {
+				background-image:url('cards/png/KS.png');
+			}
+			.playingCard.cardQS {
+				background-image:url('cards/png/QS.png');
+			}
+			.playingCard.cardJS {
+				background-image:url('cards/png/JS.png');
+			}
+			.playingCard.card9S {
+				background-image:url('cards/png/9S.png');
+			}
+			.playingCard.cardAD {
+				background-image:url('cards/png/AD.png');
+			}
+			.playingCard.cardTD {
+				background-image:url('cards/png/TD.png');
+			}
+			.playingCard.cardKD {
+				background-image:url('cards/png/KD.png');
+			}
+			.playingCard.cardQD {
+				background-image:url('cards/png/QD.png');
+			}
+			.playingCard.cardJD {
+				background-image:url('cards/png/JD.png');
+			}
+			.playingCard.card9D {
+				background-image:url('cards/png/9D.png');
+			}
+			.playingCard.cardAH {
+				background-image:url('cards/png/AH.png');
+			}
+			.playingCard.cardTH {
+				background-image:url('cards/png/TH.png');
+			}
+			.playingCard.cardKH {
+				background-image:url('cards/png/KH.png');
+			}
+			.playingCard.cardQH {
+				background-image:url('cards/png/QH.png');
+			}
+			.playingCard.cardJH {
+				background-image:url('cards/png/JH.png');
+			}
+			.playingCard.card9H {
+				background-image:url('cards/png/9H.png');
+			}
+			.playingCard.cardAC {
+				background-image:url('cards/png/AC.png');
+			}
+			.playingCard.cardTC {
+				background-image:url('cards/png/TC.png');
+			}
+			.playingCard.cardKC {
+				background-image:url('cards/png/KC.png');
+			}
+			.playingCard.cardQC {
+				background-image:url('cards/png/QC.png');
+			}
+			.playingCard.cardJC {
+				background-image:url('cards/png/JC.png');
+			}
+			.playingCard.card9C {
+				background-image:url('cards/png/9C.png');
 			}
 			#trump.C {
-				background-position-x: 0%;
+				background-image:url('cards/png/C.png');
 			}
 			#trump.H {
-				background-position-x: 33.3%;
+				background-image:url('cards/png/H.png');
 			}
 			#trump.S {
-				background-position-x: 66.6%;
+				background-image:url('cards/png/S.png');
 			}
 			#trump.D {
-				background-position-x: 100%;
+				background-image:url('cards/png/D.png');
 			}
 			.center {
 				text-align: center;
@@ -86,68 +194,6 @@
 			}
 			.radio {
 				display: block;
-			}
-			/*			
-			.cardAH, .cardAS, .cardAD, .cardAC {
-				background-position-x: 0em;
-			}
-			.cardTH, .cardTS, .cardTD, .cardTC {
-				background-position-x: 56em;
-			}
-			.cardKH, .cardKS, .cardKD, .cardKC {
-				background-position-x: 14em;
-			}
-			.cardQH, .cardQS, .cardQD, .cardQC {
-				background-position-x: 28em;
-			}
-			.cardJH, .cardJS, .cardJD, .cardJC {
-				background-position-x: 42em;
-			}
-			.card9H, .card9S, .card9D, .card9C {
-				background-position-x: 70em;
-			}
-			.cardAS, .cardTS, .cardKS, .cardQS, .cardJS, .card9S {
-				background-position-y: 39.09375em;
-			}
-			.cardAD, .cardTD, .cardKD, .cardQD, .cardJD, .card9D {
-				background-position-y: 19.546875em;
-			}
-			.cardAH, .cardTH, .cardKH, .cardQH, .cardJH, .card9H {
-				background-position-y: 58.640625em;
-			}
-			.cardAC, .cardTC, .cardKC, .cardQC, .cardJC, .card9C {
-				background-position-y: 0em;
-			}
-			*/
-			.cardAH, .cardAS, .cardAD, .cardAC {
-				background-position-x: 0%;
-			}
-			.cardTH, .cardTS, .cardTD, .cardTC {
-				background-position-x: 400%;
-			}
-			.cardKH, .cardKS, .cardKD, .cardKC {
-				background-position-x: 100%;
-			}
-			.cardQH, .cardQS, .cardQD, .cardQC {
-				background-position-x: 200%;
-			}
-			.cardJH, .cardJS, .cardJD, .cardJC {
-				background-position-x: 300%;
-			}
-			.card9H, .card9S, .card9D, .card9C {
-				background-position-x: 500%;
-			}
-			.cardAS, .cardTS, .cardKS, .cardQS, .cardJS, .card9S {
-				background-position-y: 200%;
-			}
-			.cardAD, .cardTD, .cardKD, .cardQD, .cardJD, .card9D {
-				background-position-y: 100%;
-			}
-			.cardAH, .cardTH, .cardKH, .cardQH, .cardJH, .card9H {
-				background-position-y: 300%;
-			}
-			.cardAC, .cardTC, .cardKC, .cardQC, .cardJC, .card9C {
-				background-position-y: 0%;
 			}
 		</style>
 	</head>
@@ -174,16 +220,7 @@
 		function addToQueue(f) {
 			$('body').queue(f);
 		}
-		
-		function setCardHeight(cards) {
-			var height = cards.width() * 1.3928571;
-			if (height > cards.parent().height()) {
-				height = cards.parent().height();
-				cards.width(height / 1.3928571);
-			}
-			cards.height(height);
-		}
-		
+				
 		function showError(msg){
 			$('#error').html(msg).show();
 			setTimeout(function(){
@@ -196,19 +233,17 @@
 			for(var i=0;i<hand.length;i++){
 				location.append(createCard(hand[i]));
 			}
-			location.children(".playingCard").width(100/hand.length + "%");
-			setCardHeight(location.children(".playingCard"));
+			location.children(".playingCard").addClass("card"+hand.length);
 		}
 		function createCard(c) {
-			return "<div title='" + c + "' class='playingCard card" + c + "'>" + c + "</div>";
+			return "<div title='" + c + "' class='playingCard card" + c + "'></div>";
 		}
 		
 		function playCard() {
 			var c = $(this).attr("title");
 			send({Type:"Play",PlayedCard:c});
 			cardObject = $(this);
-			getPlayer(playerid).children(".play").empty().append(cardObject).show();
-			setCardHeight(getPlayer(playerid).find(".playingCard"));
+			showHand(getPlayer(playerid).children(".play"),[c]);
 			$("#hand").children(".playingCard").unbind('click');
 			addToQueue(function () {
 				setTurn((playerid + 1) % 4);
@@ -381,18 +416,14 @@
 				case "Play":
 					playCount++;
 					if (action.Playerid != playerid) {
-						var played = createCard(action.PlayedCard,0)
 						if (playCount < 4) {
 							addToQueue(function () {
 								setTurn((action.Playerid + 1) % 4);
-								getPlayer(action.Playerid).children(".play").html(played).show();
-								setCardHeight(getPlayer(action.Playerid).find(".playingCard"));
-								
+								showHand(getPlayer(action.Playerid).children(".play"),[action.PlayedCard]);								
 							});
 						} else {
 							addToQueue(function(){
-								getPlayer(action.Playerid).children(".play").html(played).show();
-								setCardHeight(getPlayer(action.Playerid).find(".playingCard"));
+								showHand(getPlayer(action.Playerid).children(".play"),[action.PlayedCard]);
 							});
 						}
 						return;
