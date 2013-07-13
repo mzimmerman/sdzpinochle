@@ -50,14 +50,8 @@
 				margin: 0px;
 				padding: 0px;
 			}
-			#hand {
-				margin-top: 4px;
-			}
 			.playingCard {
-				background-size: contain;
-				background-repeat:no-repeat;
-				background-position: center center;
-				height: 100%;
+				max-height: 100%;
 			}
 			#trump {
 				width: 100%;
@@ -67,124 +61,52 @@
 				background-position: center center;
 			}
 			.playingCard.card1 {
-				width: 100%;
+				max-width: 100%;
 			}
 			.playingCard.card2 {
-				width: 50%;
+				max-width: 50%;
 			}
 			.playingCard.card3 {
-				width: 33.3%;
+				max-width: 33.3%;
 			}
 			.playingCard.card4 {
-				width: 25%;
+				max-width: 25%;
 			}
 			.playingCard.card5 {
-				width: 20%;
+				max-width: 20%;
 			}
 			.playingCard.card6 {
-				width: 16.66%;
+				max-width: 16.66%;
 			}
 			.playingCard.card7 {
-				width: 14.25%;
+				max-width: 14.25%;
 			}
 			.playingCard.card8 {
-				width: 12.5%;
+				max-width: 12.5%;
 			}
 			.playingCard.card9 {
-				width: 11.1%;
+				max-width: 11.1%;
 			}
 			.playingCard.card10 {
-				width: 10%;
+				max-width: 10%;
 			}
 			.playingCard.card11 {
-				width: 9%;
+				max-width: 9%;
 			}
 			.playingCard.card12 {
-				width: 8.3%;
-			}
-			.playingCard.cardAS {
-				background-image:url('cards/png/AS.png');
-			}
-			.playingCard.cardTS {
-				background-image:url('cards/png/TS.png');
-			}
-			.playingCard.cardKS {
-				background-image:url('cards/png/KS.png');
-			}
-			.playingCard.cardQS {
-				background-image:url('cards/png/QS.png');
-			}
-			.playingCard.cardJS {
-				background-image:url('cards/png/JS.png');
-			}
-			.playingCard.card9S {
-				background-image:url('cards/png/9S.png');
-			}
-			.playingCard.cardAD {
-				background-image:url('cards/png/AD.png');
-			}
-			.playingCard.cardTD {
-				background-image:url('cards/png/TD.png');
-			}
-			.playingCard.cardKD {
-				background-image:url('cards/png/KD.png');
-			}
-			.playingCard.cardQD {
-				background-image:url('cards/png/QD.png');
-			}
-			.playingCard.cardJD {
-				background-image:url('cards/png/JD.png');
-			}
-			.playingCard.card9D {
-				background-image:url('cards/png/9D.png');
-			}
-			.playingCard.cardAH {
-				background-image:url('cards/png/AH.png');
-			}
-			.playingCard.cardTH {
-				background-image:url('cards/png/TH.png');
-			}
-			.playingCard.cardKH {
-				background-image:url('cards/png/KH.png');
-			}
-			.playingCard.cardQH {
-				background-image:url('cards/png/QH.png');
-			}
-			.playingCard.cardJH {
-				background-image:url('cards/png/JH.png');
-			}
-			.playingCard.card9H {
-				background-image:url('cards/png/9H.png');
-			}
-			.playingCard.cardAC {
-				background-image:url('cards/png/AC.png');
-			}
-			.playingCard.cardTC {
-				background-image:url('cards/png/TC.png');
-			}
-			.playingCard.cardKC {
-				background-image:url('cards/png/KC.png');
-			}
-			.playingCard.cardQC {
-				background-image:url('cards/png/QC.png');
-			}
-			.playingCard.cardJC {
-				background-image:url('cards/png/JC.png');
-			}
-			.playingCard.card9C {
-				background-image:url('cards/png/9C.png');
+				max-width: 8.3%;
 			}
 			#trump.C {
-				background-image:url('cards/png/C.png');
+				background-image:url('cards/C.png');
 			}
 			#trump.H {
-				background-image:url('cards/png/H.png');
+				background-image:url('cards/H.png');
 			}
 			#trump.S {
-				background-image:url('cards/png/S.png');
+				background-image:url('cards/S.png');
 			}
 			#trump.D {
-				background-image:url('cards/png/D.png');
+				background-image:url('cards/D.png');
 			}
 			.center {
 				text-align: center;
@@ -236,14 +158,14 @@
 			location.children(".playingCard").addClass("card"+hand.length);
 		}
 		function createCard(c) {
-			return "<div title='" + c + "' class='playingCard card" + c + "'></div>";
+			return "<img title='" + c + "' class='playingCard' src='cards/" + c + ".png'>";
 		}
 		
 		function playCard() {
 			var c = $(this).attr("title");
 			send({Type:"Play",PlayedCard:c});
-			cardObject = $(this);
 			showHand(getPlayer(playerid).children(".play"),[c]);
+			$(this).remove();
 			$("#hand").children(".playingCard").unbind('click');
 			addToQueue(function () {
 				setTurn((playerid + 1) % 4);
