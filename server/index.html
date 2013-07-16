@@ -2,6 +2,7 @@
 <html>
 	<head>
 		<title>Single Deck Pinochle</title>
+		  <link href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/themes/smoothness/jquery-ui.css" type="text/css" rel="Stylesheet" />
 		<style media="screen" type="text/css">
 			html, body, .player, .tall {
 				height: 100%;
@@ -10,6 +11,9 @@
 				padding: 0px;
 				margin: 0px;
 				overflow: hidden;
+			}
+			.no-close .ui-dialog-titlebar-close {
+				display: none;
 			}
 			#game div, #continueMeld div, #chooseTrump div, #bid div, #hello div {
 				overflow: auto;
@@ -59,6 +63,11 @@
 				background-size: contain;
 				background-repeat:no-repeat;
 				background-position: center center;
+			}
+			.cardTable {
+				width: 10em;
+				height: 10em;
+				border: 1em solid black;
 			}
 			.playingCard.card1 {
 				max-width: 100%;
@@ -120,8 +129,8 @@
 		</style>
 	</head>
 	<body>
-		<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js"></script>
-		<script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.0/jquery-ui.min.js"></script>
+		<script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+		<script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
 		<script type="text/javascript" src="/_ah/channel/jsapi"></script>
 		<!--<script src="js/jquery.min.js"></script>
 		<script src="js/jquery-ui.min.js"></script>-->
@@ -177,7 +186,9 @@
 		}
 				
 		$(document).ready(function(){
+			//console.log("Doing /connect");
 			$.get("/connect").done(function (data) {
+				//console.log("Opening channel");
 				channel = new goog.appengine.Channel(data);
 				socket = channel.open();
 				socket.onmessage = onMessage;
@@ -185,23 +196,7 @@
 //				socket.onclose = onClose;
 			});
 			timer = setInterval(processQueue,500);
-
-			$("#game button").click(function () {
-				var option = parseInt($("#game input:checked").val());
-				send({Type:"Game",Option:option});
-				$(this).parent().parent().hide();
-				addToQueue(function () {
-					$("#we").html("0");
-					$("#they").html("0");
-				});
-			});
 						
-			$("#hello button").click(function () {
-				var option = $("#hello input:checked").val();
-				send({Type:"Hello",Message:option});
-				$(this).parent().parent().hide();
-			});
-
 			$("#continueMeld button").click(function () {
 				$(this).parent().parent().hide();
 				timer = setInterval(processQueue,500);
@@ -226,6 +221,13 @@
 				$(this).parent().parent().hide();
 			});
 			
+			$("#updateTables").click(function() {
+				send({Type:"Tables"});
+			});
+			$("#nameMe").hide();
+			$("#start button").click(function () {
+				send({Type:"Start"});
+			});
 		}); // end of $(document).ready()
 		
 		function getPlayer(id) {
@@ -253,18 +255,54 @@
 			getPlayer(id).addClass('turn');
 		}
 		
+		function createTable(table) {
+			return "<div class='cardTable' TableId='" + table.Id + "'>" + table.Players[0] + " & " + table.Players[2] + " vs " + table.Players[1] + " & " + table.Players[3] + "</div>";
+		}
+		
 		function onMessage(evt) {
 			//console.log("Received - " + evt.data);
 			var action = $.parseJSON(evt.data);
 			switch (action.Type) {
+				case "Tables":
+					$("#table").hide();
+					$(".cardTable").remove();
+					var list = $("#list").show();
+					for (table in action.Tables) {
+						list.append(createTable(action.Tables[table]));
+					}
+					$(".cardTable").click(function () {
+						//console.log($(this).html());
+						send({Type:"Sit",Playerid:3,TableId:parseInt($(this).attr("TableId"))});
+					});
+					return;
+				case "MyTable":
+					$("#list").hide();
+					$("#table").show();
+					playerid = action.Playerid;
+					left = (playerid + 1) % 4;
+					partner = (playerid + 2) % 4;
+					right = (playerid + 3) % 4;
+					for (var x = 0; x<action.MyTable.Players.length; x++) {
+						if ((action.MyTable.Players[x] != "") && (action.MyTable.Players[x] != null)) {
+							getPlayer(x).children("h4").text(action.MyTable.Players[x]);
+						}
+					}
+					break;
+				case "Name":
+					$("#nameMe").show().dialog({
+						dialogClass: "no-close",
+						autoOpen: true,
+						resizable: false,
+						modal: true,
+						buttons: {
+							"Send": function() {
+								send({Type:"Name",Message:$("#name").val()});
+								$(this).remove();
+							},
+						},
+					});
 				case "Message":
 					appendMessage(action.Message);
-					break;
-				case "Hello":
-					addToQueue(function () {
-						$("#hello").show();
-						//$("#hello button").click(); // debug
-					});
 					break;
 				case "Game":
 					addToQueue(function () {
@@ -289,6 +327,9 @@
 					partner = (playerid + 2) % 4;
 					right = (playerid + 3) % 4;
 					addToQueue(function(){
+						$("#start").hide();
+						$("#list").hide();
+						$("#table").show();
 						showHand($("#hand"),action.Hand);
 						$(".bid").show().empty();
 						$(".play").hide().empty();
@@ -386,11 +427,10 @@
 						$("#we").html(action.Score[playerid % 2]);
 						$("#they").html(action.Score[(playerid + 1) % 2]);
 						if (action.GameOver) {
-							alert("Game is over!");
 							if (action.Win) {
-								alert("You win!");
+								alert("Game is over, you win!");
 							} else {
-								alert("You lose!");
+								alert("Game is over, you lose!");
 							}
 						}
 					});
@@ -398,137 +438,100 @@
 			}
 		}
 		</script>
-		<div class="full quarter">
-			<div class="third tall">
-				<div class="third center tall">
-					<div id="trump" class="hide"></div>
-				</div>
-				<div class="third">
-					<div class="full">Score</div>
-					<div class="full">We<label class="right" id="we"></label></div>
-					<div class="full">They<label class="right" id="they"></label></div>
-				</div>
+		<div class="full tall">
+			<div class="full tall" id="list">
+				<button id="updateTables">Update Tables</button>
 			</div>
-			<div id="partner" class="third player">
-				<h4 class="center quarter">Partner</h4>
-				<div class="bid center full"></div>
-				<div class="play center full"></div>
-			</div>
-			<div class="third tall">
-				<div class="centerThird third">
-					<div class="full">Bid<label class="right" id="bid-value"></label></div>
-					<div class="full">We Meld<label class="right" id="wemeld"></label></div>
-					<div class="full">They Meld<label class="right" id="theymeld"></label></div>
-				</div>
-			</div>
-		</div>
-		<div class="full quarter">
-			<div id="left" class="third player">
-				<h4 class="center quarter">Opponent</h4>
-				<div class="bid center full"></div>
-				<div class="play center full"></div>
-			</div>
-			<div class="third tall">
-				<div id="continueMeld" class="full tall hide center">
-					<div class="full tall">
-						<button class="full tall">Continue</button>
+			<div class="full tall hide" id="table">
+				<div class="full quarter">
+					<div class="third tall">
+						<div class="third center tall">
+							<div id="trump" class="hide"></div>
+						</div>
+						<div class="third">
+							<div class="full">Score</div>
+							<div class="full">We<label class="right" id="we"></label></div>
+							<div class="full">They<label class="right" id="they"></label></div>
+						</div>
+					</div>
+					<div id="partner" class="third player">
+						<h4 class="center quarter">Partner</h4>
+						<div class="bid center full"></div>
+						<div class="play center full"></div>
+					</div>
+					<div class="third tall">
+						<div class="centerThird third">
+							<div class="full">Bid<label class="right" id="bid-value"></label></div>
+							<div class="full">We Meld<label class="right" id="wemeld"></label></div>
+							<div class="full">They Meld<label class="right" id="theymeld"></label></div>
+						</div>
 					</div>
 				</div>
-				<div id="hello" title="Welcome to SDZPinochle!" class="full tall hide">
-					<div class="full threeQuarter">
-						<label class="radio">
-							<input type="radio" name="optionHello" value="create" checked>
-							Create (create a game now)
-						</label>
-						<label class="radio">
-							<input type="radio" name="optionHello" value="join">
-							Join (wait for others to create a game I can join)
-						</label>
-						<label class="radio">
-							<input type="radio" name="optionHello" value="quit">
-							Quit (goodbye!)
-						</label>
+				<div class="full quarter">
+					<div id="left" class="third player">
+						<h4 class="center quarter">Opponent</h4>
+						<div class="bid center full"></div>
+						<div class="play center full"></div>
 					</div>
-					<div class="full quarter">
-						<button class="full tall">Go</button>
+					<div class="third tall">
+						<div id="continueMeld" class="full tall hide center">
+							<div class="full tall">
+								<button class="full tall">Continue</button>
+							</div>
+						</div>
+						<div id="bid" title="What's your Bid?" class="full tall hide center">
+							<div class="half full">
+								<input type="number" value="20">
+							</div>
+							<div class="half full">
+								<button class="full tall">Bid</button>
+							</div>
+						</div>
+						<div id="start" title="Start" class="full tall">
+							<button>Start</button>
+						</div>
+						<div id="chooseTrump" title="Choose Trump" class="full tall hide">
+							<div class="full threeQuarter">
+								<label class="radio">
+									<input type="radio" name="optionTrump" value="D">
+									Diamonds
+								</label>
+								<label class="radio">
+									<input type="radio" name="optionTrump" value="S">
+									Spades
+								</label>
+								<label class="radio">
+									<input type="radio" name="optionTrump" value="H">
+									Hearts
+								</label>
+								<label class="radio">
+									<input type="radio" name="optionTrump" value="C">
+									Clubs
+								</label>
+							</div>
+							<div class="full quarter">
+								<button class="full tall">Go</button>
+							</div>
+						</div>
 					</div>
-				</div>
-				<div id="bid" title="What's your Bid?" class="full tall hide center">
-					<div class="half full">
-						<input type="number" value="20">
-					</div>
-					<div class="half full">
-						<button class="full tall">Bid</button>
-					</div>
-				</div>
-				<div id="chooseTrump" title="Choose Trump" class="full tall hide">
-					<div class="full threeQuarter">
-						<label class="radio">
-							<input type="radio" name="optionTrump" value="D">
-							Diamonds
-						</label>
-						<label class="radio">
-							<input type="radio" name="optionTrump" value="S">
-							Spades
-						</label>
-						<label class="radio">
-							<input type="radio" name="optionTrump" value="H">
-							Hearts
-						</label>
-						<label class="radio">
-							<input type="radio" name="optionTrump" value="C">
-							Clubs
-						</label>
-					</div>
-					<div class="full quarter">
-						<button class="full tall">Go</button>
-					</div>
-				</div>
-				<div id="game" title="Create a Game" class="full tall hide">
-					<div class="full threeQuarter">
-						<label class="radio">
-							<input type="radio" name="optionGame" value="1" checked>
-							Play against three AI players and start immediately
-						</label>
-						<label class="radio">
-							<input type="radio" name="optionGame" value="2">
-							Play with a human partner against two AI players
-						</label>
-						<label class="radio">
-							<input type="radio" name="optionGame" value="3">
-							Play with a human partner against one AI players and 1 Human
-						</label>
-						<label class="radio">
-							<input type="radio" name="optionGame" value="4">
-							Play with a human partner against two humans
-						</label>
-						<label class="radio">
-							<input type="radio" name="optionGame" value="5">
-							Play against a human with AI partners
-						</label>
-						<label class="radio">
-							<input type="radio" name="optionGame" value="6">
-							Go back
-						</label>
-					</div>
-					<div class="full quarter">
-						<button class="full tall">Go</button>
+					<div id="right" class="third player">
+						<h4 class="center quarter">Opponent</h4>
+						<div class="bid center full"></div>
+						<div class="play center full"></div>
 					</div>
 				</div>
-			</div>
-			<div id="right" class="third player">
-				<h4 class="center quarter">Opponent</h4>
-				<div class="bid center full"></div>
-				<div class="play center full"></div>
+				<div class="full quarter">
+					<div id="bottom" class="third centerThird player">
+						<h4 class="center quarter">Me</h4>
+						<div class="bid center full"></div>
+						<div class="play center full"></div>
+					</div>
+				</div>
+				<div id="hand" class="quarter center full"></div>
 			</div>
 		</div>
-		<div class="full quarter">
-			<div id="bottom" class="third centerThird player">
-				<h4 class="center quarter">Me</h4>
-				<div class="bid center full"></div>
-				<div class="play center full"></div>
-			</div>
+		<div id="nameMe" title="Name......">
+			<input type="text" name="Name" id="name" class="text ui-widget-content ui-corner-all" />
 		</div>
-		<div id="hand" class="quarter center full"></div>
 	</body>
 </html>

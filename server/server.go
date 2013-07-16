@@ -25,22 +25,22 @@ import (
 )
 
 const (
-	ace       = "A"
-	ten       = "T"
-	king      = "K"
-	queen     = "Q"
-	jack      = "J"
-	nine      = "9"
-	spades    = "S"
-	hearts    = "H"
-	clubs     = "C"
-	diamonds  = "D"
-	StateDeal = iota
-	StateBid
-	StateTrump
-	StateMeld
-	StatePlay
-	cookieName = "sdzpinochle"
+	ace          = "A"
+	ten          = "T"
+	king         = "K"
+	queen        = "Q"
+	jack         = "J"
+	nine         = "9"
+	spades       = "S"
+	hearts       = "H"
+	clubs        = "C"
+	diamonds     = "D"
+	StateWaiting = "waiting"
+	StateBid     = "bid"
+	StateTrump   = "trump"
+	StateMeld    = "meld"
+	StatePlay    = "play"
+	cookieName   = "sdzpinochle"
 )
 
 var store = sessions.NewCookieStore([]byte("sdzpinochle"))
@@ -61,96 +61,122 @@ func init() {
 
 func connected(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	id, err := strconv.Atoi(r.FormValue("from"))
-	if logError(c, err) {
+	client := new(Client)
+	client.setId(r.FormValue("from"))
+	g := goon.FromContext(c)
+	c.Debugf("connected - Getting client %d", client.Id)
+	err := g.Get(client)
+	if err == datastore.ErrNoSuchEntity {
+		client.Tell(g, c, &sdz.Action{Type: "Error", Message: "Your client does not exist, please hit /connect again"})
+	} else if logError(c, err) {
 		return
+	} else {
+		client.Connected = true
+		_, err = g.Put(client)
+		if logError(c, err) {
+			return
+		}
+		// figure out what we need to tell the client -- table list or put them back in their game
+		//human := StubHuman(int64(id))
+		//human.Tell(c, sdz.CreateMessage("Do you want to join a game, create a new game, or quit? (join, create, quit)"))
+		if client.Name == "" {
+			client.Tell(g, c, sdz.CreateName())
+			// request a name and load it later
+		}
+		client.SendTables(g, c, nil)
 	}
-	human := StubHuman(int64(id))
-	human.Tell(c, sdz.CreateMessage("Do you want to join a game, create a new game, or quit? (join, create, quit)"))
-	human.Tell(c, sdz.CreateHello("Hello!"))
 	fmt.Fprintf(w, "Success")
 }
 
 func connect(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	g := goon.FromContext(c)
-	human := new(Human)
+	client := new(Client)
 	cookie, _ := store.Get(r, cookieName)
 	var ok bool
 	var err error
-	human.Id, ok = cookie.Values["DataId"].(int64)
-	if ok && human.Id != 0 {
-		err = g.Get(human)
-	}
-	if human.Id == 0 {
-		_, err = g.Put(human)
-		if logError(c, err) {
+
+	client.Id, ok = cookie.Values["ClientId"].(int64)
+	if ok && client.Id != 0 {
+		c.Debugf("connect - Getting client %d", client.Id)
+		err = g.Get(client)
+		if err != datastore.ErrNoSuchEntity && logError(c, err) {
 			return
 		}
-		cookie.Values["DataId"] = human.Id
-		cookie.Save(r, w)
 	}
-	if human.Token == "" {
-		human.Token, err = channel.Create(c, strconv.Itoa(int(human.Id)))
-		if logError(c, err) {
-			return
-		}
+	client.Connected = false // the client is only connecting now, need to setup the channel first
+	c.Debugf("Putting client %d", client.Id)
+	_, err = g.Put(client)
+	c.Debugf("Put client %d", client.Id)
+	if logError(c, err) {
+		return
+	}
+	cookie.Values["ClientId"] = client.Id
+	cookie.Save(r, w)
+	token, err := channel.Create(c, client.getId())
+	if logError(c, err) {
+		return
 	}
 	w.Header().Set("Content-type", " application/json")
-	rj, err := json.Marshal(human.Token)
+	rj, err := json.Marshal(token)
 	if logError(c, err) {
 		return
 	}
 	fmt.Fprintf(w, "%s", rj)
-	_, err = g.Put(human)
-	if logError(c, err) {
-		return
-	}
+	client.SendTables(g, c, nil)
 }
 
 func receive(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	g := goon.FromContext(c)
-	human := new(Human)
+	client := new(Client)
 	cookie, _ := store.Get(r, cookieName)
 	var ok bool
-	var err error
-	human.Id, ok = cookie.Values["DataId"].(int64)
-	if ok && human.Id != 0 {
-		err = g.Get(human)
-		if logError(c, err) {
-			return
-		}
-	} else {
-		logError(c, errors.New("not connected!"))
+	client.Id, ok = cookie.Values["ClientId"].(int64)
+
+	if !ok || client.Id == 0 {
+		err := errors.New("Tried to receive a message from an unknown client")
+		logError(c, err)
+		w.WriteHeader(500)
+		fmt.Fprintf(w, "Error - %v", err)
+		return
+	}
+	err := g.Get(client)
+	if datastore.ErrNoSuchEntity == err {
+		w.WriteHeader(500)
+		fmt.Fprintf(w, "Error - you don't exist")
+		return
+	} else if logError(c, err) {
+		w.WriteHeader(500)
+		fmt.Fprintf(w, "Error - %v", err)
 		return
 	}
 	decoder := json.NewDecoder(r.Body)
 	action := new(sdz.Action)
 	err = decoder.Decode(action)
 	if logError(c, err) {
+		w.WriteHeader(500)
+		fmt.Fprintf(w, "Error - %v", err)
 		return
 	}
 	c.Debugf("Received %s", action)
-	game := NewGame(4)
-	game.Players[0] = human
-	var oldId int64
-	oldId, ok = cookie.Values["Gameid"].(int64)
-	if ok && oldId != 0 {
-		game.Id = oldId
+	var game *Game
+	if client.TableId != 0 {
+		game = &Game{Id: client.TableId}
 		err = g.Get(game)
 		if err == datastore.ErrNoSuchEntity {
-			game.Id = 0 // create a new one
+			game = nil
 		} else if logError(c, err) {
 			w.WriteHeader(500)
 			fmt.Fprintf(w, "Error - %v", err)
 			return
 		}
 	}
-	game = game.processAction(c, action)
-	if game.Id != oldId {
-		cookie.Values["Gameid"] = game.Id
-		cookie.Save(r, w)
+	game, err = game.processAction(g, c, client, action)
+	if logError(c, err) {
+		w.WriteHeader(500)
+		fmt.Fprintf(w, "Error - %v", err)
+		return
 	}
 	fmt.Fprintf(w, "Success")
 }
@@ -322,6 +348,10 @@ type AI struct {
 	sdz.PlayerImpl
 	HT    *HandTracker
 	Trick *Trick
+}
+
+func (ai *AI) MarshalJSON() ([]byte, error) {
+	return json.Marshal("AI")
 }
 
 func (a *AI) reset() {
@@ -635,7 +665,7 @@ func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Su
 	return decisionMap
 }
 
-func (ai *AI) Tell(c appengine.Context, action *sdz.Action) *sdz.Action {
+func (ai *AI) Tell(g *goon.Goon, c appengine.Context, action *sdz.Action) *sdz.Action {
 	Log(ai.Playerid, "Action received - %+v", action)
 	switch action.Type {
 	case "Bid":
@@ -748,44 +778,38 @@ func (a *AI) Hand() *sdz.Hand {
 	return a.RealHand
 }
 
-func (a *AI) SetHand(c appengine.Context, h sdz.Hand, dealer, playerid int) {
+func (a *AI) SetHand(g *goon.Goon, c appengine.Context, h sdz.Hand, dealer, playerid int) {
 	a.Playerid = playerid
 	hand := make(sdz.Hand, len(h))
 	copy(hand, h)
-	a.Tell(c, sdz.CreateDeal(hand, playerid, dealer))
+	a.Tell(g, c, sdz.CreateDeal(hand, playerid, dealer))
 }
 
 type Human struct {
-	Token    string    // blank if no current Channel exists
-	RealHand *sdz.Hand `datastore:"-"`
-	Id       int64     `datastore:"-" goon:"id"`
+	RealHand *sdz.Hand
+	Client   *Client
 	sdz.PlayerImpl
 }
 
-func StubHuman(id int64) *Human {
-	return &Human{Id: id}
+func (h *Human) MarshalJSON() ([]byte, error) {
+	log.Printf("Logging from MarshalJSON in Human on %s\n", h.Client.Name)
+	return json.Marshal(h.Client.Name)
 }
 
-func (h *Human) Tell(c appengine.Context, action *sdz.Action) *sdz.Action {
-	err := channel.SendJSON(c, strconv.Itoa(int(h.Id)), action)
-	if err != nil {
-		sdz.Log("Error in Send - %v", err)
-		h.Token = ""
-	}
-	c.Debugf("Sent %s", action)
-	return nil
+func (h *Human) Tell(g *goon.Goon, c appengine.Context, action *sdz.Action) *sdz.Action {
+	return h.Client.Tell(g, c, action)
 }
 
 func (h Human) Hand() *sdz.Hand {
 	return h.RealHand
 }
 
-func (a *Human) SetHand(c appengine.Context, h sdz.Hand, dealer, playerid int) {
+func (a *Human) SetHand(g *goon.Goon, c appengine.Context, h sdz.Hand, dealer, playerid int) {
 	hand := make(sdz.Hand, len(h))
 	copy(hand, h)
 	a.RealHand = &hand
 	a.Playerid = playerid
-	a.Tell(c, sdz.CreateDeal(hand, a.Playerid, dealer))
+	a.Tell(g, c, sdz.CreateDeal(hand, a.Playerid, dealer))
 }
 
 //func (h *Human) createGame(option int, cp *ConnectionPool) {
@@ -914,8 +938,8 @@ func logError(c appengine.Context, err error) bool {
 			})
 		}
 		c.Errorf("Error - %v", err)
-		debug.PrintStack()
-		//c.Debugf("Stack = %s", debug.Stack())
+		//debug.PrintStack()
+		c.Debugf("Stack = %s", debug.Stack())
 		return true
 	}
 	return false
@@ -923,21 +947,21 @@ func logError(c appengine.Context, err error) bool {
 
 type Game struct {
 	Id          int64      `datastore:"-" goon:"id"`
-	Trick       Trick      `datastore:"-"`
-	PlayerGob   []byte     `datastore:",noindex"`
+	Trick       Trick      `datastore:"-" json:"-"`
+	PlayerGob   []byte     `datastore:",noindex" json:"-"`
 	Players     []Player   `datastore:"-"`
-	Dealer      int        `datastore:"-"`
+	Dealer      int        `datastore:"-" json:"-"`
 	Score       []int      `datastore:"-"`
 	Meld        []int      `datastore:"-"`
-	CountMeld   []bool     `datastore:"-"`
-	Counters    []int      `datastore:"-"`
+	CountMeld   []bool     `datastore:"-" json:"-"`
+	Counters    []int      `datastore:"-" json:"-"`
 	HighBid     int        `datastore:"-"`
 	HighPlayer  int        `datastore:"-"`
 	Trump       sdz.Suit   `datastore:"-"`
-	State       int        `datastore:"-"`
+	State       string     `datastore:"-"`
 	Next        int        `datastore:"-"`
-	Hands       []sdz.Hand `datastore:"-"`
-	HandsPlayed int        `datastore:"-"`
+	Hands       []sdz.Hand `datastore:"-" json:"-"`
+	HandsPlayed int        `datastore:"-" json:"-"`
 }
 
 func (x *Game) Load(c <-chan datastore.Property) error {
@@ -954,6 +978,9 @@ func (x *Game) Save(c chan<- datastore.Property) error {
 	//x.PlayerGob, err = json.Marshal(x.Players)
 	//err := json.NewEncoder(bytes.NewBuffer(x.PlayerGob)).Encode(x.Players)
 	defer close(c)
+	if x.Players == nil {
+		panic("Players should not be nil")
+	}
 	var data bytes.Buffer
 	err := gob.NewEncoder(&data).Encode(x)
 
@@ -973,21 +1000,17 @@ func (x *Game) Save(c chan<- datastore.Property) error {
 	//return datastore.SaveStruct(x, c)
 }
 
-func StubGame(human *Human) *Game {
-	game := new(Game)
-	game.Players = []Player{human}
-	return game
-}
-
 func NewGame(players int) *Game {
 	game := new(Game)
 	game.Players = make([]Player, players)
 	game.Score = make([]int, players/2)
+	game.Meld = make([]int, players/2)
+	game.State = StateWaiting
 	return game
 }
 
 // PRE : Players are already created and set
-func (game *Game) NextHand(c appengine.Context) *Game {
+func (game *Game) NextHand(g *goon.Goon, c appengine.Context) (*Game, error) {
 	game.Meld = make([]int, len(game.Players)/2)
 	game.Trick = *NewTrick()
 	game.CountMeld = make([]bool, len(game.Players)/2)
@@ -1003,11 +1026,11 @@ func (game *Game) NextHand(c appengine.Context) *Game {
 	for x := 0; x < len(game.Players); x++ {
 		game.Next = game.inc()
 		sort.Sort(hands[x])
-		game.Players[game.Next].SetHand(c, hands[x], game.Dealer, game.Next)
+		game.Players[game.Next].SetHand(g, c, hands[x], game.Dealer, game.Next)
 		Log(4, "Dealing player %d hand %s", game.Next, game.Players[game.Next].Hand())
 	}
 	game.Next = game.inc() // increment so that Dealer + 1 is asked to bid first
-	return game.processAction(c, game.Players[game.Next].Tell(c, sdz.CreateBid(0, game.Next)))
+	return game.processAction(g, c, nil, game.Players[game.Next].Tell(g, c, sdz.CreateBid(0, game.Next)))
 	// processAction will write the game to the datastore when it's done processing the action(s)
 }
 
@@ -1189,157 +1212,168 @@ func (game *Game) inc() int {
 //	}
 //}
 
-func (g Game) Broadcast(c appengine.Context, a *sdz.Action, p int) {
-	for x, player := range g.Players {
+func (game Game) Broadcast(g *goon.Goon, c appengine.Context, a *sdz.Action, p int) {
+	for x, player := range game.Players {
 		if p != x {
-			player.Tell(c, a)
+			player.Tell(g, c, a)
 		}
 	}
 }
 
-func (g Game) BroadcastAll(c appengine.Context, a *sdz.Action) {
-	g.Broadcast(c, a, -1)
+func (game Game) BroadcastAll(g *goon.Goon, c appengine.Context, a *sdz.Action) {
+	game.Broadcast(g, c, a, -1)
 }
 
-//func gameAction(w http.ResponseWriter, r *http.Request) {
-//	c := appengine.NewContext(r)
-//	game := new(Game)
-//	err := datastore.Get("id", game)
-//	action := new(sdz.Action)
-//	logError(c, err)
-//}
-
-func (game *Game) processAction(c appengine.Context, action *sdz.Action) *Game {
+// client parameter only required for actions that modify the client, like sitting at a table, setting your name, etc
+func (game *Game) processAction(g *goon.Goon, c appengine.Context, client *Client, action *sdz.Action) (*Game, error) {
 	for {
-		c.Debugf("processAction on %s with game.Id = %d", action, game.Id)
+		if game == nil {
+			c.Debugf("processAction on %s", action)
+		} else {
+			c.Debugf("processAction on %s with game.Id = %d", action, game.Id)
+		}
 		if action == nil {
 			// waiting on a human, save the state and exit
-			g := goon.FromContext(c)
 			_, err := g.Put(game)
 			logError(c, err)
 			c.Debugf("ProcessAction returning %#v", game)
-			return game
+			return game, nil
 		}
-		human := game.Players[0]
-		switch action.Type {
-		case "Hello":
-			if action.Message == "create" {
-				human.Tell(c, sdz.CreateMessage("Option 1 - Play against three AI players and start immediately"))
-				human.Tell(c, sdz.CreateMessage("Option 2 - Play with a human partner against two AI players"))
-				human.Tell(c, sdz.CreateMessage("Option 3 - Play with a human partner against one AI players and 1 Human"))
-				human.Tell(c, sdz.CreateMessage("Option 4 - Play with a human partner against two humans"))
-				human.Tell(c, sdz.CreateMessage("Option 5 - Play against a human with AI partners"))
-				human.Tell(c, sdz.CreateMessage("Option 6 - Go back"))
-				human.Tell(c, sdz.CreateGame(0))
+		switch {
+		case action.Type == "Tables":
+			client.SendTables(g, c, game)
+			return game, nil
+		case action.Type == "Name":
+			client.Name = action.Message
+			_, err := g.Put(client)
+			c.Debugf("Saving name change")
+			logError(c, err)
+			if game != nil {
+				for _, player := range game.Players {
+					c.Debugf("Checking player %#v", player)
+					if human, ok := player.(*Human); ok && human.Client.Id == client.Id {
+						human.Client = client
+						c.Debugf("%s sitting at table %d", human.Client.Name, game.Id)
+					} else {
+						c.Debugf("Not updating the client")
+					}
+				}
 				action = nil
-				continue
-			} else if action.Message == "join" {
-				human.Tell(c, sdz.CreateMessage("Waiting on a game to be started that you can join..."))
-				action = nil
-				continue
-			} else if action.Message == "quit" {
-				human.Tell(c, sdz.CreateMessage("Ok, bye bye!"))
-				action = nil
-				//human.Close()
 				continue
 			}
-		case "Game":
-			game = NewGame(4)
-			game.Players[0] = human
-			switch action.Option {
-			case 1:
-				// Option 1 - Play against three AI players and start immediately
-				for x := 1; x < 4; x++ {
-					c.Debugf("Creating an AI Player")
+			return game, nil
+		case action.Type == "Start":
+			for x := range game.Players {
+				if game.Players[x] == nil {
 					game.Players[x] = createAI()
 				}
-			case 2:
-				// Option 2 - Play with a human partner against two AI players
-				game.Players[1] = createAI()
-				//game.Players[2] = cp.Pop()
-				game.Players[3] = createAI()
-			case 3:
-				// Option 3 - Play with a human partner against one AI players and 1 Human
-				game.Players[1] = createAI()
-				//game.Players[2] = cp.Pop()
-				//game.Players[3] = cp.Pop()
-
-			case 4:
-				// Option 4 - Play with a human partner against two humans
-				for x := 1; x < 4; x++ {
-					//game.Players[x] = cp.Pop()
+			}
+			return game.NextHand(g, c)
+		case action.Type == "Sit":
+			if action.TableId == 0 { // create a new table/game
+				game = NewGame(4)
+			} else {
+				game = &Game{Id: action.TableId}
+				err := g.Get(game)
+				if logError(c, err) {
+					return game, err
 				}
-			case 5:
-				// Option 5 - Play against a human with AI partners
-				//game.Players[1] = cp.Pop()
-				game.Players[2] = createAI()
-				game.Players[3] = createAI()
 			}
-			return game.NextHand(c) // this runs processAction after setting up the initial hand
-		}
-
-		switch game.State {
-		case StateBid:
-			if action.Type != "Bid" {
-				logError(c, errors.New("Received non bid action"))
-				action = nil
-				continue
+			c.Debugf("%s - %d sitting at table %d", client.Name, client.Id, game.Id)
+			openSlot := -1
+			var meHuman *Human
+			for x, player := range game.Players {
+				human, ok := player.(*Human)
+				if ok && human.Client.Id == client.Id {
+					meHuman = human
+					game.Players[x] = nil
+					openSlot = x
+					break
+				}
+				if player == nil {
+					openSlot = x
+				}
 			}
-			if action.Playerid != game.Next {
-				logError(c, errors.New("It's not your turn!"))
-				action = nil
-				continue
+			if openSlot == -1 {
+				logError(c, errors.New("Game is full!"))
+				return game, nil
 			}
-			game.Broadcast(c, action, game.Next)
+			if meHuman == nil {
+				meHuman = &Human{Client: client}
+			}
+			game.Players[openSlot] = game.Players[action.Playerid]
+			game.Players[action.Playerid] = meHuman
+			for _, player := range game.Players {
+				if human, ok := player.(*Human); ok {
+					human.Client.SendTables(g, c, game)
+				}
+			}
+			var err error
+			game, err = game.processAction(g, c, nil, nil) // save it to the datastore
+			logError(c, err)
+			client.TableId = game.Id
+			_, err = g.Put(client)
+			logError(c, err)
+			return game, err
+		case game.State == StateBid && action.Type != "Bid":
+			logError(c, errors.New("Received non bid action"))
+			action = nil
+			continue
+		case game.State == StateBid && action.Type == "Bid" && action.Playerid != game.Next:
+			logError(c, errors.New("It's not your turn!"))
+			action = nil
+			continue
+		case game.State == StateBid && action.Type == "Bid" && action.Playerid == game.Next:
+			game.Broadcast(g, c, action, game.Next)
 			if action.Bid > game.HighBid {
 				game.HighBid = action.Bid
 				game.HighPlayer = game.Next
 			}
 			if game.HighPlayer == game.Dealer && game.inc() == game.Dealer { // dealer was stuck, tell everyone
-				game.Broadcast(c, sdz.CreateBid(game.HighBid, game.Dealer), game.Dealer)
+				game.Broadcast(g, c, sdz.CreateBid(game.HighBid, game.Dealer), game.Dealer)
 				game.Next = game.inc()
 			}
 			if game.Next == game.Dealer { // the bidding is done
 				game.State = StateTrump
 				game.Next = game.HighPlayer
-				action = game.Players[game.HighPlayer].Tell(c, sdz.CreateTrump(sdz.NASuit, game.HighPlayer))
+				action = game.Players[game.HighPlayer].Tell(g, c, sdz.CreateTrump(sdz.NASuit, game.HighPlayer))
 				continue
 			}
 			game.Next = game.inc()
-			action = game.Players[game.Next].Tell(c, sdz.CreateBid(0, game.Next))
+			action = game.Players[game.Next].Tell(g, c, sdz.CreateBid(0, game.Next))
 			continue
-		case StateTrump:
+		case game.State == StateTrump:
 			switch action.Type {
 			case "Throwin":
-				game.Broadcast(c, action, action.Playerid)
+				game.Broadcast(g, c, action, action.Playerid)
 				game.Score[game.HighPlayer%2] -= game.HighBid
-				game.BroadcastAll(c, sdz.CreateMessage(fmt.Sprintf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)))
+				game.BroadcastAll(g, c, sdz.CreateMessage(fmt.Sprintf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)))
 				Log(4, "Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)
 				game.Dealer = (game.Dealer + 1) % 4
 				Log(4, "-----------------------------------------------------------------------------")
-				return game.NextHand(c)
+				return game.NextHand(g, c)
 			case "Trump":
 				game.Trump = action.Trump
 				Log(4, "Trump is set to %s", game.Trump)
-				game.Broadcast(c, action, game.HighPlayer)
+				game.Broadcast(g, c, action, game.HighPlayer)
 				for x := 0; x < len(game.Players); x++ {
 					meld, meldHand := game.Players[x].Hand().Meld(game.Trump)
 					meldAction := sdz.CreateMeld(meldHand, meld, x)
-					game.BroadcastAll(c, meldAction)
+					game.BroadcastAll(g, c, meldAction)
 					game.Meld[x%2] += meld
 				}
 				game.Next = game.HighPlayer
 				game.Counters = make([]int, 2)
 				game.State = StatePlay
-				action = game.Players[game.Next].Tell(c, sdz.CreatePlayRequest(game.Trick.winningCard(), game.Trick.leadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
+				action = game.Players[game.Next].Tell(g, c, sdz.CreatePlayRequest(game.Trick.winningCard(), game.Trick.leadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
 				continue
 			}
-		case StatePlay:
+		case game.State == StatePlay:
 			// TODO: check for throw in
 			if sdz.ValidPlay(action.PlayedCard, game.Trick.winningCard(), game.Trick.leadSuit(), game.Players[game.Next].Hand(), game.Trump) &&
 				game.Players[game.Next].Hand().Remove(action.PlayedCard) {
 				game.Trick.Played[game.Next] = action.PlayedCard
-				game.Broadcast(c, action, game.Next)
+				game.Broadcast(g, c, action, game.Next)
 				if len(game.Trick.Played) == 1 {
 					game.Trick.Lead = game.Next
 				}
@@ -1347,15 +1381,15 @@ func (game *Game) processAction(c appengine.Context, action *sdz.Action) *Game {
 					game.Trick.WinningPlayer = game.Next
 				}
 			} else {
-				action = game.Players[game.Next].Tell(c, sdz.CreatePlayRequest(game.Trick.winningCard(), game.Trick.leadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
+				action = game.Players[game.Next].Tell(g, c, sdz.CreatePlayRequest(game.Trick.winningCard(), game.Trick.leadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
 				continue
 			}
 			if len(game.Trick.Played) == len(game.Players) {
 				game.Counters[game.Trick.WinningPlayer%2] += game.Trick.counters()
 				game.CountMeld[game.Trick.WinningPlayer%2] = true
 				game.Next = game.Trick.WinningPlayer
-				game.BroadcastAll(c, sdz.CreateMessage(fmt.Sprintf("Player %d wins trick with %s", game.Trick.WinningPlayer, game.Trick.winningCard())))
-				game.BroadcastAll(c, sdz.CreateTrick(game.Trick.WinningPlayer))
+				game.BroadcastAll(g, c, sdz.CreateMessage(fmt.Sprintf("Player %d wins trick with %s", game.Trick.WinningPlayer, game.Trick.winningCard())))
+				game.BroadcastAll(g, c, sdz.CreateTrick(game.Trick.WinningPlayer))
 				Log(4, "Player %d wins trick with %s", game.Trick.WinningPlayer, game.Trick.winningCard())
 				if len(*game.Players[0].Hand()) == 0 {
 					game.Counters[game.Trick.WinningPlayer%2]++ // last trick
@@ -1370,7 +1404,7 @@ func (game *Game) processAction(c appengine.Context, action *sdz.Action) *Game {
 						game.Score[(game.HighPlayer+1)%2] += game.Meld[(game.HighPlayer+1)%2] + game.Counters[(game.HighPlayer+1)%2]
 					}
 					// check the score for a winner
-					game.BroadcastAll(c, sdz.CreateMessage(fmt.Sprintf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)))
+					game.BroadcastAll(g, c, sdz.CreateMessage(fmt.Sprintf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)))
 					Log(4, "Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)
 					win := make([]bool, 2)
 					gameOver := false
@@ -1382,35 +1416,109 @@ func (game *Game) processAction(c appengine.Context, action *sdz.Action) *Game {
 						gameOver = true
 					}
 					for x := 0; x < len(game.Players); x++ {
-						game.Players[x].Tell(c, sdz.CreateScore(x, game.Score, gameOver, win[x%2]))
+						game.Players[x].Tell(g, c, sdz.CreateScore(x, game.Score, gameOver, win[x%2]))
 					}
 					if gameOver {
 						g := goon.FromContext(c)
+						for _, player := range game.Players {
+							if human, ok := player.(*Human); ok {
+								logError(c, g.Get(human.Client))
+								human.Client.TableId = 0
+								_, err := g.Put(human.Client)
+								logError(c, err)
+							}
+						}
 						key := g.Key(game)
 						if key != nil {
 							logError(c, g.Delete(key))
 						}
-						return nil // game over
+						return nil, nil // game over
 					}
 					game.Dealer = (game.Dealer + 1) % 4
 					Log(4, "-----------------------------------------------------------------------------")
-					return game.NextHand(c)
+					return game.NextHand(g, c)
 				}
 				game.Trick = *NewTrick()
-				action = game.Players[game.Next].Tell(c, sdz.CreatePlayRequest(game.Trick.winningCard(), game.Trick.leadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
+				action = game.Players[game.Next].Tell(g, c, sdz.CreatePlayRequest(game.Trick.winningCard(), game.Trick.leadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
 				continue
 			}
 			game.Next = game.inc()
-			action = game.Players[game.Next].Tell(c, sdz.CreatePlayRequest(game.Trick.winningCard(), game.Trick.leadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
+			action = game.Players[game.Next].Tell(g, c, sdz.CreatePlayRequest(game.Trick.winningCard(), game.Trick.leadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
 			continue
 		}
 	}
 }
 
+type Client struct {
+	Id        int64 `datastore:"-" goon:"id"`
+	Connected bool
+	Name      string
+	TableId   int64
+}
+
+func (c Client) getId() string {
+	return strconv.Itoa(int(c.Id))
+}
+
+func (c *Client) setId(id string) {
+	tmp, _ := strconv.Atoi(id)
+	c.Id = int64(tmp)
+}
+
+func (client *Client) SendTables(g *goon.Goon, c appengine.Context, game *Game) {
+	if client.Name == "" {
+		client.Tell(g, c, sdz.CreateName())
+	}
+	if game == nil && client.TableId == 0 {
+		var tables []*Game
+		query := datastore.NewQuery("Game").Limit(30)
+		_, err := g.GetAll(query, &tables)
+		if err != datastore.ErrNoSuchEntity && logError(c, err) {
+			return
+		}
+		tables = append(tables, NewGame(4))
+		c.Debugf("Sending first table to %d - %s %#v", client.Id, client.Name, tables[0])
+		logError(c, channel.SendJSON(c, client.getId(), struct{ Type, Tables interface{} }{Type: "Tables", Tables: tables}))
+	} else {
+		if game == nil {
+			game = &Game{Id: client.TableId}
+			if logError(c, g.Get(game)) {
+				return
+			}
+		}
+		me := 0
+		for x, player := range game.Players {
+			human, ok := player.(*Human)
+			if ok {
+				if human.Client.Id == client.Id {
+					me = x
+					break
+				}
+			}
+		}
+		c.Debugf("Sending MyTable to %d-%s %#v", client.Id, client.Name, game)
+		logError(c, channel.SendJSON(c, client.getId(), struct{ Type, MyTable, Playerid interface{} }{Type: "MyTable", MyTable: game, Playerid: me}))
+	}
+}
+
+func (client *Client) Tell(g *goon.Goon, c appengine.Context, action *sdz.Action) *sdz.Action {
+	err := channel.SendJSON(c, client.getId(), action)
+	if err != nil {
+		sdz.Log("Error in Send - %v", err)
+		client.Connected = false
+		_, err = g.Put(client)
+		logError(c, err)
+		return nil
+	}
+	c.Debugf("Sent %s", action)
+	return nil
+}
+
 type Player interface {
-	Tell(appengine.Context, *sdz.Action) *sdz.Action // returns the response if known immediately
+	Tell(*goon.Goon, appengine.Context, *sdz.Action) *sdz.Action // returns the response if known immediately
 	Hand() *sdz.Hand
-	SetHand(appengine.Context, sdz.Hand, int, int)
+	SetHand(*goon.Goon, appengine.Context, sdz.Hand, int, int)
 	PlayerID() int
 	Team() int
+	MarshalJSON() ([]byte, error)
 }

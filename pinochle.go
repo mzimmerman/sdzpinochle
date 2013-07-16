@@ -247,7 +247,7 @@ type Action struct {
 	Amount                  int
 	Message                 string
 	Hand                    Hand
-	Option                  int
+	TableId                 int64
 	GameOver, Win           bool
 	Score                   []int
 	Dealer                  int
@@ -290,12 +290,12 @@ func (action *Action) MarshalJSON() ([]byte, error) {
 	return json.Marshal(data)
 }
 
-func CreateGame(option int) *Action {
-	return &Action{Type: "Game", Option: option}
+func CreateName() *Action {
+	return &Action{Type: "Name"}
 }
 
-func CreateHello(m string) *Action {
-	return &Action{Type: "Hello", Message: m}
+func CreateSit(tableid int64) *Action {
+	return &Action{Type: "Sit", TableId: tableid}
 }
 
 func CreateMessage(m string) *Action {

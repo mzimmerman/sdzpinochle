@@ -30,7 +30,7 @@ func (t *testSuite) TestRemove() {
 	hand := sdz.Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")}
 	sort.Sort(hand)
 	ai := createAI()
-	ai.SetHand(nil, hand, 0, 0)
+	ai.SetHand(nil, nil, hand, 0, 0)
 	t.Equal(12, len(*ai.Hand()))
 	t.True(ai.Hand().Remove(C("JD")))
 	t.True(ai.Hand().Remove(C("JD")))
@@ -43,8 +43,8 @@ func (t *testSuite) TestBidding() {
 	hand := sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AD"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
 	sort.Sort(hand)
 	ai := createAI()
-	ai.SetHand(nil, hand, 0, 1)
-	action := ai.Tell(nil, sdz.CreateBid(0, 1))
+	ai.SetHand(nil, nil, hand, 0, 1)
+	action := ai.Tell(nil, nil, sdz.CreateBid(0, 1))
 	t.Not(t.True(22 > action.Bid || action.Bid > 24))
 }
 
@@ -57,7 +57,7 @@ func (t *testSuite) TestFullGame() {
 	for x := 0; x < len(game.Players); x++ {
 		game.Players[x] = createAI()
 	}
-	game.NextHand(c)
+	game.NextHand(nil, c)
 }
 
 func (t *testSuite) TestPotentialCards() {
@@ -185,7 +185,7 @@ func (t *testSuite) TestPotentialCards() {
 func (t *testSuite) TestFindCardToPlay() {
 	//func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	ai := createAI()
-	ai.SetHand(nil, sdz.Hand{C("AD"), C("AD"), C("TD"), C("JD"), C("TC"), C("KC"), C("QC"), C("TH"), C("JH"), C("9H"), C("KS"), C("QS")}, 0, 3)
+	ai.SetHand(nil, nil, sdz.Hand{C("AD"), C("AD"), C("TD"), C("JD"), C("TC"), C("KC"), C("QC"), C("TH"), C("JH"), C("9H"), C("KS"), C("QS")}, 0, 3)
 	ai.HT.Cards[0][C("KH")] = 1
 	ai.HT.Cards[0][C("QH")] = 1
 	ai.HT.Cards[1][C("9H")] = 1
@@ -556,11 +556,11 @@ func (t *testSuite) TestWorth() {
 func (t *testSuite) TestAITracking() {
 	ai := createAI()
 	hand := sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AD"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
-	ai.SetHand(nil, hand, 0, 0)
+	ai.SetHand(nil, nil, hand, 0, 0)
 	ai.Trump = sdz.Spades
-	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{C("JD"), C("QS"), C("KD"), C("QD")}, 6, 1))
-	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{C("JD"), C("QS")}, 4, 2))
-	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{}, 0, 3))
+	ai.Tell(nil, nil, sdz.CreateMeld(sdz.Hand{C("JD"), C("QS"), C("KD"), C("QD")}, 6, 1))
+	ai.Tell(nil, nil, sdz.CreateMeld(sdz.Hand{C("JD"), C("QS")}, 4, 2))
+	ai.Tell(nil, nil, sdz.CreateMeld(sdz.Hand{}, 0, 3))
 	//ai.calculate()
 	t.Equal(1, ai.HT.Cards[1][C("JD")])
 	t.Equal(1, ai.HT.Cards[1][C("QS")])
@@ -576,9 +576,9 @@ func (t *testSuite) TestAITracking() {
 	t.Equal(1, ai.HT.Cards[1][C("KD")])
 
 	ai.Trick.Lead = 1
-	ai.Tell(nil, sdz.CreatePlay(C("JD"), 1))
-	ai.Tell(nil, sdz.CreatePlay(C("KD"), 2))
-	ai.Tell(nil, sdz.CreatePlay(C("AD"), 3))
+	ai.Tell(nil, nil, sdz.CreatePlay(C("JD"), 1))
+	ai.Tell(nil, nil, sdz.CreatePlay(C("KD"), 2))
+	ai.Tell(nil, nil, sdz.CreatePlay(C("AD"), 3))
 	val, ok := ai.HT.Cards[1][C("JD")]
 	t.True(ok)
 	t.Equal(0, val)
@@ -596,43 +596,43 @@ func (t *testSuite) TestAITracking() {
 	t.Equal(1, ai.HT.PlayedCards[C("AD")])
 
 	ai.Trick.Lead = 1
-	ai.Tell(nil, sdz.CreatePlay(C("QD"), 1))
-	ai.Tell(nil, sdz.CreatePlay(C("9H"), 2))
-	ai.Tell(nil, sdz.CreatePlay(C("9H"), 3))
+	ai.Tell(nil, nil, sdz.CreatePlay(C("QD"), 1))
+	ai.Tell(nil, nil, sdz.CreatePlay(C("9H"), 2))
+	ai.Tell(nil, nil, sdz.CreatePlay(C("9H"), 3))
 	val, ok = ai.HT.Cards[1][C("QD")]
 	t.True(ok)
 	t.Equal(0, val)
 
 	ai = createAI()
 	hand = sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AS"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
-	ai.SetHand(nil, hand, 0, 0)
+	ai.SetHand(nil, nil, hand, 0, 0)
 	ai.Trump = sdz.Spades
-	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{}, 0, 0))
-	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{}, 0, 1))
-	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{}, 0, 2))
-	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{}, 0, 3))
+	ai.Tell(nil, nil, sdz.CreateMeld(sdz.Hand{}, 0, 0))
+	ai.Tell(nil, nil, sdz.CreateMeld(sdz.Hand{}, 0, 1))
+	ai.Tell(nil, nil, sdz.CreateMeld(sdz.Hand{}, 0, 2))
+	ai.Tell(nil, nil, sdz.CreateMeld(sdz.Hand{}, 0, 3))
 	//ai.calculate()
 	ai.Trick.Lead = 1
 
-	ai.Tell(nil, sdz.CreatePlay(C("JD"), 1))
-	ai.Tell(nil, sdz.CreatePlay(C("JD"), 2))
-	ai.Tell(nil, sdz.CreatePlay(C("KD"), 3))
-	play := ai.Tell(nil, sdz.CreatePlayRequest(ai.Trick.winningCard(), ai.Trick.leadSuit(), ai.Trump, ai.PlayerID(), &sdz.Hand{}))
+	ai.Tell(nil, nil, sdz.CreatePlay(C("JD"), 1))
+	ai.Tell(nil, nil, sdz.CreatePlay(C("JD"), 2))
+	ai.Tell(nil, nil, sdz.CreatePlay(C("KD"), 3))
+	play := ai.Tell(nil, nil, sdz.CreatePlayRequest(ai.Trick.winningCard(), ai.Trick.leadSuit(), ai.Trump, ai.PlayerID(), &sdz.Hand{}))
 	t.Equal(C("TD"), play.PlayedCard)
-	ai.Tell(nil, sdz.CreateTrick(0))
-	ai.Tell(nil, sdz.CreatePlay(C("QD"), 1))
-	ai.Tell(nil, sdz.CreatePlay(C("KD"), 2))
-	ai.Tell(nil, sdz.CreatePlay(C("KH"), 3))
-	play = ai.Tell(nil, sdz.CreatePlayRequest(ai.Trick.winningCard(), ai.Trick.leadSuit(), ai.Trump, ai.PlayerID(), &sdz.Hand{}))
+	ai.Tell(nil, nil, sdz.CreateTrick(0))
+	ai.Tell(nil, nil, sdz.CreatePlay(C("QD"), 1))
+	ai.Tell(nil, nil, sdz.CreatePlay(C("KD"), 2))
+	ai.Tell(nil, nil, sdz.CreatePlay(C("KH"), 3))
+	play = ai.Tell(nil, nil, sdz.CreatePlayRequest(ai.Trick.winningCard(), ai.Trick.leadSuit(), ai.Trump, ai.PlayerID(), &sdz.Hand{}))
 	t.Equal(C("TD"), play.PlayedCard)
 
 	ai = createAI()
 	hand = sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AD"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
-	ai.SetHand(nil, hand, 0, 0)
+	ai.SetHand(nil, nil, hand, 0, 0)
 	ai.Trump = sdz.Spades
-	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{C("JD"), C("JD"), C("QS"), C("QS"), C("KD"), C("QD")}, 32, 1))
-	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{}, 0, 2))
-	ai.Tell(nil, sdz.CreateMeld(sdz.Hand{}, 0, 3))
+	ai.Tell(nil, nil, sdz.CreateMeld(sdz.Hand{C("JD"), C("JD"), C("QS"), C("QS"), C("KD"), C("QD")}, 32, 1))
+	ai.Tell(nil, nil, sdz.CreateMeld(sdz.Hand{}, 0, 2))
+	ai.Tell(nil, nil, sdz.CreateMeld(sdz.Hand{}, 0, 3))
 	//ai.calculate()
 	t.Equal(0, ai.HT.Cards[0][C("JD")])
 	t.Equal(2, ai.HT.Cards[1][C("JD")])
@@ -661,7 +661,7 @@ func (t *testSuite) TestCalculate() {
 	sort.Sort(hand)
 	ai := createAI()
 	// dealer 0, playerid 1
-	ai.SetHand(nil, hand, 0, 1)
+	ai.SetHand(nil, nil, hand, 0, 1)
 	for x := 0; x < 4; x++ {
 		if x == 1 {
 			t.Equal(ai.HT.Cards[x][C("9D")], 2)
