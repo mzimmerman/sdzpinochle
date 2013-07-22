@@ -133,7 +133,7 @@
 		<script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js"></script>
 		<script type="text/javascript" src="/_ah/channel/jsapi"></script>
 		<!--<script src="js/jquery.min.js"></script>
-		<script src="js/jquery-ui.min.js"></script>-->
+		<script src="js/jquery-ui.js"></script>-->
 		<script type="text/javascript">
 		var token;
 		var playerid;
@@ -247,7 +247,7 @@
 			$.post("/receive",text).done(function (data) {
 				//console.log("Response from action = " + data);
 			});
-			//console.log("Sent - " + text);
+			console.log("Sent - " + text);
 		}
 		
 		function setTurn(id) {
@@ -260,7 +260,7 @@
 		}
 		
 		function onMessage(evt) {
-			//console.log("Received - " + evt.data);
+			console.log("Received - " + evt.data);
 			var action = $.parseJSON(evt.data);
 			switch (action.Type) {
 				case "Tables":
@@ -287,6 +287,27 @@
 							getPlayer(x).children("h4").text(action.MyTable.Players[x]);
 						}
 					}
+					if (action.MyTable.State == "new") {
+						$("#start").show();
+					} else {
+						$("#start").hide();
+					}
+					if (action.MyTable.State == "bid") {
+						$(".bid").show().empty();
+						$(".play").hide().empty();
+						getPlayer(action.Dealer).children(".bid").html("Stuck");
+					} else {
+						$(".bid").hide().empty();
+						$(".play").show().empty();
+					}
+					$("#bid-value").html(action.MyTable.HighBid);
+					$("#bid input").val(action.MyTable.HighBid);
+					wemeld = action.MyTable.Meld[playerid%2];
+					theymeld = action.MyTable.Meld[(playerid+1)%2];
+					$("#trump").addClass(action.MyTable.Trump).show();
+					$("#wemeld").html(wemeld);
+					$("#theymeld").html(theymeld);
+					setTurn((action.Dealer + 1) % 4);
 					break;
 				case "Name":
 					$("#nameMe").show().dialog({

@@ -21,26 +21,26 @@ import (
 	"runtime/debug"
 	"sort"
 	"strconv"
-	//"time"
+	"time"
 )
 
 const (
-	ace          = "A"
-	ten          = "T"
-	king         = "K"
-	queen        = "Q"
-	jack         = "J"
-	nine         = "9"
-	spades       = "S"
-	hearts       = "H"
-	clubs        = "C"
-	diamonds     = "D"
-	StateWaiting = "waiting"
-	StateBid     = "bid"
-	StateTrump   = "trump"
-	StateMeld    = "meld"
-	StatePlay    = "play"
-	cookieName   = "sdzpinochle"
+	ace        = "A"
+	ten        = "T"
+	king       = "K"
+	queen      = "Q"
+	jack       = "J"
+	nine       = "9"
+	spades     = "S"
+	hearts     = "H"
+	clubs      = "C"
+	diamonds   = "D"
+	StateNew   = "new"
+	StateBid   = "bid"
+	StateTrump = "trump"
+	StateMeld  = "meld"
+	StatePlay  = "play"
+	cookieName = "sdzpinochle"
 )
 
 var store = sessions.NewCookieStore([]byte("sdzpinochle"))
@@ -57,6 +57,28 @@ func init() {
 	//gob.Register(AI{})
 	gob.Register(new(Human))
 	//gob.Register(Human{})
+}
+
+func remind(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	g := goon.FromContext(c)
+	late := time.Now().Add(-time.Minute)
+	query := datastore.NewQuery("Game").Filter("Updated < ", late)
+	gameKeys, err := g.GetAll(query, nil)
+	if logError(c, err) {
+		return
+	}
+	games := make([]*Game, len(gameKeys))
+	for x := range gameKeys {
+		games[x] = &Game{Id: gameKeys[x].IntID()}
+	}
+	err = g.GetMulti(&games)
+	for _, game := range games {
+		if game.Updated.After(late) {
+			continue
+		}
+		game.retell(g, c)
+	}
 }
 
 func connected(w http.ResponseWriter, r *http.Request) {
@@ -946,22 +968,23 @@ func logError(c appengine.Context, err error) bool {
 }
 
 type Game struct {
-	Id          int64      `datastore:"-" goon:"id"`
-	Trick       Trick      `datastore:"-" json:"-"`
-	PlayerGob   []byte     `datastore:",noindex" json:"-"`
-	Players     []Player   `datastore:"-"`
-	Dealer      int        `datastore:"-" json:"-"`
-	Score       []int      `datastore:"-"`
-	Meld        []int      `datastore:"-"`
-	CountMeld   []bool     `datastore:"-" json:"-"`
-	Counters    []int      `datastore:"-" json:"-"`
-	HighBid     int        `datastore:"-"`
-	HighPlayer  int        `datastore:"-"`
-	Trump       sdz.Suit   `datastore:"-"`
-	State       string     `datastore:"-"`
+	Id          int64    `datastore:"-" goon:"id"`
+	Trick       Trick    `datastore:"-" json:"-"`
+	PlayerGob   []byte   `datastore:"-" json:"-"`
+	Players     []Player `datastore:"-"`
+	Dealer      int      `datastore:"-" json:"-"`
+	Score       []int    `datastore:"-"`
+	Meld        []int    `datastore:"-"`
+	CountMeld   []bool   `datastore:"-" json:"-"`
+	Counters    []int    `datastore:"-" json:"-"`
+	HighBid     int      `datastore:"-"`
+	HighPlayer  int      `datastore:"-"`
+	Trump       sdz.Suit `datastore:"-"`
+	State       string
 	Next        int        `datastore:"-"`
 	Hands       []sdz.Hand `datastore:"-" json:"-"`
 	HandsPlayed int        `datastore:"-" json:"-"`
+	Updated     time.Time  `json:"-"`
 }
 
 func (x *Game) Load(c <-chan datastore.Property) error {
@@ -969,23 +992,37 @@ func (x *Game) Load(c <-chan datastore.Property) error {
 	//	return err
 	//}
 	//return json.NewDecoder(bytes.NewReader([]byte(x.PlayerGob))).Decode(&x.Players)
-	prop := <-c
-	return gob.NewDecoder(bytes.NewReader(prop.Value.([]byte))).Decode(&x)
+	for {
+		prop := <-c
+		log.Printf("Property is %s", prop.Name)
+		if prop.Name == "" {
+			return nil
+		}
+		switch prop.Name {
+		case "GameGob":
+			if err := gob.NewDecoder(bytes.NewReader(prop.Value.([]byte))).Decode(&x); err != nil {
+				return err
+			}
+		default:
+			// skip, it'll get loaded in the Gob, I just want to query on it :)
+		}
+	}
 }
 
 func (x *Game) Save(c chan<- datastore.Property) error {
 	//var err error
 	//x.PlayerGob, err = json.Marshal(x.Players)
 	//err := json.NewEncoder(bytes.NewBuffer(x.PlayerGob)).Encode(x.Players)
-	defer close(c)
 	if x.Players == nil {
 		panic("Players should not be nil")
 	}
+	x.Updated = time.Now()
 	var data bytes.Buffer
 	err := gob.NewEncoder(&data).Encode(x)
 
 	//err := gob.NewEncoder(bytes.NewBuffer(x.PlayerGob)).Encode(x.Players)
 	if err != nil {
+		close(c)
 		return err
 	}
 	c <- datastore.Property{
@@ -993,11 +1030,7 @@ func (x *Game) Save(c chan<- datastore.Property) error {
 		Value:   data.Bytes(),
 		NoIndex: true,
 	}
-	return nil
-	//x.PlayerGob = data.Bytes()
-	//log.Printf("json = %s", x.PlayerGob)
-	//log.Printf("players = %#v", x.Players)
-	//return datastore.SaveStruct(x, c)
+	return datastore.SaveStruct(x, c)
 }
 
 func NewGame(players int) *Game {
@@ -1005,7 +1038,7 @@ func NewGame(players int) *Game {
 	game.Players = make([]Player, players)
 	game.Score = make([]int, players/2)
 	game.Meld = make([]int, players/2)
-	game.State = StateWaiting
+	game.State = StateNew
 	return game
 }
 
@@ -1224,6 +1257,31 @@ func (game Game) BroadcastAll(g *goon.Goon, c appengine.Context, a *sdz.Action) 
 	game.Broadcast(g, c, a, -1)
 }
 
+func (game *Game) retell(g *goon.Goon, c appengine.Context) {
+	switch game.State {
+	//StateNew   = "new"
+	//StateBid   = "bid"
+	//StateTrump = "trump"
+	//StateMeld  = "meld"
+	//StatePlay  = "play"
+	case StateNew:
+		// do nothing, we're not waiting on anyone in particular
+	case StateBid:
+		game.Players[game.Next].Tell(g, c, sdz.CreateDeal(*game.Players[game.Next].Hand(), game.Next, game.Dealer))
+		game.Players[game.Next].Tell(g, c, sdz.CreateBid(game.HighBid, game.Next))
+	case StateTrump:
+		game.Players[game.Next].Tell(g, c, sdz.CreateDeal(*game.Players[game.Next].Hand(), game.Next, game.Dealer))
+		game.Players[game.Next].Tell(g, c, sdz.CreateTrump(sdz.NASuit, game.Next))
+	case StateMeld:
+		// never going to be stuck here on a user action
+	case StatePlay:
+		for x, card := range game.Trick.Played {
+			game.Players[game.Next].Tell(g, c, sdz.CreatePlay(card, x))
+		}
+		game.Players[game.Next].Tell(g, c, sdz.CreatePlayRequest(game.Trick.winningCard(), game.Trick.leadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
+	}
+}
+
 // client parameter only required for actions that modify the client, like sitting at a table, setting your name, etc
 func (game *Game) processAction(g *goon.Goon, c appengine.Context, client *Client, action *sdz.Action) (*Game, error) {
 	for {
@@ -1263,6 +1321,10 @@ func (game *Game) processAction(g *goon.Goon, c appengine.Context, client *Clien
 			}
 			return game, nil
 		case action.Type == "Start":
+			c.Debugf("Game is %#v", game)
+			if game.State != StateNew {
+				return game, errors.New("Game is already started")
+			}
 			for x := range game.Players {
 				if game.Players[x] == nil {
 					game.Players[x] = createAI()
@@ -1498,6 +1560,7 @@ func (client *Client) SendTables(g *goon.Goon, c appengine.Context, game *Game) 
 		}
 		c.Debugf("Sending MyTable to %d-%s %#v", client.Id, client.Name, game)
 		logError(c, channel.SendJSON(c, client.getId(), struct{ Type, MyTable, Playerid interface{} }{Type: "MyTable", MyTable: game, Playerid: me}))
+		game.retell(g, c)
 	}
 }
 
