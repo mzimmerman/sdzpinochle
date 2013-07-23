@@ -330,6 +330,10 @@ func CreateMeld(hand Hand, amount, playerid int) *Action {
 	return &Action{Type: "Meld", Hand: hand, Amount: amount, Playerid: playerid}
 }
 
+func CreateDisconnect(playerid int) *Action {
+	return &Action{Type: "Disconnect", Playerid: playerid}
+}
+
 func CreateDeal(hand Hand, playerid, dealer int) *Action {
 	return &Action{Type: "Deal", Hand: hand, Playerid: playerid, Dealer: dealer}
 }
