@@ -307,6 +307,8 @@
 					$("#trump").addClass(action.MyTable.Trump).show();
 					$("#wemeld").html(wemeld);
 					$("#theymeld").html(theymeld);
+					$("#we").html(action.MyTable.Score[playerid % 2]);
+					$("#they").html(action.MyTable.Score[(playerid + 1) % 2]);
 					setTurn((action.Dealer + 1) % 4);
 					break;
 				case "Name":

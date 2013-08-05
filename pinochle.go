@@ -338,8 +338,8 @@ func CreateDeal(hand Hand, playerid, dealer int) *Action {
 	return &Action{Type: "Deal", Hand: hand, Playerid: playerid, Dealer: dealer}
 }
 
-func CreateScore(playerid int, score []int, gameOver, win bool) *Action {
-	return &Action{Type: "Score", Playerid: playerid, Score: score, Win: win, GameOver: gameOver}
+func CreateScore(score []int, gameOver, win bool) *Action {
+	return &Action{Type: "Score", Score: score, Win: win, GameOver: gameOver}
 }
 
 type PlayerImpl struct {

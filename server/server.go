@@ -561,7 +561,7 @@ func (trick Trick) worth(playerid int, trump sdz.Suit) (worth int) {
 	for x := range trick.Played {
 		if playerid%2 == x%2 {
 			if trick.Played[x].Suit() == trump {
-				worth--
+				worth -= 2
 			}
 			switch trick.Played[x].Face() {
 			case sdz.Ace:
@@ -571,7 +571,7 @@ func (trick Trick) worth(playerid int, trump sdz.Suit) (worth int) {
 			}
 		} else {
 			if trick.Played[x].Suit() == trump {
-				worth++
+				worth += 2
 			}
 			switch trick.Played[x].Face() {
 			case sdz.Ace:
@@ -1130,8 +1130,9 @@ func (game *Game) processAction(g *goon.Goon, c appengine.Context, client *Clien
 			case "Throwin":
 				game.Broadcast(g, c, action, action.Playerid)
 				game.Score[game.HighPlayer%2] -= game.HighBid
-				game.BroadcastAll(g, c, sdz.CreateMessage(fmt.Sprintf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)))
+				game.BroadcastAll(g, c, sdz.CreateMessage(fmt.Sprintf("Player %d threw in! Scores are now Team0 = %d to Team1 = %d, played %d hands", action.Playerid, game.Score[0], game.Score[1], game.HandsPlayed)))
 				Log(4, "Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)
+				game.BroadcastAll(g, c, sdz.CreateScore(game.Score, false, false))
 				game.Dealer = (game.Dealer + 1) % 4
 				Log(4, "-----------------------------------------------------------------------------")
 				return game.NextHand(g, c)
@@ -1199,7 +1200,7 @@ func (game *Game) processAction(g *goon.Goon, c appengine.Context, client *Clien
 						gameOver = true
 					}
 					for x := 0; x < len(game.Players); x++ {
-						game.Players[x].Tell(g, c, game, sdz.CreateScore(x, game.Score, gameOver, win[x%2]))
+						game.Players[x].Tell(g, c, game, sdz.CreateScore(game.Score, gameOver, win[x%2]))
 					}
 					if gameOver {
 						g := goon.FromContext(c)
