@@ -561,7 +561,7 @@ func (t *testSuite) TestAITracking() {
 	ai.Tell(nil, nil, nil, sdz.CreateMeld(sdz.Hand{C("JD"), C("QS"), C("KD"), C("QD")}, 6, 1))
 	ai.Tell(nil, nil, nil, sdz.CreateMeld(sdz.Hand{C("JD"), C("QS")}, 4, 2))
 	ai.Tell(nil, nil, nil, sdz.CreateMeld(sdz.Hand{}, 0, 3))
-	//ai.calculate()
+
 	t.Equal(1, ai.HT.Cards[1][C("JD")])
 	t.Equal(1, ai.HT.Cards[1][C("QS")])
 	t.Equal(1, ai.HT.Cards[2][C("JD")])
@@ -582,7 +582,7 @@ func (t *testSuite) TestAITracking() {
 	val, ok := ai.HT.Cards[1][C("JD")]
 	t.True(ok)
 	t.Equal(0, val)
-	//ai.calculate()
+
 	val, ok = ai.HT.Cards[1][C("JD")]
 	t.True(ok)
 	t.Equal(0, val)
@@ -615,12 +615,12 @@ func (t *testSuite) TestAITracking() {
 	ai.Trick.Lead = 1
 
 	ai.Tell(nil, nil, nil, sdz.CreatePlay(C("JD"), 1))
-	ai.Tell(nil, nil, nil, sdz.CreatePlay(C("JD"), 2))
+	ai.Tell(nil, nil, nil, sdz.CreatePlay(C("QD"), 2))
 	ai.Tell(nil, nil, nil, sdz.CreatePlay(C("KD"), 3))
 	play := ai.Tell(nil, nil, nil, sdz.CreatePlayRequest(ai.Trick.winningCard(), ai.Trick.leadSuit(), ai.Trump, ai.PlayerID(), &sdz.Hand{}))
 	t.Equal(C("TD"), play.PlayedCard)
-	ai.Tell(nil, nil, nil, sdz.CreateTrick(0))
-	ai.Tell(nil, nil, nil, sdz.CreatePlay(C("QD"), 1))
+	ai.Tell(nil, nil, nil, sdz.CreateTrick(1))
+	ai.Tell(nil, nil, nil, sdz.CreatePlay(C("JD"), 1))
 	ai.Tell(nil, nil, nil, sdz.CreatePlay(C("KD"), 2))
 	ai.Tell(nil, nil, nil, sdz.CreatePlay(C("KH"), 3))
 	play = ai.Tell(nil, nil, nil, sdz.CreatePlayRequest(ai.Trick.winningCard(), ai.Trick.leadSuit(), ai.Trump, ai.PlayerID(), &sdz.Hand{}))

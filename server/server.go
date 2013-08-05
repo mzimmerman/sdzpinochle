@@ -283,8 +283,8 @@ func (ai *AI) PlayCard(c sdz.Card, playerid int) {
 		if val > 0 {
 			ai.HT.Cards[playerid][c]--
 		} else {
-			Log(ai.Playerid, "Player %d has card %s", playerid, c)
-			panic("Player is supposed to have 0 cards, how can he have played it?!")
+			Log(ai.Playerid, "Player %d does not have card %s, panicking", playerid, c)
+			panic("panic")
 		}
 		if val == 1 && ai.HT.PlayedCards[c] == 1 && playerid != ai.Playerid {
 			// Other player could have only shown one in meld, but has two - now we don't know who has the last one
@@ -750,12 +750,23 @@ func (ai *AI) Tell(g *goon.Goon, c appengine.Context, game *Game, action *sdz.Ac
 			ai.Trick.WinningPlayer = action.Playerid
 		}
 		ai.PlayCard(action.PlayedCard, action.Playerid)
-		if action.Playerid != ai.Playerid && action.PlayedCard.Suit() != ai.Trick.leadSuit() {
-			Log(ai.Playerid, "nofollow - nosuit on Player%d on suit %s with trick %#v", action.Playerid, ai.Trick.leadSuit(), ai.Trick)
+		if action.Playerid == ai.Playerid {
+			// no cards to remove from others, I was asked to play
+			return response
+		}
+		switch {
+		case action.PlayedCard.Suit() != ai.Trick.leadSuit() && action.PlayedCard.Suit() != ai.Trump: // couldn't follow suit, couldn't lay trump
+			ai.noSuit(action.Playerid, ai.Trump)
+			fallthrough
+		case action.PlayedCard.Suit() != ai.Trick.leadSuit(): // couldn't follow suit
 			ai.noSuit(action.Playerid, ai.Trick.leadSuit())
-			if ai.Trick.leadSuit() != ai.Trump && action.PlayedCard.Suit() != ai.Trump {
-				Log(ai.Playerid, "notrump - nosuit on Player%d on suit %s", action.Playerid, ai.Trump)
-				ai.noSuit(action.Playerid, ai.Trump)
+		case action.Playerid != ai.Trick.WinningPlayer: // did not win
+			for _, f := range sdz.Faces() {
+				card := sdz.CreateCard(action.PlayedCard.Suit(), f)
+				if card.Beats(ai.Trick.winningCard(), ai.Trump) {
+					ai.HT.Cards[action.Playerid][card] = 0
+					ai.calculateCard(card)
+				}
 			}
 		}
 		return response
