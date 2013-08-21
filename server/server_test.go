@@ -48,16 +48,19 @@ func (t *testSuite) TestBidding() {
 	t.Not(t.True(22 > action.Bid || action.Bid > 24))
 }
 
-func (t *testSuite) TestFullGame() {
+func BenchmarkFullGame(b *testing.B) {
 	c, err := appenginetesting.NewContext(&appenginetesting.Options{Debug: "critical"})
-	t.Equal(nil, err, "Could not get a context")
-	defer c.Close()
-
-	game := NewGame(4)
-	for x := 0; x < len(game.Players); x++ {
-		game.Players[x] = createAI()
+	if err != nil {
+		b.Fatalf("Could not start up appenginetesting")
 	}
-	game.NextHand(nil, c)
+	defer c.Close()
+	for y := 0; y < b.N; y++ {
+		game := NewGame(4)
+		for x := 0; x < len(game.Players); x++ {
+			game.Players[x] = createAI()
+		}
+		game.NextHand(nil, c)
+	}
 }
 
 func (t *testSuite) TestPotentialCards() {
@@ -182,6 +185,43 @@ func (t *testSuite) TestPotentialCards() {
 
 }
 
+func (t *testSuite) TestPlayHandWithCard() {
+	//func playHandWithCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) (sdz.Card, [2]int) {
+	ht := new(HandTracker)
+	ht.Owner = 0
+	for x := 0; x < len(ht.Cards); x++ {
+		ht.Cards[x] = make(map[sdz.Card]int)
+		for _, card := range sdz.AllCards() {
+			ht.Cards[x][card] = 0
+		}
+	}
+	ht.PlayedCards = map[sdz.Card]int{"AD": 0, "TD": 0, "KD": 0, "QD": 0, "JD": 2, "9D": 2, "AS": 2, "TS": 2, "KS": 2, "QS": 2, "JS": 2, "9S": 2, "AH": 2, "TH": 2, "KH": 2, "QH": 2, "JH": 2, "9H": 2, "AC": 2, "TC": 2, "KC": 2, "QC": 2, "JC": 2, "9C": 2}
+	//for _, card := range sdz.AllCards() {
+	//	ht.PlayedCards[card] = 0
+	//}
+	ht.Cards[0]["AD"] = 1
+	ht.Cards[1]["TD"] = 1
+	ht.Cards[2]["KD"] = 1
+	ht.Cards[3]["QD"] = 1
+
+	before := len(ht.Cards[0])
+	card, value := playHandWithCard(0, ht, NewTrick(), sdz.Diamonds)
+	t.Equal(before, len(ht.Cards[0]))
+	t.Equal(card, sdz.CreateCard("D", "A"))
+	t.Equal(value, 4)
+
+	ht.Cards[1]["AD"] = 1
+	ht.Cards[2]["TD"] = 1
+	ht.Cards[3]["KD"] = 1
+	ht.Cards[0]["QD"] = 1
+
+	before = len(ht.Cards[0])
+	card, value = playHandWithCard(0, ht, NewTrick(), sdz.Diamonds)
+	t.Equal(before, len(ht.Cards[0]))
+	t.Equal(card, C("AD"))
+	t.Equal(value, 3)
+}
+
 func (t *testSuite) TestFindCardToPlay() {
 	//func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	ai := createAI()
@@ -196,127 +236,127 @@ func (t *testSuite) TestFindCardToPlay() {
 	t.True(card == C("TD"))
 }
 
-func (t *testSuite) TestRankCard() {
-	//func rankCard(playerid int, ht *HandTracker, trick *Trick, lead, trump sdz.Suit) *Trick {
-	ai := createAI()
-	ht := ai.HT
-	for _, card := range sdz.AllCards() {
-		ht.Cards[3][card] = 0
-	}
-	ht.Cards[0][C("AD")] = 1
-	ht.Cards[0][C("TD")] = 1
-	ht.Cards[0][C("QD")] = 2
-	ht.Cards[1][C("AD")] = 1
-	ht.Cards[2][C("KD")] = 1
-	ht.Cards[2][C("TD")] = 1
-	ht.Cards[2][C("QS")] = 1
-	ht.Cards[3][C("KD")] = 1
-	for _, card := range []sdz.Card{C("AD"), C("TD"), C("QD"), C("KD"), C("QS")} {
-		ai.calculateCard(card)
-	}
+//func (t *testSuite) TestRankCard() {
+//	//func rankCard(playerid int, ht *HandTracker, trick *Trick, lead, trump sdz.Suit) *Trick {
+//	ai := createAI()
+//	ht := ai.HT
+//	for _, card := range sdz.AllCards() {
+//		ht.Cards[3][card] = 0
+//	}
+//	ht.Cards[0][C("AD")] = 1
+//	ht.Cards[0][C("TD")] = 1
+//	ht.Cards[0][C("QD")] = 2
+//	ht.Cards[1][C("AD")] = 1
+//	ht.Cards[2][C("KD")] = 1
+//	ht.Cards[2][C("TD")] = 1
+//	ht.Cards[2][C("QS")] = 1
+//	ht.Cards[3][C("KD")] = 1
+//	for _, card := range []sdz.Card{C("AD"), C("TD"), C("QD"), C("KD"), C("QS")} {
+//		ai.calculateCard(card)
+//	}
 
-	trick := NewTrick()
-	trick.Played[0] = C("AD")
-	trick.Played[1] = C("AD")
-	trick.Played[2] = C("KD")
-	trick.WinningPlayer = 0
-	trick.Lead = 0
-	// 3 has options of KD
-	victim := rankCard(3, ht, trick, sdz.Diamonds)
-	t.Equal(C("AD"), victim.Played[0])
-	t.Equal(C("AD"), victim.Played[1])
-	t.Equal(C("KD"), victim.Played[2])
-	t.Equal(C("KD"), victim.Played[3])
-	t.Equal(-32, victim.worth(3, sdz.Diamonds))
+//	trick := NewTrick()
+//	trick.Played[0] = C("AD")
+//	trick.Played[1] = C("AD")
+//	trick.Played[2] = C("KD")
+//	trick.WinningPlayer = 0
+//	trick.Lead = 0
+//	// 3 has options of KD
+//	victim := rankCard(3, ht, trick, sdz.Diamonds)
+//	t.Equal(C("AD"), victim.Played[0])
+//	t.Equal(C("AD"), victim.Played[1])
+//	t.Equal(C("KD"), victim.Played[2])
+//	t.Equal(C("KD"), victim.Played[3])
+//	t.Equal(-32, victim.worth(3, sdz.Diamonds))
 
-	trick = NewTrick()
-	trick.Played[0] = C("AD")
-	trick.Played[1] = C("AD")
-	trick.WinningPlayer = 0
-	trick.Lead = 0
-	// 2 has real options of KD, TD, QD
-	// 3 has real options of KD
-	victim = rankCard(2, ht, trick, sdz.Diamonds)
-	t.Equal(C("AD"), victim.Played[0])
-	t.Equal(C("AD"), victim.Played[1])
-	t.Equal(C("KD"), victim.Played[2])
-	t.Equal(C("KD"), victim.Played[3])
-	t.Equal(32, victim.worth(2, sdz.Diamonds))
+//	trick = NewTrick()
+//	trick.Played[0] = C("AD")
+//	trick.Played[1] = C("AD")
+//	trick.WinningPlayer = 0
+//	trick.Lead = 0
+//	// 2 has real options of KD, TD, QD
+//	// 3 has real options of KD
+//	victim = rankCard(2, ht, trick, sdz.Diamonds)
+//	t.Equal(C("AD"), victim.Played[0])
+//	t.Equal(C("AD"), victim.Played[1])
+//	t.Equal(C("KD"), victim.Played[2])
+//	t.Equal(C("KD"), victim.Played[3])
+//	t.Equal(32, victim.worth(2, sdz.Diamonds))
 
-	trick = NewTrick()
-	trick.Played[0] = C("TD")
-	trick.Played[1] = C("AD")
-	trick.WinningPlayer = 1
-	trick.Lead = 0
-	ht.Cards[2][C("9D")] = 0
-	// 2 has real options of KD, TD, QD and no option of a 9D
-	ht.Cards[3][C("KD")] = 1
-	ht.Cards[3][C("TD")] = 1
-	ht.Cards[3][C("AD")] = 1
-	ht.Cards[3][C("9D")] = 1
-	ht.Cards[3][C("QD")] = 1
-	// 3 has options of KD, TD, AD, 9D, and QD
-	victim = rankCard(2, ht, trick, sdz.Diamonds)
-	t.Equal(C("TD"), victim.Played[0])
-	t.Equal(C("AD"), victim.Played[1])
-	t.Equal(C("JD"), victim.Played[2])
-	t.Equal(C("KD"), victim.Played[3])
+//	trick = NewTrick()
+//	trick.Played[0] = C("TD")
+//	trick.Played[1] = C("AD")
+//	trick.WinningPlayer = 1
+//	trick.Lead = 0
+//	ht.Cards[2][C("9D")] = 0
+//	// 2 has real options of KD, TD, QD and no option of a 9D
+//	ht.Cards[3][C("KD")] = 1
+//	ht.Cards[3][C("TD")] = 1
+//	ht.Cards[3][C("AD")] = 1
+//	ht.Cards[3][C("9D")] = 1
+//	ht.Cards[3][C("QD")] = 1
+//	// 3 has options of KD, TD, AD, 9D, and QD
+//	victim = rankCard(2, ht, trick, sdz.Diamonds)
+//	t.Equal(C("TD"), victim.Played[0])
+//	t.Equal(C("AD"), victim.Played[1])
+//	t.Equal(C("JD"), victim.Played[2])
+//	t.Equal(C("KD"), victim.Played[3])
 
-}
+//}
 
-func (t *testSuite) TestWorth() {
-	trick := NewTrick()
-	trick.Played[0] = C("AS")
-	trick.Played[1] = C("9S")
-	trick.Played[2] = C("KS")
-	trick.Played[3] = C("QS")
-	trick.WinningPlayer = 0
-	t.Equal(12, trick.worth(0, sdz.Diamonds))
-	t.Equal(12, trick.worth(2, sdz.Diamonds))
-	t.Equal(-12, trick.worth(1, sdz.Diamonds))
-	t.Equal(-12, trick.worth(3, sdz.Diamonds))
-	trick.certain = false
-	t.Equal(6, trick.worth(0, sdz.Diamonds))
-	t.Equal(6, trick.worth(2, sdz.Diamonds))
-	t.Equal(-6, trick.worth(1, sdz.Diamonds))
-	t.Equal(-6, trick.worth(3, sdz.Diamonds))
-	t.Equal(6, trick.worth(0, sdz.Spades))
-	t.Equal(6, trick.worth(2, sdz.Spades))
-	t.Equal(-6, trick.worth(1, sdz.Spades))
-	t.Equal(-6, trick.worth(3, sdz.Spades))
+//func (t *testSuite) TestWorth() {
+//	trick := NewTrick()
+//	trick.Played[0] = C("AS")
+//	trick.Played[1] = C("9S")
+//	trick.Played[2] = C("KS")
+//	trick.Played[3] = C("QS")
+//	trick.WinningPlayer = 0
+//	t.Equal(12, trick.worth(0, sdz.Diamonds))
+//	t.Equal(12, trick.worth(2, sdz.Diamonds))
+//	t.Equal(-12, trick.worth(1, sdz.Diamonds))
+//	t.Equal(-12, trick.worth(3, sdz.Diamonds))
+//	trick.certain = false
+//	t.Equal(6, trick.worth(0, sdz.Diamonds))
+//	t.Equal(6, trick.worth(2, sdz.Diamonds))
+//	t.Equal(-6, trick.worth(1, sdz.Diamonds))
+//	t.Equal(-6, trick.worth(3, sdz.Diamonds))
+//	t.Equal(6, trick.worth(0, sdz.Spades))
+//	t.Equal(6, trick.worth(2, sdz.Spades))
+//	t.Equal(-6, trick.worth(1, sdz.Spades))
+//	t.Equal(-6, trick.worth(3, sdz.Spades))
 
-	trick.Played[0] = C("9S")
-	trick.Played[1] = C("AS")
-	trick.Played[2] = C("KS")
-	trick.Played[3] = C("TS")
-	trick.WinningPlayer = 1
-	trick.certain = false
-	t.Equal(-9, trick.worth(0, sdz.Diamonds))
-	t.Equal(-9, trick.worth(2, sdz.Diamonds))
-	t.Equal(9, trick.worth(1, sdz.Diamonds))
-	t.Equal(9, trick.worth(3, sdz.Diamonds))
-	t.Equal(-9, trick.worth(0, sdz.Spades))
-	t.Equal(-9, trick.worth(2, sdz.Spades))
-	t.Equal(9, trick.worth(1, sdz.Spades))
-	t.Equal(9, trick.worth(3, sdz.Spades))
+//	trick.Played[0] = C("9S")
+//	trick.Played[1] = C("AS")
+//	trick.Played[2] = C("KS")
+//	trick.Played[3] = C("TS")
+//	trick.WinningPlayer = 1
+//	trick.certain = false
+//	t.Equal(-9, trick.worth(0, sdz.Diamonds))
+//	t.Equal(-9, trick.worth(2, sdz.Diamonds))
+//	t.Equal(9, trick.worth(1, sdz.Diamonds))
+//	t.Equal(9, trick.worth(3, sdz.Diamonds))
+//	t.Equal(-9, trick.worth(0, sdz.Spades))
+//	t.Equal(-9, trick.worth(2, sdz.Spades))
+//	t.Equal(9, trick.worth(1, sdz.Spades))
+//	t.Equal(9, trick.worth(3, sdz.Spades))
 
-	trick.Played[0] = C("9S")
-	trick.Played[1] = C("AS")
-	trick.Played[2] = C("JD")
-	trick.Played[3] = C("TS")
-	trick.WinningPlayer = 2
-	trick.certain = false
-	t.Equal(10, trick.worth(0, sdz.Diamonds))
-	t.Equal(10, trick.worth(2, sdz.Diamonds))
-	t.Equal(-10, trick.worth(1, sdz.Diamonds))
-	t.Equal(-10, trick.worth(3, sdz.Diamonds))
-	trick.WinningPlayer = 1
-	t.Equal(-4, trick.worth(0, sdz.Spades))
-	t.Equal(-4, trick.worth(2, sdz.Spades))
-	t.Equal(4, trick.worth(1, sdz.Spades))
-	t.Equal(4, trick.worth(3, sdz.Spades))
+//	trick.Played[0] = C("9S")
+//	trick.Played[1] = C("AS")
+//	trick.Played[2] = C("JD")
+//	trick.Played[3] = C("TS")
+//	trick.WinningPlayer = 2
+//	trick.certain = false
+//	t.Equal(10, trick.worth(0, sdz.Diamonds))
+//	t.Equal(10, trick.worth(2, sdz.Diamonds))
+//	t.Equal(-10, trick.worth(1, sdz.Diamonds))
+//	t.Equal(-10, trick.worth(3, sdz.Diamonds))
+//	trick.WinningPlayer = 1
+//	t.Equal(-4, trick.worth(0, sdz.Spades))
+//	t.Equal(-4, trick.worth(2, sdz.Spades))
+//	t.Equal(4, trick.worth(1, sdz.Spades))
+//	t.Equal(4, trick.worth(3, sdz.Spades))
 
-}
+//}
 
 //func (t *testSuite) TestHands() {
 //	p1 := createAI()
