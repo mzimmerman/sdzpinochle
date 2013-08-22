@@ -429,6 +429,15 @@ func ValidPlay(playedCard, winningCard Card, leadSuit Suit, hand *Hand, trump Su
 	return true
 }
 
+func (h *Hand) Contains(card Card) bool {
+	for _, c := range *h {
+		if c == card {
+			return true
+		}
+	}
+	return false
+}
+
 func (h *Hand) Remove(card Card) bool {
 	for x := range *h {
 		if (*h)[x] == card {

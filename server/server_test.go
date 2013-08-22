@@ -2,7 +2,7 @@
 package sdzpinochleserver
 
 import (
-	"github.com/icub3d/appenginetesting"
+	//"github.com/icub3d/appenginetesting"
 	sdz "github.com/mzimmerman/sdzpinochle"
 	pt "github.com/remogatto/prettytest"
 	"sort"
@@ -48,20 +48,20 @@ func (t *testSuite) TestBidding() {
 	t.Not(t.True(22 > action.Bid || action.Bid > 24))
 }
 
-func BenchmarkFullGame(b *testing.B) {
-	c, err := appenginetesting.NewContext(&appenginetesting.Options{Debug: "critical"})
-	if err != nil {
-		b.Fatalf("Could not start up appenginetesting")
-	}
-	defer c.Close()
-	for y := 0; y < b.N; y++ {
-		game := NewGame(4)
-		for x := 0; x < len(game.Players); x++ {
-			game.Players[x] = createAI()
-		}
-		game.NextHand(nil, c)
-	}
-}
+//func BenchmarkFullGame(b *testing.B) {
+//	c, err := appenginetesting.NewContext(&appenginetesting.Options{Debug: "critical"})
+//	if err != nil {
+//		b.Fatalf("Could not start up appenginetesting")
+//	}
+//	defer c.Close()
+//	for y := 0; y < b.N; y++ {
+//		game := NewGame(4)
+//		for x := 0; x < len(game.Players); x++ {
+//			game.Players[x] = createAI()
+//		}
+//		game.NextHand(nil, c)
+//	}
+//}
 
 func (t *testSuite) TestPotentialCards() {
 	ai := createAI()
@@ -73,18 +73,19 @@ func (t *testSuite) TestPotentialCards() {
 	ht.Cards[0][C("TD")] = 1
 	ht.Cards[0][C("KD")] = 2
 	potentials := potentialCards(0, ht, sdz.NACard, sdz.NASuit, sdz.Spades)
-	t.True(potentials[C("AD")])
-	t.True(potentials[C("TD")])
-	t.True(potentials[C("KD")])
-	t.False(potentials[C("QD")])
+
+	t.True(potentials.Contains("AD"))
+	t.True(potentials.Contains("TD"))
+	t.True(potentials.Contains("KD"))
+	t.False(potentials.Contains("QD"))
 
 	delete(ht.Cards[0], C("TS"))
 	potentials = potentialCards(0, ht, C("KD"), sdz.Diamonds, sdz.Spades)
 
-	t.True(potentials[C("AD")])
-	t.True(potentials[C("TD")])
-	t.False(potentials[C("KD")])
-	t.False(potentials[C("TS")])
+	t.True(potentials.Contains("AD"))
+	t.True(potentials.Contains("TD"))
+	t.False(potentials.Contains("KD"))
+	t.False(potentials.Contains("TS"))
 
 	//func potentialCards(playerid, ht *HandTracker, winning sdz.Card, lead sdz.Suit, trump sdz.Suit) map[sdz.Card]int {
 	delete(ht.Cards[0], C("AH"))
@@ -93,19 +94,19 @@ func (t *testSuite) TestPotentialCards() {
 	ht.Cards[0][C("AS")] = 1
 	ht.Cards[0][C("TS")] = 0
 	potentials = potentialCards(0, ht, C("KH"), sdz.Hearts, sdz.Spades)
-	t.True(potentials[C("AH")])
-	t.True(potentials[C("TH")])
-	t.True(potentials[C("AS")])
-	t.True(potentials[C("QH")])
-	t.False(potentials[C("TS")])
+	t.True(potentials.Contains("AH"))
+	t.True(potentials.Contains("TH"))
+	t.True(potentials.Contains("AS"))
+	t.True(potentials.Contains("QH"))
+	t.False(potentials.Contains("TS"))
 
 	ht.Cards[0][C("AH")] = 1
 	potentials = potentialCards(0, ht, C("KH"), sdz.Hearts, sdz.Spades)
-	t.True(potentials[C("AH")])
-	t.True(potentials[C("TH")])
-	t.False(potentials[C("AS")])
-	t.False(potentials[C("QH")])
-	t.False(potentials[C("TS")])
+	t.True(potentials.Contains("AH"))
+	t.True(potentials.Contains("TH"))
+	t.False(potentials.Contains("AS"))
+	t.False(potentials.Contains("QH"))
+	t.False(potentials.Contains("TS"))
 
 	ai = createAI()
 	ht = ai.HT
@@ -164,8 +165,8 @@ func (t *testSuite) TestPotentialCards() {
 	ht.Cards[0][C("JS")] = 1
 	potentials = potentialCards(0, ht, C("JS"), sdz.Spades, sdz.Clubs)
 	t.Equal(1, len(potentials))
-	t.True(potentials[C("JS")])
-	t.False(potentials[C("TD")])
+	t.True(potentials.Contains("JS"))
+	t.False(potentials.Contains("TD"))
 
 	//PotentialCards called with 0,winning=AS,lead=D,trump=C,
 	//ht=&main.HandTracker{cards:[4]map[sdzpinochle.Card]int{map[sdzpinochle.Card]int{"9C":0, "AC":0, "AS":0, "KD":0, "QD":0, "QS":0, "TH":0, "JC":0, "AD":0, "9D":0, "KC":0, "TS":0, "9H":0, "TC":0, "TD":0, "QH":0, "9S":0, "JD":0, "QC":0, "KH":0, "JH":0, "KS":0, "AH":0, "JS":0}, map[sdzpinochle.Card]int{"9C":0, "QC":0, "9D":0, "AH":0, "AC":0, "QH":1, "JD":0, "KS":0, "JC":0, "AS":0, "KC":0, "TH":0, "TC":0, "QS":0, "KH":0, "TS":0}, map[sdzpinochle.Card]int{"KS":0, "JD":0, "JC":0, "TH":0, "KH":0, "AS":0, "QD":0, "TC":0, "AC":0, "AH":0, "QH":0, "9C":0, "KD":1, "QC":0, "9D":0, "KC":0, "QS":0, "TS":0}, map[sdzpinochle.Card]int{"TH":0, "AS":0, "AH":0, "TS":0, "KC":0, "9C":0, "QS":0, "TC":0, "9D":0, "AC":0, "KS":0, "QC":0, "KH":0, "JD":0, "QH":0, "JC":0}}, playedCards:map[sdzpinochle.Card]int{"KH":2, "KD":0, "JC":2, "AH":2, "TH":2, "TD":1, "9S":1, "TC":2, "9D":2, "AS":2, "KS":2, "JS":1, "QC":2, "KC":2, "QD":1, "QS":2, "9H":1, "QH":1, "AD":0, "JD":2, "AC":2, "JH":1, "9C":2, "TS":2}}
@@ -205,7 +206,7 @@ func (t *testSuite) TestPlayHandWithCard() {
 	ht.Cards[3]["QD"] = 1
 
 	before := len(ht.Cards[0])
-	card, value := playHandWithCard(0, ht, NewTrick(), sdz.Diamonds)
+	card, value := playHandWithCard(true, 0, ht, NewTrick(), sdz.Diamonds)
 	t.Equal(before, len(ht.Cards[0]))
 	t.Equal(card, sdz.CreateCard("D", "A"))
 	t.Equal(value, 4)
@@ -215,11 +216,67 @@ func (t *testSuite) TestPlayHandWithCard() {
 	ht.Cards[3]["KD"] = 1
 	ht.Cards[0]["QD"] = 1
 
-	before = len(ht.Cards[0])
-	card, value = playHandWithCard(0, ht, NewTrick(), sdz.Diamonds)
-	t.Equal(before, len(ht.Cards[0]))
+	card, value = playHandWithCard(true, 0, ht, NewTrick(), sdz.Diamonds)
 	t.Equal(card, C("AD"))
 	t.Equal(value, 3)
+
+	ht.Cards[1]["AD"] = 1
+	ht.Cards[2]["TD"] = 1
+	ht.Cards[3]["KD"] = 1
+	ht.Cards[0]["QD"] = 1
+
+	ht.PlayedCards["AS"] = 1
+	ht.Cards[0]["AS"] = 1
+	ht.PlayedCards["TS"] = 1
+	ht.Cards[1]["TS"] = 1
+	ht.PlayedCards["QS"] = 1
+	ht.Cards[2]["QS"] = 1
+	ht.PlayedCards["JS"] = 1
+	ht.Cards[3]["JS"] = 1
+
+	card, value = playHandWithCard(true, 0, ht, NewTrick(), sdz.Diamonds)
+	t.Equal(card, C("AD"))
+	t.Equal(value, 6)
+
+	ht.PlayedCards["AC"] = 0
+	ht.PlayedCards["TC"] = 0
+
+	ht.Cards[0]["AC"] = 1
+	delete(ht.Cards[1], "AC")
+	delete(ht.Cards[2], "AC")
+	delete(ht.Cards[3], "AC")
+	delete(ht.Cards[1], "TC")
+	delete(ht.Cards[2], "TC")
+	delete(ht.Cards[3], "TC")
+
+	card, value = playHandWithCard(true, 0, ht, NewTrick(), sdz.Diamonds)
+	t.Equal(card, C("AC"))
+	t.Equal(value, 10)
+
+}
+
+func (t *testSuite) TestFindCardToPlayShort() {
+	//func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
+	ai := createAI()
+	ai.SetHand(nil, nil, nil, sdz.Hand{C("AD"), C("QS")}, 0, 3)
+	for card := range ai.HT.PlayedCards {
+		ai.HT.PlayedCards[card] = 2
+	}
+	ai.HT.PlayedCards["AD"] = 1
+	ai.HT.PlayedCards["QS"] = 1
+	//ai.HT.Cards[0][C("KH")] = 1
+	ai.HT.PlayedCards["KH"] = 1
+	//ai.HT.Cards[0][C("QH")] = 1
+	ai.HT.PlayedCards["QH"] = 1
+	//ai.HT.Cards[1][C("9H")] = 2
+	ai.HT.PlayedCards["9H"] = 0
+	//ai.HT.Cards[2][C("KD")] = 1
+	ai.HT.PlayedCards["KD"] = 1
+	//ai.HT.Cards[2][C("QD")] = 1
+	ai.HT.PlayedCards["QD"] = 1
+	action := sdz.CreatePlayRequest(sdz.NACard, sdz.NASuit, sdz.Hearts, 3, ai.Hand())
+	card := ai.findCardToPlay(action)
+	t.True(card == C("AD") || card == C("QS"))
 }
 
 func (t *testSuite) TestFindCardToPlay() {
@@ -235,363 +292,6 @@ func (t *testSuite) TestFindCardToPlay() {
 	card := ai.findCardToPlay(action)
 	t.True(card == C("TD"))
 }
-
-//func (t *testSuite) TestRankCard() {
-//	//func rankCard(playerid int, ht *HandTracker, trick *Trick, lead, trump sdz.Suit) *Trick {
-//	ai := createAI()
-//	ht := ai.HT
-//	for _, card := range sdz.AllCards() {
-//		ht.Cards[3][card] = 0
-//	}
-//	ht.Cards[0][C("AD")] = 1
-//	ht.Cards[0][C("TD")] = 1
-//	ht.Cards[0][C("QD")] = 2
-//	ht.Cards[1][C("AD")] = 1
-//	ht.Cards[2][C("KD")] = 1
-//	ht.Cards[2][C("TD")] = 1
-//	ht.Cards[2][C("QS")] = 1
-//	ht.Cards[3][C("KD")] = 1
-//	for _, card := range []sdz.Card{C("AD"), C("TD"), C("QD"), C("KD"), C("QS")} {
-//		ai.calculateCard(card)
-//	}
-
-//	trick := NewTrick()
-//	trick.Played[0] = C("AD")
-//	trick.Played[1] = C("AD")
-//	trick.Played[2] = C("KD")
-//	trick.WinningPlayer = 0
-//	trick.Lead = 0
-//	// 3 has options of KD
-//	victim := rankCard(3, ht, trick, sdz.Diamonds)
-//	t.Equal(C("AD"), victim.Played[0])
-//	t.Equal(C("AD"), victim.Played[1])
-//	t.Equal(C("KD"), victim.Played[2])
-//	t.Equal(C("KD"), victim.Played[3])
-//	t.Equal(-32, victim.worth(3, sdz.Diamonds))
-
-//	trick = NewTrick()
-//	trick.Played[0] = C("AD")
-//	trick.Played[1] = C("AD")
-//	trick.WinningPlayer = 0
-//	trick.Lead = 0
-//	// 2 has real options of KD, TD, QD
-//	// 3 has real options of KD
-//	victim = rankCard(2, ht, trick, sdz.Diamonds)
-//	t.Equal(C("AD"), victim.Played[0])
-//	t.Equal(C("AD"), victim.Played[1])
-//	t.Equal(C("KD"), victim.Played[2])
-//	t.Equal(C("KD"), victim.Played[3])
-//	t.Equal(32, victim.worth(2, sdz.Diamonds))
-
-//	trick = NewTrick()
-//	trick.Played[0] = C("TD")
-//	trick.Played[1] = C("AD")
-//	trick.WinningPlayer = 1
-//	trick.Lead = 0
-//	ht.Cards[2][C("9D")] = 0
-//	// 2 has real options of KD, TD, QD and no option of a 9D
-//	ht.Cards[3][C("KD")] = 1
-//	ht.Cards[3][C("TD")] = 1
-//	ht.Cards[3][C("AD")] = 1
-//	ht.Cards[3][C("9D")] = 1
-//	ht.Cards[3][C("QD")] = 1
-//	// 3 has options of KD, TD, AD, 9D, and QD
-//	victim = rankCard(2, ht, trick, sdz.Diamonds)
-//	t.Equal(C("TD"), victim.Played[0])
-//	t.Equal(C("AD"), victim.Played[1])
-//	t.Equal(C("JD"), victim.Played[2])
-//	t.Equal(C("KD"), victim.Played[3])
-
-//}
-
-//func (t *testSuite) TestWorth() {
-//	trick := NewTrick()
-//	trick.Played[0] = C("AS")
-//	trick.Played[1] = C("9S")
-//	trick.Played[2] = C("KS")
-//	trick.Played[3] = C("QS")
-//	trick.WinningPlayer = 0
-//	t.Equal(12, trick.worth(0, sdz.Diamonds))
-//	t.Equal(12, trick.worth(2, sdz.Diamonds))
-//	t.Equal(-12, trick.worth(1, sdz.Diamonds))
-//	t.Equal(-12, trick.worth(3, sdz.Diamonds))
-//	trick.certain = false
-//	t.Equal(6, trick.worth(0, sdz.Diamonds))
-//	t.Equal(6, trick.worth(2, sdz.Diamonds))
-//	t.Equal(-6, trick.worth(1, sdz.Diamonds))
-//	t.Equal(-6, trick.worth(3, sdz.Diamonds))
-//	t.Equal(6, trick.worth(0, sdz.Spades))
-//	t.Equal(6, trick.worth(2, sdz.Spades))
-//	t.Equal(-6, trick.worth(1, sdz.Spades))
-//	t.Equal(-6, trick.worth(3, sdz.Spades))
-
-//	trick.Played[0] = C("9S")
-//	trick.Played[1] = C("AS")
-//	trick.Played[2] = C("KS")
-//	trick.Played[3] = C("TS")
-//	trick.WinningPlayer = 1
-//	trick.certain = false
-//	t.Equal(-9, trick.worth(0, sdz.Diamonds))
-//	t.Equal(-9, trick.worth(2, sdz.Diamonds))
-//	t.Equal(9, trick.worth(1, sdz.Diamonds))
-//	t.Equal(9, trick.worth(3, sdz.Diamonds))
-//	t.Equal(-9, trick.worth(0, sdz.Spades))
-//	t.Equal(-9, trick.worth(2, sdz.Spades))
-//	t.Equal(9, trick.worth(1, sdz.Spades))
-//	t.Equal(9, trick.worth(3, sdz.Spades))
-
-//	trick.Played[0] = C("9S")
-//	trick.Played[1] = C("AS")
-//	trick.Played[2] = C("JD")
-//	trick.Played[3] = C("TS")
-//	trick.WinningPlayer = 2
-//	trick.certain = false
-//	t.Equal(10, trick.worth(0, sdz.Diamonds))
-//	t.Equal(10, trick.worth(2, sdz.Diamonds))
-//	t.Equal(-10, trick.worth(1, sdz.Diamonds))
-//	t.Equal(-10, trick.worth(3, sdz.Diamonds))
-//	trick.WinningPlayer = 1
-//	t.Equal(-4, trick.worth(0, sdz.Spades))
-//	t.Equal(-4, trick.worth(2, sdz.Spades))
-//	t.Equal(4, trick.worth(1, sdz.Spades))
-//	t.Equal(4, trick.worth(3, sdz.Spades))
-
-//}
-
-//func (t *testSuite) TestHands() {
-//	p1 := createAI()
-//	p2 := createAI()
-//	p3 := createAI()
-//	p0 := createAI()
-//	game := &sdz.Game{Players: []sdz.Player{p0, p1, p2, p3}}
-//	game.MeldHands = make([]sdz.Hand, len(game.Players))
-//	game.Meld = make([]int, len(game.Players))
-//	game.Dealer = 0
-//	p1.SetHand(sdz.Hand{C("AD"), C("QD"), C("TC"), C("KC"), C("KC"), C("QC"), C("QC"), C("AH"), C("JH"), C("9H"), C("QS"), C("9S")}, game.Dealer, 1)
-//	p2.SetHand(sdz.Hand{C("KD"), C("JD"), C("9D"), C("9D"), C("JC"), C("AH"), C("TH"), C("KH"), C("QH"), C("AS"), C("QS"), C("JS")}, game.Dealer, 2)
-//	p3.SetHand(sdz.Hand{C("TD"), C("KD"), C("QD"), C("JD"), C("AC"), C("AC"), C("TC"), C("KH"), C("9H"), C("TS"), C("KS"), C("9S")}, game.Dealer, 3)
-//	p0.SetHand(sdz.Hand{C("AD"), C("TD"), C("JC"), C("9C"), C("9C"), C("TH"), C("QH"), C("JH"), C("AS"), C("TS"), C("KS"), C("JS")}, game.Dealer, 0)
-//	game.Broadcast(sdz.CreateBid(22, 1), 3)
-//	game.Trump = sdz.Clubs
-//	game.BroadcastAll(sdz.CreateTrump(game.Trump, 3))
-//	p1.trump = game.Trump
-//	p2.trump = game.Trump
-//	p3.trump = game.Trump
-//	p0.trump = game.Trump
-//	for x := 0; x < len(game.Players); x++ {
-//		game.Meld[x], game.MeldHands[x] = game.Players[x].Hand().Meld(game.Trump)
-//		meldAction := sdz.CreateMeld(game.MeldHands[x], game.Meld[x], x)
-//		game.BroadcastAll(meldAction)
-//	}
-//	next := 3
-//	for trick := 0; trick < 12; trick++ {
-//		var winningCard sdz.Card
-//		var cardPlayed sdz.Card
-//		var leadSuit sdz.Suit
-//		winningPlayer := next
-//		counters := 0
-//		for x := 0; x < 4; x++ {
-//			// play the hand
-//			// TODO: handle possible throwin
-//			action := sdz.CreatePlayRequest(winningCard, leadSuit, game.Trump, next, game.Players[next].Hand())
-//			game.Players[next].Tell(action)
-//			action, open := game.Players[next].Listen()
-//			if !open {
-//				game.Broadcast(sdz.CreateMessage("Player disconnected"), next)
-//				return
-//			}
-//			cardPlayed = action.PlayedCard
-//			game.Players[next].Hand().Remove(cardPlayed)
-//			if x == 0 {
-//				winningCard = cardPlayed
-//				leadSuit = cardPlayed.Suit()
-//			} else {
-//				if cardPlayed.Beats(winningCard, game.Trump) {
-//					winningCard = cardPlayed
-//					winningPlayer = next
-//				}
-//			}
-//			game.Broadcast(action, next)
-//			next = (next + 1) % 4
-//		}
-//		next = winningPlayer
-//		game.BroadcastAll(sdz.CreateMessage(fmt.Sprintf("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)))
-//		game.BroadcastAll(sdz.CreateTrick(winningPlayer))
-//		//Log("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)
-//	}
-
-//	//game.Dealer = 3
-//	//p1.SetHand(sdz.Hand{C("AD"), C("TD"), C("JD"), C("TC"), C("KC"), C("AH"), C("KH"), C("QH"), C("TS"), C("QS"), C("QS"), C("JS")}, game.Dealer, 1)
-//	//p2.SetHand(sdz.Hand{C("AD"), C("QD"), C("QD"), C("AC"), C("QC"), C("QC"), C("JC"), C("JC"), C("TH"), C("QH"), C("KS"), C("JS")}, game.Dealer, 2)
-//	//p3.SetHand(sdz.Hand{C("TD"), C("JD"), C("AC"), C("TC"), C("AH"), C("KH"), C("JH"), C("JH"), C("9H"), C("TS"), C("9S"), C("9S")}, game.Dealer, 3)
-//	//p0.SetHand(sdz.Hand{C("KD"), C("KD"), C("9D"), C("9D"), C("KC"), C("9C"), C("9C"), C("TH"), C("9H"), C("AS"), C("AS"), C("KS")}, game.Dealer, 0)
-//	//game.Broadcast(sdz.CreateBid(20, 3), 3)
-//	//game.Trump = sdz.Clubs
-//	//game.BroadcastAll(sdz.CreateTrump(game.Trump, 1))
-//	//p1.trump = game.Trump
-//	//p2.trump = game.Trump
-//	//p3.trump = game.Trump
-//	//p0.trump = game.Trump
-//	//for x := 0; x < len(game.Players); x++ {
-//	//	game.Meld[x], game.MeldHands[x] = game.Players[x].Hand().Meld(game.Trump)
-//	//	meldAction := sdz.CreateMeld(game.MeldHands[x], game.Meld[x], x)
-//	//	game.BroadcastAll(meldAction)
-//	//}
-//	//next = 3
-//	//for trick := 0; trick < 12; trick++ {
-//	//	var winningCard sdz.Card
-//	//	var cardPlayed sdz.Card
-//	//	var leadSuit sdz.Suit
-//	//	winningPlayer := next
-//	//	counters := 0
-//	//	for x := 0; x < 4; x++ {
-//	//		// play the hand
-//	//		// TODO: handle possible throwin
-//	//		action := sdz.CreatePlayRequest(winningCard, leadSuit, game.Trump, next, game.Players[next].Hand())
-//	//		game.Players[next].Tell(action)
-//	//		action, open := game.Players[next].Listen()
-//	//		if !open {
-//	//			game.Broadcast(sdz.CreateMessage("Player disconnected"), next)
-//	//			return
-//	//		}
-//	//		cardPlayed = action.PlayedCard
-//	//		game.Players[next].Hand().Remove(cardPlayed)
-//	//		if x == 0 {
-//	//			winningCard = cardPlayed
-//	//			leadSuit = cardPlayed.Suit()
-//	//		} else {
-//	//			if cardPlayed.Beats(winningCard, game.Trump) {
-//	//				winningCard = cardPlayed
-//	//				winningPlayer = next
-//	//			}
-//	//		}
-//	//		game.Broadcast(action, next)
-//	//		next = (next + 1) % 4
-//	//	}
-//	//	next = winningPlayer
-//	//	game.BroadcastAll(sdz.CreateMessage(fmt.Sprintf("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)))
-//	//	game.BroadcastAll(sdz.CreateTrick(winningPlayer))
-//	//	//Log("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)
-//	//}
-
-//	//p1 = createAI()
-//	//p2 = createAI()
-//	//p3 = createAI()
-//	//p0 = createAI()
-//	//game = &sdz.Game{Players: []sdz.Player{p0, p1, p2, p3}}
-//	//game.MeldHands = make([]sdz.Hand, len(game.Players))
-//	//game.Meld = make([]int, len(game.Players))
-//	//p1.SetHand(sdz.Hand{C("AD"), C("QD"), C("JD"), C("9D"), C("AH"), C("TH"), C("KH"), C("KH"), C("JH"), C("KS"), C("JS"), C("JS")}, 0, 1)
-//	//p2.SetHand(sdz.Hand{C("TD"), C("KD"), C("QC"), C("QC"), C("9C"), C("TH"), C("QH"), C("9H"), C("9H"), C("AS"), C("TS"), C("QS")}, 0, 2)
-//	//p3.SetHand(sdz.Hand{C("KD"), C("QD"), C("JD"), C("AC"), C("AC"), C("TC"), C("TC"), C("JC"), C("AH"), C("JH"), C("AS"), C("KS")}, 0, 3)
-//	//p0.SetHand(sdz.Hand{C("AD"), C("TD"), C("9D"), C("KC"), C("KC"), C("JC"), C("9C"), C("QH"), C("TS"), C("QS"), C("9S"), C("9S")}, 0, 0)
-//	//game.Broadcast(sdz.CreateBid(21, 3), 3)
-//	//game.BroadcastAll(sdz.CreateTrump(sdz.Clubs, 3))
-//	//p1.trump = sdz.Clubs
-//	//p2.trump = sdz.Clubs
-//	//p3.trump = sdz.Clubs
-//	//p0.trump = sdz.Clubs
-//	//for x := 0; x < len(game.Players); x++ {
-//	//	game.Meld[x], game.MeldHands[x] = game.Players[x].Hand().Meld(game.Trump)
-//	//	meldAction := sdz.CreateMeld(game.MeldHands[x], game.Meld[x], x)
-//	//	game.BroadcastAll(meldAction)
-//	//}
-//	//next = 1
-//	//for trick := 0; trick < 12; trick++ {
-//	//	var winningCard sdz.Card
-//	//	var cardPlayed sdz.Card
-//	//	var leadSuit sdz.Suit
-//	//	winningPlayer := next
-//	//	counters := 0
-//	//	for x := 0; x < 4; x++ {
-//	//		// play the hand
-//	//		// TODO: handle possible throwin
-//	//		action := sdz.CreatePlayRequest(winningCard, leadSuit, game.Trump, next, game.Players[next].Hand())
-//	//		game.Players[next].Tell(action)
-//	//		action, open := game.Players[next].Listen()
-//	//		if !open {
-//	//			game.Broadcast(sdz.CreateMessage("Player disconnected"), next)
-//	//			return
-//	//		}
-//	//		cardPlayed = action.PlayedCard
-//	//		game.Players[next].Hand().Remove(cardPlayed)
-//	//		if x == 0 {
-//	//			winningCard = cardPlayed
-//	//			leadSuit = cardPlayed.Suit()
-//	//		} else {
-//	//			if cardPlayed.Beats(winningCard, game.Trump) {
-//	//				winningCard = cardPlayed
-//	//				winningPlayer = next
-//	//			}
-//	//		}
-//	//		game.Broadcast(action, next)
-//	//		next = (next + 1) % 4
-//	//	}
-//	//	next = winningPlayer
-//	//	game.BroadcastAll(sdz.CreateMessage(fmt.Sprintf("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)))
-//	//	game.BroadcastAll(sdz.CreateTrick(winningPlayer))
-//	//	//Log("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)
-//	//}
-
-//	//p1 = createAI()
-//	//p2 = createAI()
-//	//p3 = createAI()
-//	//p0 = createAI()
-//	//game = &sdz.Game{Players: []sdz.Player{p0, p1, p2, p3}}
-//	//game.MeldHands = make([]sdz.Hand, len(game.Players))
-//	//game.Meld = make([]int, len(game.Players))
-//	//p1.SetHand(sdz.Hand{C("AD"), C("TD"), C("KD"), C("KD"), C("QD"), C("JD"), C("AC"), C("QC"), C("9C"), C("QH"), C("9H"), C("KS")}, 0, 1)
-//	//p2.SetHand(sdz.Hand{C("TD"), C("QD"), C("9D"), C("AC"), C("QC"), C("JC"), C("9C"), C("TH"), C("KH"), C("QH"), C("JH"), C("AS")}, 0, 2)
-//	//p3.SetHand(sdz.Hand{C("AD"), C("TC"), C("KC"), C("KC"), C("JC"), C("AH"), C("AH"), C("TH"), C("TS"), C("KS"), C("JS"), C("9S")}, 0, 3)
-//	//p0.SetHand(sdz.Hand{C("JD"), C("9D"), C("TC"), C("KH"), C("JH"), C("9H"), C("AS"), C("TS"), C("QS"), C("QS"), C("JS"), C("9S")}, 0, 0)
-//	//game.Broadcast(sdz.CreateBid(31, 1), 1)
-//	//game.BroadcastAll(sdz.CreateTrump(sdz.Diamonds, 1))
-//	//p1.trump = sdz.Diamonds
-//	//p2.trump = sdz.Diamonds
-//	//p3.trump = sdz.Diamonds
-//	//p0.trump = sdz.Diamonds
-//	//for x := 0; x < len(game.Players); x++ {
-//	//	game.Meld[x], game.MeldHands[x] = game.Players[x].Hand().Meld(game.Trump)
-//	//	meldAction := sdz.CreateMeld(game.MeldHands[x], game.Meld[x], x)
-//	//	game.BroadcastAll(meldAction)
-//	//}
-//	//next = 1
-//	//for trick := 0; trick < 12; trick++ {
-//	//	var winningCard sdz.Card
-//	//	var cardPlayed sdz.Card
-//	//	var leadSuit sdz.Suit
-//	//	winningPlayer := next
-//	//	counters := 0
-//	//	for x := 0; x < 4; x++ {
-//	//		// play the hand
-//	//		// TODO: handle possible throwin
-//	//		action := sdz.CreatePlayRequest(winningCard, leadSuit, game.Trump, next, game.Players[next].Hand())
-//	//		game.Players[next].Tell(action)
-//	//		action, open := game.Players[next].Listen()
-//	//		if !open {
-//	//			game.Broadcast(sdz.CreateMessage("Player disconnected"), next)
-//	//			return
-//	//		}
-//	//		cardPlayed = action.PlayedCard
-//	//		game.Players[next].Hand().Remove(cardPlayed)
-//	//		if x == 0 {
-//	//			winningCard = cardPlayed
-//	//			leadSuit = cardPlayed.Suit()
-//	//		} else {
-//	//			if cardPlayed.Beats(winningCard, game.Trump) {
-//	//				winningCard = cardPlayed
-//	//				winningPlayer = next
-//	//			}
-//	//		}
-//	//		game.Broadcast(action, next)
-//	//		next = (next + 1) % 4
-//	//	}
-//	//	next = winningPlayer
-//	//	game.BroadcastAll(sdz.CreateMessage(fmt.Sprintf("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)))
-//	//	game.BroadcastAll(sdz.CreateTrick(winningPlayer))
-//	//	//Log("Player %d wins trick #%d with %s for %d points", winningPlayer, trick+1, winningCard, counters)
-//	//}
-//}
 
 func (t *testSuite) TestAITracking() {
 	ai := createAI()
@@ -685,7 +385,7 @@ func (t *testSuite) TestNoSuit() {
 	ai.RealHand = &sdz.Hand{C("9D"), C("9D"), C("QD"), C("TD"), C("TD"), C("AD"), C("JC"), C("QC"), C("KC"), C("AH"), C("AH"), C("KS")}
 	ai.populate()
 	ai.HT.Cards[1][C("9D")] = 1
-	ai.noSuit(1, sdz.Diamonds)
+	ai.HT.noSuit(1, sdz.Diamonds)
 
 	t.Equal(0, ai.HT.Cards[1][C("9D")])
 	t.Equal(0, ai.HT.Cards[1][C("JD")])
@@ -737,7 +437,7 @@ func (t *testSuite) TestCalculate() {
 	ai.HT.Cards[2][C("QS")] = 0
 
 	for _, card := range []sdz.Card{C("QD"), C("KH"), C("KD"), C("9S"), C("TS"), C("JS"), C("QS")} {
-		ai.calculateCard(card)
+		ai.HT.calculateCard(card)
 	}
 
 	t.Equal(1, ai.HT.Cards[3][C("JS")])
@@ -764,7 +464,7 @@ func (t *testSuite) TestCalculate() {
 	ai.HT.Cards[0][C("JD")] = 1
 	ai.HT.Cards[1][C("JD")] = 0
 	ai.HT.Cards[2][C("JD")] = 0
-	ai.calculateCard(C("JD"))
+	ai.HT.calculateCard(C("JD"))
 	val, ok := ai.HT.Cards[0][C("JD")]
 	t.Equal(1, val)
 	t.True(ok)
