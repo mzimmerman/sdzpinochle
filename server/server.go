@@ -8,6 +8,7 @@ import (
 	"encoding/gob"
 	"github.com/gorilla/sessions"
 	"log"
+	"runtime"
 	//"appengine/datastore"
 	"appengine/mail"
 	"encoding/json"
@@ -49,6 +50,7 @@ const (
 )
 
 var store = sessions.NewCookieStore([]byte("sdzpinochle"))
+var sem = make(chan bool, runtime.NumCPU())
 
 func init() {
 	http.HandleFunc("/connect", connect)
@@ -63,6 +65,9 @@ func init() {
 	//gob.Register(AI{})
 	gob.Register(new(Human))
 	//gob.Register(Human{})
+	for x := 0; x < runtime.NumCPU(); x++ {
+		sem <- true
+	}
 }
 
 func remind(w http.ResponseWriter, r *http.Request) {
@@ -617,7 +622,7 @@ type Result struct {
 	Points int
 }
 
-func playHandWithCard(initial bool, playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) (sdz.Card, int) {
+func playHandWithCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) (sdz.Card, int) {
 	Log(4, "Calling playHandWithCard")
 	decisionMap := potentialCards(playerid, ht, trick.winningCard(), trick.leadSuit(), trump)
 	if len(decisionMap) == 0 {
@@ -641,9 +646,9 @@ func playHandWithCard(initial bool, playerid int, ht *HandTracker, trick *Trick,
 		}
 		points := 0
 		if len(newtrick.Played) != 4 {
-			_, points = playHandWithCard(false, (playerid+1)%4, newht, newtrick, trump)
+			_, points = playHandWithCard((playerid+1)%4, newht, newtrick, trump)
 		} else { // trick is over, create a new trick
-			_, points = playHandWithCard(false, newtrick.WinningPlayer, newht, NewTrick(), trump)
+			_, points = playHandWithCard(newtrick.WinningPlayer, newht, NewTrick(), trump)
 			Log(4, "Player %d pretend won the hand with a %s", newtrick.WinningPlayer, newtrick.winningCard())
 			if ht.Owner%2 == newtrick.WinningPlayer%2 {
 				points += newtrick.counters()
@@ -652,9 +657,13 @@ func playHandWithCard(initial bool, playerid int, ht *HandTracker, trick *Trick,
 		results <- Result{myCard, points}
 	}
 	for _, card := range decisionMap {
-		if initial {
-			go inline(card)
-		} else {
+		select {
+		case <-sem:
+			go func() {
+				inline(card)
+				sem <- true
+			}()
+		default:
 			inline(card)
 		}
 	}
@@ -732,7 +741,7 @@ func playHandWithCard(initial bool, playerid int, ht *HandTracker, trick *Trick,
 //}
 
 func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
-	card, _ := playHandWithCard(true, ai.Playerid, ai.HT, ai.Trick, ai.Trump)
+	card, _ := playHandWithCard(ai.Playerid, ai.HT, ai.Trick, ai.Trump)
 	return card
 	//return rankCard(ai.Playerid, ai.HT, ai.Trick, ai.Trump).Played[ai.Playerid]
 }

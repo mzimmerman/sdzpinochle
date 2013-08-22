@@ -206,7 +206,7 @@ func (t *testSuite) TestPlayHandWithCard() {
 	ht.Cards[3]["QD"] = 1
 
 	before := len(ht.Cards[0])
-	card, value := playHandWithCard(true, 0, ht, NewTrick(), sdz.Diamonds)
+	card, value := playHandWithCard(0, ht, NewTrick(), sdz.Diamonds)
 	t.Equal(before, len(ht.Cards[0]))
 	t.Equal(card, sdz.CreateCard("D", "A"))
 	t.Equal(value, 4)
@@ -216,7 +216,7 @@ func (t *testSuite) TestPlayHandWithCard() {
 	ht.Cards[3]["KD"] = 1
 	ht.Cards[0]["QD"] = 1
 
-	card, value = playHandWithCard(true, 0, ht, NewTrick(), sdz.Diamonds)
+	card, value = playHandWithCard(0, ht, NewTrick(), sdz.Diamonds)
 	t.Equal(card, C("AD"))
 	t.Equal(value, 3)
 
@@ -234,7 +234,7 @@ func (t *testSuite) TestPlayHandWithCard() {
 	ht.PlayedCards["JS"] = 1
 	ht.Cards[3]["JS"] = 1
 
-	card, value = playHandWithCard(true, 0, ht, NewTrick(), sdz.Diamonds)
+	card, value = playHandWithCard(0, ht, NewTrick(), sdz.Diamonds)
 	t.Equal(card, C("AD"))
 	t.Equal(value, 6)
 
@@ -249,7 +249,7 @@ func (t *testSuite) TestPlayHandWithCard() {
 	delete(ht.Cards[2], "TC")
 	delete(ht.Cards[3], "TC")
 
-	card, value = playHandWithCard(true, 0, ht, NewTrick(), sdz.Diamonds)
+	card, value = playHandWithCard(0, ht, NewTrick(), sdz.Diamonds)
 	t.Equal(card, C("AC"))
 	t.Equal(value, 10)
 
