@@ -201,7 +201,7 @@ func convert(oldMap map[sdz.Card]int) CardMap {
 
 func (t *testSuite) TestPlayHandWithCard() {
 	//func playHandWithCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) (sdz.Card, [2]int) {
-	ht := NewHandTracker(0)
+	ht := getHT(0)
 	for x := 0; x < len(ht.Cards); x++ {
 		for card := range sdz.AllCards {
 			ht.Cards[x][card] = 3
@@ -260,7 +260,7 @@ func (t *testSuite) TestPlayHandWithCard() {
 	card, value = playHandWithCard(0, ht, NewTrick(), sdz.Diamonds)
 	t.Equal(card, C("AC"))
 	t.Equal(value, 10)
-
+	HTs <- ht
 }
 
 func (t *testSuite) TestFindCardToPlayShort() {
@@ -382,7 +382,7 @@ func (t *testSuite) TestAITracking() {
 }
 
 func (t *testSuite) TestNoSuit() {
-	ht := NewHandTracker(0)
+	ht := getHT(0)
 	ht.Cards[1][index("9D")] = 1
 	ht.noSuit(1, sdz.Diamonds)
 
@@ -393,6 +393,8 @@ func (t *testSuite) TestNoSuit() {
 	t.Equal(None, ht.Cards[1][index("TD")])
 	t.Equal(None, ht.Cards[1][index("AD")])
 	t.Equal(Unknown, ht.Cards[1][index("AS")])
+
+	HTs <- ht
 }
 
 func (t *testSuite) TestCalculate() {

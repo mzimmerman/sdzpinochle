@@ -54,8 +54,7 @@ const (
 var store = sessions.NewCookieStore([]byte("sdzpinochle"))
 
 var sem = make(chan bool, runtime.NumCPU())
-
-//var sem = make(chan bool)
+var HTs = make(chan *HandTracker, 1000)
 
 func init() {
 	http.HandleFunc("/connect", connect)
@@ -73,6 +72,17 @@ func init() {
 	for x := 0; x < runtime.NumCPU(); x++ {
 		sem <- true
 	}
+}
+
+func getHT(owner int) *HandTracker {
+	var ht *HandTracker
+	select {
+	case ht = <-HTs:
+	default:
+		ht = new(HandTracker)
+	}
+	ht.reset(owner)
+	return ht
 }
 
 func remind(w http.ResponseWriter, r *http.Request) {
@@ -329,13 +339,18 @@ func (cm *CardMap) dec(x int) {
 	}
 }
 
-func NewHandTracker(owner int) *HandTracker {
-	ht := &HandTracker{Owner: owner}
+func (ht *HandTracker) reset(owner int) {
+	ht.Owner = owner
 	for x := 0; x < len(ht.PlayedCards); x++ {
-		ht.PlayedCards[x] = None
-		ht.Cards[owner][x] = None
+		for y := 0; y < 4; y++ {
+			if y == ht.Owner {
+				ht.PlayedCards[x] = None
+				ht.Cards[y][x] = None
+			} else {
+				ht.Cards[y][x] = Unknown
+			}
+		}
 	}
-	return ht
 }
 
 type HandTracker struct {
@@ -373,12 +388,11 @@ func (ht *HandTracker) sum(cardIndex int) int {
 }
 
 func (oldht *HandTracker) Copy() (newht *HandTracker) {
-	newht = new(HandTracker)
+	newht = getHT(oldht.Owner)
 	for x := 0; x < len(oldht.Cards); x++ {
 		newht.Cards[x] = oldht.Cards[x]
 	}
 	newht.PlayedCards = oldht.PlayedCards
-	newht.Owner = oldht.Owner
 	return
 }
 
@@ -530,7 +544,11 @@ func (ai *AI) MarshalJSON() ([]byte, error) {
 }
 
 func (a *AI) reset() {
-	a.HT = NewHandTracker(a.Playerid)
+	if a.HT == nil {
+		a.HT = getHT(a.Playerid)
+	} else {
+		a.HT.reset(a.Playerid)
+	}
 	a.Trick = NewTrick()
 }
 
@@ -720,6 +738,7 @@ func inline(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit, myCard 
 			points += newtrick.counters()
 		}
 	}
+	HTs <- newht // return the HandTracker to the pool for reuse
 	results <- Result{myCard, points}
 }
 
@@ -1322,6 +1341,8 @@ func (game *Game) processAction(g *goon.Goon, c appengine.Context, client *Clien
 								human.Client.TableId = 0
 								_, err := g.Put(human.Client)
 								logError(c, err)
+							} else {
+								HTs <- player.(*AI).HT
 							}
 						}
 						key := g.Key(game)
