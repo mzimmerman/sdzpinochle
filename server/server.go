@@ -47,10 +47,15 @@ const (
 	TrumpWin   = iota
 	FollowLose = iota
 	FollowWin  = iota
+	None       = 3
+	Unknown    = 0
 )
 
 var store = sessions.NewCookieStore([]byte("sdzpinochle"))
+
 var sem = make(chan bool, runtime.NumCPU())
+
+//var sem = make(chan bool)
 
 func init() {
 	http.HandleFunc("/connect", connect)
@@ -235,59 +240,176 @@ func Log(playerid int, m string, v ...interface{}) {
 	}
 }
 
+func card(cardIndex int) sdz.Card {
+	face := sdz.NAFace
+	suit := sdz.NASuit
+	switch cardIndex % 6 {
+	case 0:
+		face = ace
+	case 1:
+		face = ten
+	case 2:
+		face = king
+	case 3:
+		face = queen
+	case 4:
+		face = jack
+	case 5:
+		face = nine
+	}
+	switch cardIndex / 6 {
+	case 0:
+		suit = spades
+	case 1:
+		suit = hearts
+	case 2:
+		suit = clubs
+	case 3:
+		suit = diamonds
+	}
+	return sdz.CreateCard(suit, face)
+}
+
+func index(c sdz.Card) int {
+	Log(4, "Doing index on card %s", c)
+	var index int
+	switch c.Face() {
+	case "A":
+		index = 0
+	case "T":
+		index = 1
+	case "K":
+		index = 2
+	case "Q":
+		index = 3
+	case "J":
+		index = 4
+	case "9":
+		index = 5
+	}
+	switch c.Suit() {
+	case "S":
+		return index
+	case "H":
+		return index + 6
+	case "C":
+		return index + 12
+	case "D":
+		return index + 18
+	}
+	panic("index of NASuit!")
+}
+
+type CardMap [24]int
+
+func (cm *CardMap) inc(x int) {
+	switch cm[x] {
+	case 2:
+		panic("Cannot increment past 2")
+	case Unknown:
+		fallthrough
+	case None:
+		cm[x] = 1
+	case 1:
+		cm[x]++
+	}
+}
+
+func (cm *CardMap) dec(x int) {
+	switch cm[x] {
+	case None:
+		Log(4, "Attempting to decrement %s from %d", card(x), cm[x])
+		panic("Cannot decrement past 0")
+	case Unknown:
+	// do nothing
+	case 1:
+		cm[x] = None
+	case 2:
+		cm[x]--
+	}
+}
+
+func NewHandTracker(owner int) *HandTracker {
+	ht := &HandTracker{Owner: owner}
+	for x := 0; x < len(ht.PlayedCards); x++ {
+		ht.PlayedCards[x] = None
+		ht.Cards[owner][x] = None
+	}
+	return ht
+}
+
 type HandTracker struct {
-	Cards [4]map[sdz.Card]int
-	// missing entry = know nothing
-	// 0 = does not have any of this card
+	Cards [4]CardMap
+	// 0 = know nothing = Unknown
+	// 3 = does not have any of this card = None
 	// 1 = has this card
 	// 2 = has two of these cards
-	PlayedCards map[sdz.Card]int
+	PlayedCards CardMap
 	Owner       int // the playerid of the "owning" player
+}
+
+func (ht *HandTracker) sum(cardIndex int) int {
+	sum := ht.PlayedCards[cardIndex]
+	if sum == None {
+		sum = 0
+	}
+	//Log(ht.Owner, "1-Summing card %s, sum = %d", card(cardIndex), sum)
+	for x := 0; x < len(ht.Cards); x++ {
+		switch ht.Cards[x][cardIndex] {
+		case None:
+		case Unknown:
+			// do nothing
+		default:
+			//Log(ht.Owner, "2-Adding %d to sum for player %d", ht.Cards[x][cardIndex], x)
+			sum += ht.Cards[x][cardIndex]
+		}
+	}
+	if sum > 2 {
+		//Log(ht.Owner, "3-Summing card %s, sum = %d", card(cardIndex), sum)
+		ht.Debug()
+		panic("sumthing is wrong, get it?!?!")
+	}
+	return sum
 }
 
 func (oldht *HandTracker) Copy() (newht *HandTracker) {
 	newht = new(HandTracker)
-	newht.PlayedCards = make(map[sdz.Card]int)
 	for x := 0; x < len(oldht.Cards); x++ {
-		newht.Cards[x] = make(map[sdz.Card]int)
-		for card, val := range oldht.Cards[x] {
-			newht.Cards[x][card] = val
-		}
+		newht.Cards[x] = oldht.Cards[x]
 	}
-	for card, val := range oldht.PlayedCards {
-		newht.PlayedCards[card] = val
-	}
+	newht.PlayedCards = oldht.PlayedCards
 	newht.Owner = oldht.Owner
 	return
 }
 
-func (ht *HandTracker) PlayCard(c sdz.Card, playerid int, trick *Trick, trump sdz.Suit) {
-	Log(ht.Owner, "In ht.PlayCard for %d-%s on player %d", playerid, c, ht.Owner)
-	Log(ht.Owner, "ht.PlayedCards = %v", HTString(ht.PlayedCards))
+func (ht *HandTracker) Debug() {
+	Log(ht.Owner, "ht.PlayedCards = %v", ht.PlayedCards)
 	for x := 0; x < 4; x++ {
-		Log(ht.Owner, "Player%d - %s", x, HTString(ht.Cards[x]))
+		Log(ht.Owner, "Player%d - %s", x, ht.Cards[x])
 	}
-	if ht.PlayedCards[c] >= 2 {
-		Log(ht.Owner, "Player %d has card %s", playerid, c)
-		panic("Played cards cannot be greater than 2")
-	}
-	ht.PlayedCards[c]++
-	if val, ok := ht.Cards[playerid][c]; ok {
-		if val > 0 {
-			ht.Cards[playerid][c]--
-		} else {
+}
+
+func (ht *HandTracker) PlayCard(c sdz.Card, playerid int, trick *Trick, trump sdz.Suit) {
+	cardIndex := index(c)
+	Log(ht.Owner, "In ht.PlayCard for %d-%s on player %d", playerid, c, ht.Owner)
+	ht.Debug()
+	ht.PlayedCards.inc(cardIndex)
+	if val := ht.Cards[playerid][cardIndex]; val != Unknown {
+		if val == None {
 			Log(4, "Player %d does not have card %s, panicking", playerid, c)
 			panic("panic")
+		} else {
+			ht.Cards[playerid].dec(cardIndex)
 		}
-		if val == 1 && ht.PlayedCards[c] == 1 && playerid != ht.Owner {
+		if val == 1 && ht.PlayedCards[cardIndex] == 1 && playerid != ht.Owner {
 			// Other player could have only shown one in meld, but has two - now we don't know who has the last one
 			Log(ht.Owner, "htcardset - deleted card %s for player %d", c, playerid)
-			delete(ht.Cards[playerid], c)
+			ht.Cards[playerid][cardIndex] = Unknown
 		}
 	}
-	ht.calculateCard(c)
+	ht.calculateCard(cardIndex)
 	switch {
-	case trick.leadSuit() == sdz.NASuit:
+	case trick.leadSuit() == sdz.NASuit || trump == sdz.NASuit:
 		// do nothing
 	case c.Suit() != trick.leadSuit() && c.Suit() != trump: // couldn't follow suit, couldn't lay trump
 		ht.noSuit(playerid, trump)
@@ -298,46 +420,28 @@ func (ht *HandTracker) PlayCard(c sdz.Card, playerid int, trick *Trick, trump sd
 		for _, f := range sdz.Faces() {
 			card := sdz.CreateCard(c.Suit(), f)
 			if card.Beats(trick.winningCard(), trump) {
-				ht.Cards[playerid][card] = 0
-				ht.calculateCard(card)
+				cardIndex := index(card)
+				ht.Cards[playerid][cardIndex] = None
+				ht.calculateCard(cardIndex)
 			}
 		}
 	}
 	Log(ht.Owner, "Player %d played card %s", playerid, c)
 }
 
-type Decision map[sdz.Card]bool
-
-func (dec Decision) Sort() sdz.Hand {
-	hand := make(sdz.Hand, len(dec))
-	x := 0
-	for card := range dec {
-		hand[x] = card
-		x++
+func (cm CardMap) String() string {
+	output := "[24]int{"
+	for x, c := range sdz.AllCards() {
+		if cm[x] == Unknown {
+			continue
+		}
+		if cm[x] == None {
+			output += fmt.Sprintf("[%d]%s:%d ", x, c, 0)
+		} else {
+			output += fmt.Sprintf("[%d]%s:%d ", x, c, cm[x])
+		}
 	}
-	sort.Sort(hand)
-	return hand
-}
-
-type HTString map[sdz.Card]int
-
-func (hts HTString) Sort() sdz.Hand {
-	hand := make(sdz.Hand, len(hts))
-	x := 0
-	for card := range hts {
-		hand[x] = card
-		x++
-	}
-	sort.Sort(hand)
-	return hand
-}
-
-func (hts HTString) String() (output string) {
-	hand := hts.Sort()
-	for x := range hand {
-		output += fmt.Sprintf("%s:%d ", hand[x], hts[hand[x]])
-	}
-	return output
+	return output + "}"
 }
 
 func (ai *AI) PlayCard(c sdz.Card, playerid int) {
@@ -345,58 +449,45 @@ func (ai *AI) PlayCard(c sdz.Card, playerid int) {
 }
 
 func (ai *AI) populate() {
-	for _, suit := range sdz.Suits() {
-		for _, face := range sdz.Faces() {
-			card := sdz.CreateCard(suit, face)
-			ai.HT.Cards[ai.Playerid][card] = 0
-		}
-	}
 	for _, card := range *ai.RealHand {
-		ai.HT.Cards[ai.Playerid][card]++
-		ai.HT.calculateCard(card)
+		cardIndex := index(card)
+		ai.HT.Cards[ai.Playerid].inc(cardIndex)
+		ai.HT.calculateCard(cardIndex)
 	}
 }
 
 func (ht *HandTracker) noSuit(playerid int, suit sdz.Suit) {
 	Log(ht.Owner, "No suit start")
-	for _, face := range sdz.Faces() {
-		card := sdz.CreateCard(suit, face)
-		ht.Cards[playerid][card] = 0
-		ht.calculateCard(card)
+	cardIndex := index(sdz.CreateCard(suit, sdz.Ace))
+	for x := 0; x < 6; x++ {
+		ht.Cards[playerid][cardIndex] = None
+		ht.calculateCard(cardIndex)
+		cardIndex++
 	}
 	Log(ht.Owner, "No suit end")
 }
 
-func (ht *HandTracker) calculateCard(c sdz.Card) {
-	sum := ht.PlayedCards[c]
-	if c == "NA" {
-		panic("NA how?")
-	}
-	Log(ht.Owner, "htcardset - Sum for %s is %d", c, sum)
-	for x := 0; x < 4; x++ {
-		if val, ok := ht.Cards[x][c]; ok {
-			sum += val
-			Log(ht.Owner, "htcardsetIterative%d - Sum for %s is now %d", x, c, sum)
-		}
-	}
+func (ht *HandTracker) calculateCard(cardIndex int) {
+	sum := ht.sum(cardIndex)
+	Log(ht.Owner, "htcardset - Sum for %s is %d", card(cardIndex), sum)
 	if sum > 2 || sum < 0 {
-		sdz.Log("htcardset - Card=%s,sum=%d", c, sum)
-		Log(ht.Owner, "ht.PlayedCards = %v", HTString(ht.PlayedCards))
+		sdz.Log("htcardset - Card=%s,sum=%d", cardIndex, sum)
+		Log(ht.Owner, "ht.PlayedCards = %s", ht.PlayedCards)
 		for x := 0; x < 4; x++ {
-			Log(ht.Owner, "Player%d - %s", x, HTString(ht.Cards[x]))
+			Log(ht.Owner, "Player%d - %s", x, ht.Cards[x])
 		}
 		panic("Cannot have more cards than 2 or less than 0 - " + string(sum))
 	}
 	if sum == 2 {
 		for x := 0; x < 4; x++ {
-			if _, ok := ht.Cards[x][c]; !ok {
-				ht.Cards[x][c] = 0
+			if val := ht.Cards[x][cardIndex]; val == Unknown {
+				ht.Cards[x][cardIndex] = None
 			}
 		}
 	} else {
 		unknown := -1
 		for x := 0; x < 4; x++ {
-			if _, ok := ht.Cards[x][c]; !ok {
+			if val := ht.Cards[x][cardIndex]; val == Unknown {
 				if unknown == -1 {
 					unknown = x
 				} else {
@@ -407,19 +498,17 @@ func (ht *HandTracker) calculateCard(c sdz.Card) {
 			}
 		}
 		if unknown != -1 {
-			if ht.PlayedCards[c] > 0 || ht.Cards[ht.Owner][c] == 1 {
-				if unknown != -1 {
-					ht.Cards[unknown][c] = 2 - sum
-				}
+			if ht.PlayedCards[cardIndex] > 0 || ht.Cards[ht.Owner][cardIndex] == 1 {
+				ht.Cards[unknown][cardIndex] = 2 - sum
 			} else if sum == 0 {
-				ht.Cards[unknown][c] = 2
+				ht.Cards[unknown][cardIndex] = 2
 			}
 		}
 	}
-	Log(ht.Owner, "TT[%s]=%d", c, ht.PlayedCards[c])
+	Log(ht.Owner, "PC[%s]=%d", card(cardIndex), ht.PlayedCards[cardIndex])
 	for x := 0; x < 4; x++ {
-		if _, ok := ht.Cards[x][c]; ok {
-			Log(ht.Owner, "P%d[%s]=%d", x, c, ht.Cards[x][c])
+		if val := ht.Cards[x][cardIndex]; val != Unknown {
+			Log(ht.Owner, "P%d[%s]=%d", x, card(cardIndex), ht.Cards[x][cardIndex])
 		}
 	}
 }
@@ -441,17 +530,7 @@ func (ai *AI) MarshalJSON() ([]byte, error) {
 }
 
 func (a *AI) reset() {
-	a.HT = new(HandTracker)
-	a.HT.Owner = a.Playerid
-	for x := 0; x < 4; x++ {
-		a.HT.Cards[x] = make(map[sdz.Card]int)
-	}
-	a.HT.PlayedCards = make(map[sdz.Card]int)
-	for _, suit := range sdz.Suits() {
-		for _, face := range sdz.Faces() {
-			a.HT.PlayedCards[sdz.CreateCard(suit, face)] = 0
-		}
-	}
+	a.HT = NewHandTracker(a.Playerid)
 	a.Trick = NewTrick()
 }
 
@@ -622,6 +701,28 @@ type Result struct {
 	Points int
 }
 
+func inline(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit, myCard sdz.Card, results chan Result) {
+	newht := ht.Copy()
+	newtrick := trick.Copy()
+	Log(4, "Marking card %s as played for %d", myCard, playerid)
+	newht.PlayCard(myCard, playerid, newtrick, trump)
+	newtrick.Played[playerid] = myCard
+	if myCard.Beats(newtrick.winningCard(), trump) {
+		newtrick.WinningPlayer = playerid
+	}
+	points := 0
+	if len(newtrick.Played) != 4 {
+		_, points = playHandWithCard((playerid+1)%4, newht, newtrick, trump)
+	} else { // trick is over, create a new trick
+		_, points = playHandWithCard(newtrick.WinningPlayer, newht, NewTrick(), trump)
+		Log(4, "Player %d pretend won the hand with a %s", newtrick.WinningPlayer, newtrick.winningCard())
+		if ht.Owner%2 == newtrick.WinningPlayer%2 {
+			points += newtrick.counters()
+		}
+	}
+	results <- Result{myCard, points}
+}
+
 func playHandWithCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) (sdz.Card, int) {
 	Log(4, "Calling playHandWithCard")
 	decisionMap := potentialCards(playerid, ht, trick.winningCard(), trick.leadSuit(), trump)
@@ -635,36 +736,15 @@ func playHandWithCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Sui
 	}
 	numCards := len(decisionMap)
 	results := make(chan Result, numCards)
-	inline := func(myCard sdz.Card) {
-		newht := ht.Copy()
-		newtrick := trick.Copy()
-		Log(4, "Marking card %s as played for %d", myCard, playerid)
-		newht.PlayCard(myCard, playerid, newtrick, trump)
-		newtrick.Played[playerid] = myCard
-		if myCard.Beats(newtrick.winningCard(), trump) {
-			newtrick.WinningPlayer = playerid
-		}
-		points := 0
-		if len(newtrick.Played) != 4 {
-			_, points = playHandWithCard((playerid+1)%4, newht, newtrick, trump)
-		} else { // trick is over, create a new trick
-			_, points = playHandWithCard(newtrick.WinningPlayer, newht, NewTrick(), trump)
-			Log(4, "Player %d pretend won the hand with a %s", newtrick.WinningPlayer, newtrick.winningCard())
-			if ht.Owner%2 == newtrick.WinningPlayer%2 {
-				points += newtrick.counters()
-			}
-		}
-		results <- Result{myCard, points}
-	}
 	for _, card := range decisionMap {
 		select {
 		case <-sem:
 			go func() {
-				inline(card)
+				inline(playerid, ht, trick, trump, card, results)
 				sem <- true
 			}()
 		default:
-			inline(card)
+			inline(playerid, ht, trick, trump, card, results)
 		}
 	}
 	bestCard := sdz.NACard
@@ -681,80 +761,25 @@ func playHandWithCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Sui
 	return bestCard, bestPoints
 }
 
-//func rankCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) *Trick {
-//	//sdz.Log("calling Player%d rankCard on trick %s", playerid, trick)
-//	decisionMap := potentialCards(playerid, ht, trick.winningCard(), trick.leadSuit(), trump)
-//	if len(decisionMap) == 0 {
-//		Log(4, "playerid = %d", playerid)
-//		Log(4, "ht.PlayedCards = %v", HTString(ht.PlayedCards))
-//		for x := 0; x < 4; x++ {
-//			Log(4, "Player%d -------- %s", x, HTString(ht.Cards[x]))
-//		}
-//		panic("decisionMap should not be empty")
-//	}
-//	//sdz.Log("Player%d - Potential cards to play - %v", playerid, decisionMap)
-//	//sdz.Log("Received Trick %s", trick)
-//	var topTrick *Trick
-//	nextPlayer := (playerid + 1) % 4
-//	for _, card := range Decision(decisionMap).Sort() {
-//		tempTrick := new(Trick)
-//		*tempTrick = *trick // make a copy
-//		trick.Played = make(map[int]sdz.Card)
-//		for x := range tempTrick.Played { // now copy the map
-//			trick.Played[x] = tempTrick.Played[x]
-//		}
-//		tempTrick.Played[playerid] = card
-//		if tempTrick.leadSuit() == sdz.NASuit || tempTrick.winningCard() == sdz.NACard {
-//			tempTrick.Lead = playerid
-//			tempTrick.WinningPlayer = playerid
-//		}
-//		if CardBeatsTrick(card, tempTrick, trump) {
-//			tempTrick.WinningPlayer = playerid
-//			if _, ok := ht.Cards[playerid][card]; !ok {
-//				tempTrick.certain = false
-//			}
-//		}
-//		if len(tempTrick.Played) < 4 {
-//			tempTrick = rankCard(nextPlayer, ht, tempTrick, trump)
-//		}
-//		//sdz.Log("Playerid = %d - Top = %s, Temp = %s", playerid, topTrick, tempTrick)
-//		if topTrick == nil {
-//			topTrick = tempTrick
-//		} else {
-//			topWorth := topTrick.worth(playerid, trump)
-//			tempWorth := tempTrick.worth(playerid, trump)
-//			switch {
-//			case topWorth < tempWorth:
-//				topTrick = tempTrick
-//			case !topTrick.certain && !tempTrick.certain && (topWorth == tempWorth) && (card.Face().Less(topTrick.Played[playerid].Face())):
-//				topTrick = tempTrick
-//			case topWorth == tempWorth && topTrick.Played[playerid].Face().Less(card.Face()):
-//				topTrick = tempTrick
-//			}
-//			if topWorth < tempWorth || (topWorth == tempWorth && topTrick.Played[playerid].Face().Less(card.Face())) {
-//				topTrick = tempTrick
-//			}
-//		}
-//	}
-//	//sdz.Log("Returning worth %d - %s", topTrick.worth(playerid, trump), topTrick)
-//	return topTrick
-//}
-
 func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
-	card, _ := playHandWithCard(ai.Playerid, ai.HT, ai.Trick, ai.Trump)
+	card, _ := playHandWithCard(ai.Playerid, ai.HT, ai.Trick, action.Trump)
 	return card
 	//return rankCard(ai.Playerid, ai.HT, ai.Trick, ai.Trump).Played[ai.Playerid]
 }
 
 func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Suit, trump sdz.Suit) sdz.Hand {
 	Log(ht.Owner, "PotentialCards called with %d,winning=%s,lead=%s,trump=%s", playerid, winning, lead, trump)
-	Log(ht.Owner, "PotentialCards Player%d - %#v", playerid, ht.Cards[playerid])
+	Log(ht.Owner, "PotentialCards Player%d - %s", playerid, ht.Cards[playerid])
 	validHand := make(sdz.Hand, 0)
 	potentialHand := make(sdz.Hand, 0)
 	handStatus := Nothing
-	for card := range ht.PlayedCards {
-		val, ok := ht.Cards[playerid][card]
-		if ok && val > 0 {
+	for cardIndex, card := range sdz.AllCards() {
+		val := ht.Cards[playerid][cardIndex]
+		if val == Unknown {
+			if ht.sum(cardIndex) < 2 {
+				potentialHand = append(potentialHand, card)
+			}
+		} else if val != None {
 			cardStatus := Nothing
 			switch {
 			case winning == sdz.NACard:
@@ -774,8 +799,6 @@ func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Su
 			} else if cardStatus == handStatus {
 				validHand = append(validHand, card)
 			}
-		} else if !ok && ht.PlayedCards[card]+ht.Cards[0][card]+ht.Cards[1][card]+ht.Cards[2][card]+ht.Cards[3][card] != 2 {
-			potentialHand = append(potentialHand, card)
 		}
 	}
 
@@ -891,11 +914,12 @@ func (ai *AI) Tell(g *goon.Goon, c appengine.Context, game *Game, action *sdz.Ac
 			return nil // seeing our own meld, we don't care
 		}
 		for _, card := range action.Hand {
-			val, ok := ai.HT.Cards[action.Playerid][card]
-			if !ok {
-				ai.HT.Cards[action.Playerid][card] = 1
+			cardIndex := index(card)
+			val := ai.HT.Cards[action.Playerid][cardIndex]
+			if val == Unknown {
+				ai.HT.Cards[action.Playerid][cardIndex] = 1
 			} else if val == 1 {
-				ai.HT.Cards[action.Playerid][card] = 2
+				ai.HT.Cards[action.Playerid][cardIndex] = 2
 			}
 		}
 	case "Message": // nothing to do here, no one to read it
