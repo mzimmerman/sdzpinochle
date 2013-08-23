@@ -250,66 +250,6 @@ func Log(playerid int, m string, v ...interface{}) {
 	}
 }
 
-func card(cardIndex int) sdz.Card {
-	face := sdz.NAFace
-	suit := sdz.NASuit
-	switch cardIndex % 6 {
-	case 0:
-		face = ace
-	case 1:
-		face = ten
-	case 2:
-		face = king
-	case 3:
-		face = queen
-	case 4:
-		face = jack
-	case 5:
-		face = nine
-	}
-	switch cardIndex / 6 {
-	case 0:
-		suit = spades
-	case 1:
-		suit = hearts
-	case 2:
-		suit = clubs
-	case 3:
-		suit = diamonds
-	}
-	return sdz.CreateCard(suit, face)
-}
-
-func index(c sdz.Card) int {
-	//Log(4, "Doing index on card %s", c)
-	var index int
-	switch c.Face() {
-	case "A":
-		index = 0
-	case "T":
-		index = 1
-	case "K":
-		index = 2
-	case "Q":
-		index = 3
-	case "J":
-		index = 4
-	case "9":
-		index = 5
-	}
-	switch c.Suit() {
-	case "S":
-		return index
-	case "H":
-		return index + 6
-	case "C":
-		return index + 12
-	case "D":
-		return index + 18
-	}
-	panic("index of NASuit!")
-}
-
 type CardMap [24]int
 
 func (cm *CardMap) inc(x int) {

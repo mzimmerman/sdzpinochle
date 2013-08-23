@@ -39,6 +39,17 @@ func fakeDeal(d *Deck) (h []Hand) {
 	return
 }
 
+func (t *testSuite) TestSuit() {
+	t.True(Card(ND).Suit() == Diamonds)
+	t.True(Card(AD).Suit() == Diamonds)
+	t.True(Card(NS).Suit() == Spades)
+	t.True(Card(AS).Suit() == Spades)
+	t.True(Card(NH).Suit() == Hearts)
+	t.True(Card(AH).Suit() == Hearts)
+	t.True(Card(NC).Suit() == Clubs)
+	t.True(Card(AC).Suit() == Clubs)
+}
+
 func (t *testSuite) TestDeal() {
 	deck := CreateDeck()
 	var h []Hand
@@ -66,81 +77,71 @@ func (t *testSuite) TestMin() {
 	t.Equal(min(5, 5), 5)
 }
 
-func C(c string) Card {
-	return Card(c)
-}
-
 func (t *testSuite) TestRemove() {
-	hand := Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")}
+	hand := Hand{JD, QD, KD, AD, TD, JD, QS, QS, KS, AS, TS, JS}
 	sort.Sort(hand)
 	t.Equal(len(hand), 12)
-	t.True(hand.Remove(C("JD")))
+	t.True(hand.Remove(JD))
 	t.Equal(len(hand), 11)
-	t.True(hand.Remove(C("JD")))
+	t.True(hand.Remove(JD))
 	t.Equal(len(hand), 10)
-	t.False(hand.Remove(C("JD")))
-	t.False(hand.Remove(C("QH")))
-	t.True(hand.Remove(C("KD")))
-	t.False(hand.Remove(C("KD")))
-	t.True(hand.Remove(C("QD")))
-	t.True(hand.Remove(C("AD")))
-	t.True(hand.Remove(C("TD")))
-	t.True(hand.Remove(C("QS")))
-	t.True(hand.Remove(C("QS")))
-	t.True(hand.Remove(C("KS")))
-	t.True(hand.Remove(C("AS")))
-	t.True(hand.Remove(C("TS")))
-	t.True(hand.Remove(C("JS")))
+	t.False(hand.Remove(JD))
+	t.False(hand.Remove(QH))
+	t.True(hand.Remove(KD))
+	t.False(hand.Remove(KD))
+	t.True(hand.Remove(QD))
+	t.True(hand.Remove(AD))
+	t.True(hand.Remove(TD))
+	t.True(hand.Remove(QS))
+	t.True(hand.Remove(QS))
+	t.True(hand.Remove(KS))
+	t.True(hand.Remove(AS))
+	t.True(hand.Remove(TS))
+	t.True(hand.Remove(JS))
 	t.Equal(len(hand), 0)
-	t.False(hand.Remove(C("9D")))
+	t.False(hand.Remove(ND))
 }
 
 func (t *testSuite) TestValidPlay() {
 	// playedCard, winningCard Card, leadSuit Suit, hand Hand, trump Suit
-	hand := Hand{C("JD"), C("QS"), C("9D"), C("TH")}
-	t.True(ValidPlay(C("JD"), C("9D"), Diamonds, &hand, Diamonds))
-	t.False(ValidPlay(C("QD"), C("9D"), Diamonds, &hand, Diamonds))
-	t.True(ValidPlay(C("JD"), C("9D"), Diamonds, &hand, Spades))
-	t.False(ValidPlay(C("JD"), C("9D"), Hearts, &hand, Diamonds))
-	t.True(ValidPlay(C("TH"), C("9D"), Hearts, &hand, Diamonds))
-	t.True(ValidPlay(C("QS"), C("KS"), Spades, &hand, Diamonds))
-	t.False(ValidPlay(C("JD"), C("9D"), Hearts, &hand, Spades))
-	t.True(ValidPlay(C("QS"), C("9D"), Clubs, &hand, Spades))
-	t.False(ValidPlay(C("QS"), C("9D"), Diamonds, &hand, Spades))
-	t.False(ValidPlay(C("JD"), C("9C"), Clubs, &hand, Spades))
-	t.True(ValidPlay(C("JD"), C("KD"), Clubs, &hand, Diamonds))
-	hand.Remove(C("QS"))
-	t.True(ValidPlay(C("JD"), C("9S"), Spades, &hand, Clubs))
-	t.True(ValidPlay(C("9S"), NACard, NASuit, &hand, Clubs))
-	t.True(ValidPlay(C("9D"), NACard, NASuit, &hand, Clubs))
+	hand := Hand{JD, QS, ND, TH}
+	t.True(ValidPlay(JD, ND, Diamonds, &hand, Diamonds))
+	t.False(ValidPlay(QD, ND, Diamonds, &hand, Diamonds))
+	t.True(ValidPlay(JD, ND, Diamonds, &hand, Spades))
+	t.False(ValidPlay(JD, ND, Hearts, &hand, Diamonds))
+	t.True(ValidPlay(TH, ND, Hearts, &hand, Diamonds))
+	t.True(ValidPlay(QS, KS, Spades, &hand, Diamonds))
+	t.False(ValidPlay(JD, ND, Hearts, &hand, Spades))
+	t.True(ValidPlay(QS, ND, Clubs, &hand, Spades))
+	t.False(ValidPlay(QS, ND, Diamonds, &hand, Spades))
+	t.False(ValidPlay(JD, NC, Clubs, &hand, Spades))
+	t.True(ValidPlay(JD, KD, Clubs, &hand, Diamonds))
+	hand.Remove(QS)
+	t.True(ValidPlay(JD, NS, Spades, &hand, Clubs))
+	t.True(ValidPlay(NS, NACard, NASuit, &hand, Clubs))
+	t.True(ValidPlay(ND, NACard, NASuit, &hand, Clubs))
 }
 
 func (t *testSuite) TestCount() {
-	hand := Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("JD"), C("JS"), C("QD"), C("KS"), C("AS"), C("TS"), C("JS"), C("TD")}
+	hand := Hand{JD, QD, KD, AD, JD, JS, QD, KS, AS, TS, JS, TD}
 	count := hand.Count()
-	t.Equal(count[C("JS")], 2)
-	t.Equal(count[C("KD")], 1)
-	t.Equal(count[C("AD")], 1)
-	t.Equal(count[C("TD")], 1)
-	t.Equal(count[C("QS")], 0)
-	t.Equal(count[C("KS")], 1)
-	t.Equal(count[C("AS")], 1)
-	t.Equal(count[C("TS")], 1)
-	t.Equal(count[C("JS")], 2)
-	t.Equal(count[C("JH")], 0)
+	t.Equal(count[JS], 2)
+	t.Equal(count[KD], 1)
+	t.Equal(count[AD], 1)
+	t.Equal(count[TD], 1)
+	t.Equal(count[QS], 0)
+	t.Equal(count[KS], 1)
+	t.Equal(count[AS], 1)
+	t.Equal(count[TS], 1)
+	t.Equal(count[JS], 2)
+	t.Equal(count[JH], 0)
 }
 
 func (t *testSuite) TestMeld2() {
 	// spades, hearts, clubs, diamonds
-	shown := Hand{
-		C("JD"), C("JD"),
-		C("QD"),
-		C("KD"),
-		C("QS"), C("QS"),
-		C("KS"),
-	}
+	shown := Hand{JD, JD, QD, KD, QS, QS, KS}
 	sort.Sort(shown)
-	hand := Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")}
+	hand := Hand{JD, QD, KD, AD, TD, JD, QS, QS, KS, AS, TS, JS}
 	sort.Sort(hand)
 	_, results := hand.Meld(Hearts)
 	sort.Sort(results)
@@ -150,39 +151,39 @@ func (t *testSuite) TestMeld2() {
 }
 
 func (t *testSuite) TestSuitLess() {
-	t.False(Spades.Less(Hearts))
-	t.False(Spades.Less(Diamonds))
-	t.True(Diamonds.Less(Spades))
-	t.False(Hearts.Less(Hearts))
-	t.True(Diamonds.Less(Hearts))
-	t.False(Diamonds.Less(Diamonds))
+	t.False(Suit(Spades).Less(Hearts))
+	t.False(Suit(Spades).Less(Diamonds))
+	t.True(Suit(Diamonds).Less(Spades))
+	t.False(Suit(Hearts).Less(Hearts))
+	t.True(Suit(Diamonds).Less(Hearts))
+	t.False(Suit(Diamonds).Less(Diamonds))
 }
 
 func (t *testSuite) TestBeats() {
-	t.True(C("JD").Beats(C("9D"), Diamonds))
-	t.True(C("JD").Beats(C("9D"), Spades))
-	t.True(C("JD").Beats(C("9S"), Diamonds))
-	t.True(C("9S").Beats(C("JD"), Spades))
-	t.False(C("9D").Beats(C("9D"), Diamonds))
-	t.False(C("9D").Beats(C("9D"), Diamonds))
-	t.False(C("AD").Beats(C("AD"), Diamonds))
+	t.True(Card(JD).Beats(ND, Diamonds))
+	t.True(Card(JD).Beats(ND, Spades))
+	t.True(Card(JD).Beats(NS, Diamonds))
+	t.True(Card(NS).Beats(JD, Spades))
+	t.False(Card(ND).Beats(ND, Diamonds))
+	t.False(Card(ND).Beats(ND, Diamonds))
+	t.False(Card(AD).Beats(AD, Diamonds))
 }
 
 func (t *testSuite) TestCardInHand() {
-	hand := Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")}
-	t.True(IsCardInHand(C("JD"), hand))
-	t.False(IsCardInHand(C("9S"), hand))
+	hand := Hand{JD, QD, KD, AD, TD, JD, QS, QS, KS, AS, TS, JS}
+	t.True(IsCardInHand(JD, hand))
+	t.False(IsCardInHand(NS, hand))
 }
 
 func (t *testSuite) TestMeld() {
 	hands := []Hand{
-		Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")},
-		Hand{C("JD"), C("QD"), C("KD"), C("QD"), C("KD"), C("JH"), C("JC"), C("QS"), C("KS"), C("AS"), C("TS"), C("JS")},
-		Hand{C("9D"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QS"), C("QS"), C("KS"), C("AS"), C("9S"), C("9S")},
-		Hand{C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("JD"), C("QD"), C("KD"), C("AD"), C("TD"), C("TS"), C("JS")},
-		Hand{C("AD"), C("TD"), C("KD"), C("KD"), C("QD"), C("QD"), C("JD"), C("AS"), C("KS"), C("TH"), C("QS"), C("9H")},
-		Hand{C("AD"), C("AH"), C("AS"), C("AC"), C("KD"), C("KH"), C("KS"), C("KC"), C("QS"), C("QS"), C("JD"), C("JD")},
-		Hand{C("QD"), C("QH"), C("QS"), C("QC"), C("QD"), C("QH"), C("QS"), C("QC"), C("9S"), C("9S"), C("JD"), C("9D")},
+		Hand{JD, QD, KD, AD, TD, JD, QS, QS, KS, AS, TS, JS},
+		Hand{JD, QD, KD, QD, KD, JH, JC, QS, KS, AS, TS, JS},
+		Hand{ND, QD, KD, AD, TD, JD, QS, QS, KS, AS, NS, NS},
+		Hand{JD, QD, KD, AD, TD, JD, QD, KD, AD, TD, TS, JS},
+		Hand{AD, TD, KD, KD, QD, QD, JD, AS, KS, TH, QS, NH},
+		Hand{AD, AH, AS, AC, KD, KH, KS, KC, QS, QS, JD, JD},
+		Hand{QD, QH, QS, QC, QD, QH, QS, QC, NS, NS, JD, ND},
 	}
 	// spades, hearts, clubs, diamonds
 	results := []map[Suit]int{
@@ -195,7 +196,7 @@ func (t *testSuite) TestMeld() {
 		map[Suit]int{Spades: 66, Hearts: 64, Clubs: 64, Diamonds: 65},
 	}
 	for x := 0; x < len(hands); x++ {
-		for _, trump := range Suits() {
+		for _, trump := range Suits {
 			sort.Sort(hands[x])
 			meld, _ := hands[x].Meld(trump)
 			t.Equal(results[x][trump], meld)

@@ -15,62 +15,85 @@ func Log(m string, v ...interface{}) {
 }
 
 const (
-	debugLog    = false
-	Ace         = Face("A")
-	Ten         = Face("T")
-	King        = Face("K")
-	Queen       = Face("Q")
-	Jack        = Face("J")
-	Nine        = Face("9")
-	Spades      = Suit("S")
-	Hearts      = Suit("H")
-	Clubs       = Suit("C")
-	Diamonds    = Suit("D")
+	Ace         = iota
+	Ten         = iota
+	King        = iota
+	Queen       = iota
+	Jack        = iota
+	Nine        = iota
+	NAFace      = -1
 	acearound   = 10
 	kingaround  = 8
 	queenaround = 6
 	jackaround  = 4
-	NACard      = Card("NA")
-	NASuit      = Suit("N")
-	NAFace      = Face("F")
+	debugLog    = false
 )
 
-var AllCards []Card
+const (
+	Spades   = iota
+	Hearts   = iota
+	Clubs    = iota
+	Diamonds = iota
+	NASuit   = -1
+)
+
+const (
+	AS     = iota
+	TS     = iota
+	KS     = iota
+	QS     = iota
+	JS     = iota
+	NS     = iota
+	AH     = iota
+	TH     = iota
+	KH     = iota
+	QH     = iota
+	JH     = iota
+	NH     = iota
+	AC     = iota
+	TC     = iota
+	KC     = iota
+	QC     = iota
+	JC     = iota
+	NC     = iota
+	AD     = iota
+	TD     = iota
+	KD     = iota
+	QD     = iota
+	JD     = iota
+	ND     = iota
+	NACard = -1
+)
+
+var AllCards [24]Card
+var Faces [6]Face
+var Suits [4]Suit
 
 func init() {
-	AllCards = make([]Card, 24)
+	Faces = [6]Face{Ace, Ten, King, Queen, Jack, Nine}
+	Suits = [4]Suit{Spades, Hearts, Clubs, Diamonds}
 	x := 0
-	for _, suit := range Suits() {
-		for _, face := range Faces() {
+	for _, suit := range Suits {
+		for _, face := range Faces {
 			AllCards[x] = CreateCard(suit, face)
 			x++
 		}
 	}
 }
 
-type Card string // two chars Face + String
-type Suit string // one char
-type Face string // one char
-
-func Faces() [6]Face {
-	return [6]Face{Ace, Ten, King, Queen, Jack, Nine}
-}
-
-func Suits() [4]Suit {
-	return [4]Suit{Spades, Hearts, Clubs, Diamonds}
-}
+type Card int // an integer representation of the card
+type Suit int
+type Face int
 
 type Deck [48]Card
 type Hand []Card
 
 func CreateCard(suit Suit, face Face) Card {
-	if suit == NASuit {
-		return NACard
-	}
-	if face == NAFace {
-		return NACard
-	}
-	return Card(string(face) + string(suit))
+	return Card(int(suit)*6 + int(face))
+}
+
+func (c Card) String() string {
+	return c.Face().String() + c.Suit().String()
 }
 
 func (a Card) Beats(b Card, trump Suit) bool {
@@ -80,7 +103,7 @@ func (a Card) Beats(b Card, trump Suit) bool {
 	}
 	switch {
 	case a.Suit() == b.Suit():
-		return a.Face().Less(b.Face())
+		return a < b
 	case a.Suit() == trump:
 		return true
 	}
@@ -95,14 +118,14 @@ func (c Card) Suit() Suit {
 	if c == NACard {
 		return NASuit
 	}
-	return Suit(c[1])
+	return Suit(int(c) / 6)
 }
 
 func (c Card) Face() Face {
 	if c == NACard {
 		return NAFace
 	}
-	return Face(c[0])
+	return Face(int(c) % 6)
 }
 
 func (d *Deck) Swap(i, j int) {
@@ -140,77 +163,47 @@ func (h Hand) Less(i, j int) bool {
 }
 
 func (a Face) Less(b Face) bool {
-	switch {
-	case b == Ace:
-		return false
-	case a == Ace:
-		return true
-	case b == Ten:
-		return false
-	case a == Ten:
-		return true
-	case b == King:
-		return false
-	case a == King:
-		return true
-	case b == Queen:
-		return false
-	case a == Queen:
-		return true
-	case b == Jack:
-		return false
-	case a == Jack:
-		return true
+	return a < b
+}
+
+func (a Suit) String() string {
+	switch a {
+	case Diamonds:
+		return "D"
+	case Spades:
+		return "S"
+	case Hearts:
+		return "H"
+	case Clubs:
+		return "C"
 	}
-	return false
+	panic(fmt.Sprintf("Error finding suit for %d", a))
+}
+
+func (a Face) String() string {
+	switch a {
+	case Nine:
+		return "9"
+	case Jack:
+		return "J"
+	case Queen:
+		return "Q"
+	case King:
+		return "K"
+	case Ten:
+		return "T"
+	case Ace:
+		return "A"
+	}
+	panic(fmt.Sprintf("Error finding face for %d", int(a)))
 }
 
 func (a Suit) Less(b Suit) bool { // only for sorting the suits for display in the hand
-	switch {
-	case a == Spades:
-		return false
-	case b == Spades:
-		return true
-	case a == Hearts:
-		return false
-	case b == Hearts:
-		return true
-	case a == Clubs:
-		return false
-	case b == Clubs:
-		return true
-	}
-	return false
+	return a > b
 }
 
 func (h Hand) Swap(i, j int) {
 	h[i], h[j] = h[j], h[i]
-}
-
-func (h Hand) Lowest(given Card) bool {
-	low := given
-	for _, card := range h {
-		if card.Suit() != given.Suit() {
-			continue
-		}
-		if low.Face().Less(card.Face()) {
-			low = card
-		}
-	}
-	return low == given
-}
-
-func (h Hand) Highest(given Card) bool {
-	high := given
-	for _, card := range h {
-		if card.Suit() != given.Suit() {
-			continue
-		}
-		if card.Face().Less(high.Face()) {
-			high = card
-		}
-	}
-	return high == given
 }
 
 func (d Deck) Deal() (hands []Hand) {
@@ -227,14 +220,9 @@ func (d Deck) Deal() (hands []Hand) {
 }
 
 func CreateDeck() (deck Deck) {
-	index := 0
-	for _, face := range Faces() {
-		for _, suit := range Suits() {
-			for z := 0; z < 2; z++ {
-				deck[index] = Card(string(face) + string(suit))
-				index++
-			}
-		}
+	for x := 0; x < 24; x++ {
+		deck[x] = AllCards[x]
+		deck[x+24] = AllCards[x]
 	}
 	return
 }
@@ -462,8 +450,8 @@ func (h Hand) CountSuit(suit Suit) (count int) {
 
 func (h Hand) Count() (cards map[Card]int) {
 	cards = make(map[Card]int)
-	for _, face := range Faces() {
-		for _, suit := range Suits() {
+	for _, face := range Faces {
+		for _, suit := range Suits {
 			cards[CreateCard(suit, face)] = 0
 		}
 	}
@@ -495,11 +483,11 @@ func (h Hand) Meld(trump Suit) (meld int, result Hand) {
 	}
 	show := make(map[Card]int)
 	around := make(map[Face]int)
-	for _, value := range Faces() {
+	for _, value := range Faces {
 		around[value] = 2
 	}
 	//	fmt.Printf("AroundBefore = %v\n", around)
-	for _, suit := range Suits() { // look through each suit
+	for _, suit := range Suits { // look through each suit
 		switch { // straights & marriages
 		case trump == suit:
 			if debugLog {
@@ -511,7 +499,7 @@ func (h Hand) Meld(trump Suit) (meld int, result Hand) {
 			// double straight
 			case count[CreateCard(suit, Ace)] == 2 && count[CreateCard(suit, Ten)] == 2 && count[CreateCard(suit, King)] == 2 && count[CreateCard(suit, Queen)] == 2 && count[CreateCard(suit, Jack)] == 2:
 				meld += 150
-				for _, face := range Faces() {
+				for _, face := range Faces {
 					show[CreateCard(suit, face)] = 2
 				}
 				if debugLog {
@@ -565,7 +553,7 @@ func (h Hand) Meld(trump Suit) (meld int, result Hand) {
 			}
 			meld += 2
 		}
-		for _, face := range Faces() { // looking for "around" meld
+		for _, face := range Faces { // looking for "around" meld
 			//						fmt.Printf("Looking for %d in suit %d\n", value, suit)
 			around[face] = min(count[CreateCard(suit, face)], around[face])
 		}
@@ -586,7 +574,7 @@ func (h Hand) Meld(trump Suit) (meld int, result Hand) {
 			if around[face] == 2 {
 				worth *= 10
 			}
-			for _, suit := range Suits() {
+			for _, suit := range Suits {
 				show[CreateCard(suit, face)] = max(show[CreateCard(suit, face)], around[face])
 			}
 			meld += worth
