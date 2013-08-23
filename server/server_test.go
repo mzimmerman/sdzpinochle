@@ -2,7 +2,7 @@
 package sdzpinochleserver
 
 import (
-	//"github.com/icub3d/appenginetesting"
+	"github.com/icub3d/appenginetesting"
 	sdz "github.com/mzimmerman/sdzpinochle"
 	pt "github.com/remogatto/prettytest"
 	"sort"
@@ -48,25 +48,25 @@ func (t *testSuite) TestBidding() {
 	t.Not(t.True(22 > action.Bid || action.Bid > 24))
 }
 
-//func BenchmarkFullGame(b *testing.B) {
-//	c, err := appenginetesting.NewContext(&appenginetesting.Options{Debug: "critical"})
-//	if err != nil {
-//		b.Fatalf("Could not start up appenginetesting")
-//	}
-//	defer c.Close()
-//	for y := 0; y < b.N; y++ {
-//		game := NewGame(4)
-//		for x := 0; x < len(game.Players); x++ {
-//			game.Players[x] = createAI()
-//		}
-//		game.NextHand(nil, c)
-//	}
-//}
+func BenchmarkFullGame(b *testing.B) {
+	c, err := appenginetesting.NewContext(&appenginetesting.Options{Debug: "critical"})
+	if err != nil {
+		b.Fatalf("Could not start up appenginetesting")
+	}
+	defer c.Close()
+	for y := 0; y < b.N; y++ {
+		game := NewGame(4)
+		for x := 0; x < len(game.Players); x++ {
+			game.Players[x] = createAI()
+		}
+		game.NextHand(nil, c)
+	}
+}
 
 func (t *testSuite) TestPotentialCards() {
 	ai := createAI()
 	ht := ai.HT
-	for card := range sdz.AllCards() {
+	for card := range sdz.AllCards {
 		ht.Cards[0][card] = 0
 	}
 	ht.Cards[0][index("AD")] = Unknown
@@ -115,7 +115,7 @@ func (t *testSuite) TestPotentialCards() {
 
 	ai = createAI()
 	ht = ai.HT
-	for card := range sdz.AllCards() {
+	for card := range sdz.AllCards {
 		ht.Cards[0][card] = 0
 	}
 	ht.Cards[0][index("AD")] = 2
@@ -134,7 +134,7 @@ func (t *testSuite) TestPotentialCards() {
 
 	ai = createAI()
 	ht = ai.HT
-	for card := range sdz.AllCards() {
+	for card := range sdz.AllCards {
 		ht.Cards[0][card] = 0
 	}
 	ht.Cards[0][index("AD")] = 2
@@ -160,7 +160,7 @@ func (t *testSuite) TestPotentialCards() {
 	//Player3 - map[JH:0 AH:0 KD:0 9C:0 JS:0 KC:1 TD:0 AC:0 9H:0 QC:1 9D:0]
 	ai = createAI()
 	ht = ai.HT
-	for card := range sdz.AllCards() {
+	for card := range sdz.AllCards {
 		ht.Cards[0][card] = 0
 	}
 	ht.Cards[0][index("TD")] = 2
@@ -203,7 +203,7 @@ func (t *testSuite) TestPlayHandWithCard() {
 	//func playHandWithCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) (sdz.Card, [2]int) {
 	ht := NewHandTracker(0)
 	for x := 0; x < len(ht.Cards); x++ {
-		for card := range sdz.AllCards() {
+		for card := range sdz.AllCards {
 			ht.Cards[x][card] = 3
 		}
 	}

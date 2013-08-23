@@ -271,7 +271,7 @@ func card(cardIndex int) sdz.Card {
 }
 
 func index(c sdz.Card) int {
-	Log(4, "Doing index on card %s", c)
+	//Log(4, "Doing index on card %s", c)
 	var index int
 	switch c.Face() {
 	case "A":
@@ -318,7 +318,7 @@ func (cm *CardMap) inc(x int) {
 func (cm *CardMap) dec(x int) {
 	switch cm[x] {
 	case None:
-		Log(4, "Attempting to decrement %s from %d", card(x), cm[x])
+		//Log(4, "Attempting to decrement %s from %d", card(x), cm[x])
 		panic("Cannot decrement past 0")
 	case Unknown:
 	// do nothing
@@ -383,27 +383,27 @@ func (oldht *HandTracker) Copy() (newht *HandTracker) {
 }
 
 func (ht *HandTracker) Debug() {
-	Log(ht.Owner, "ht.PlayedCards = %v", ht.PlayedCards)
+	//Log(ht.Owner, "ht.PlayedCards = %v", ht.PlayedCards)
 	for x := 0; x < 4; x++ {
-		Log(ht.Owner, "Player%d - %s", x, ht.Cards[x])
+		//Log(ht.Owner, "Player%d - %s", x, ht.Cards[x])
 	}
 }
 
 func (ht *HandTracker) PlayCard(c sdz.Card, playerid int, trick *Trick, trump sdz.Suit) {
 	cardIndex := index(c)
-	Log(ht.Owner, "In ht.PlayCard for %d-%s on player %d", playerid, c, ht.Owner)
+	//Log(ht.Owner, "In ht.PlayCard for %d-%s on player %d", playerid, c, ht.Owner)
 	ht.Debug()
 	ht.PlayedCards.inc(cardIndex)
 	if val := ht.Cards[playerid][cardIndex]; val != Unknown {
 		if val == None {
-			Log(4, "Player %d does not have card %s, panicking", playerid, c)
+			//Log(4, "Player %d does not have card %s, panicking", playerid, c)
 			panic("panic")
 		} else {
 			ht.Cards[playerid].dec(cardIndex)
 		}
 		if val == 1 && ht.PlayedCards[cardIndex] == 1 && playerid != ht.Owner {
 			// Other player could have only shown one in meld, but has two - now we don't know who has the last one
-			Log(ht.Owner, "htcardset - deleted card %s for player %d", c, playerid)
+			//Log(ht.Owner, "htcardset - deleted card %s for player %d", c, playerid)
 			ht.Cards[playerid][cardIndex] = Unknown
 		}
 	}
@@ -426,12 +426,12 @@ func (ht *HandTracker) PlayCard(c sdz.Card, playerid int, trick *Trick, trump sd
 			}
 		}
 	}
-	Log(ht.Owner, "Player %d played card %s", playerid, c)
+	//Log(ht.Owner, "Player %d played card %s", playerid, c)
 }
 
 func (cm CardMap) String() string {
 	output := "[24]int{"
-	for x, c := range sdz.AllCards() {
+	for x, c := range sdz.AllCards {
 		if cm[x] == Unknown {
 			continue
 		}
@@ -457,19 +457,19 @@ func (ai *AI) populate() {
 }
 
 func (ht *HandTracker) noSuit(playerid int, suit sdz.Suit) {
-	Log(ht.Owner, "No suit start")
+	//Log(ht.Owner, "No suit start")
 	cardIndex := index(sdz.CreateCard(suit, sdz.Ace))
 	for x := 0; x < 6; x++ {
 		ht.Cards[playerid][cardIndex] = None
 		ht.calculateCard(cardIndex)
 		cardIndex++
 	}
-	Log(ht.Owner, "No suit end")
+	//Log(ht.Owner, "No suit end")
 }
 
 func (ht *HandTracker) calculateCard(cardIndex int) {
 	sum := ht.sum(cardIndex)
-	Log(ht.Owner, "htcardset - Sum for %s is %d", card(cardIndex), sum)
+	//Log(ht.Owner, "htcardset - Sum for %s is %d", card(cardIndex), sum)
 	if sum > 2 || sum < 0 {
 		sdz.Log("htcardset - Card=%s,sum=%d", cardIndex, sum)
 		Log(ht.Owner, "ht.PlayedCards = %s", ht.PlayedCards)
@@ -505,12 +505,12 @@ func (ht *HandTracker) calculateCard(cardIndex int) {
 			}
 		}
 	}
-	Log(ht.Owner, "PC[%s]=%d", card(cardIndex), ht.PlayedCards[cardIndex])
-	for x := 0; x < 4; x++ {
-		if val := ht.Cards[x][cardIndex]; val != Unknown {
-			Log(ht.Owner, "P%d[%s]=%d", x, card(cardIndex), ht.Cards[x][cardIndex])
-		}
-	}
+	//Log(ht.Owner, "PC[%s]=%d", card(cardIndex), ht.PlayedCards[cardIndex])
+	//for x := 0; x < 4; x++ {
+	//	if val := ht.Cards[x][cardIndex]; val != Unknown {
+	//		Log(ht.Owner, "P%d[%s]=%d", x, card(cardIndex), ht.Cards[x][cardIndex])
+	//	}
+	//}
 }
 
 type AI struct {
@@ -704,7 +704,7 @@ type Result struct {
 func inline(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit, myCard sdz.Card, results chan Result) {
 	newht := ht.Copy()
 	newtrick := trick.Copy()
-	Log(4, "Marking card %s as played for %d", myCard, playerid)
+	//Log(4, "Marking card %s as played for %d", myCard, playerid)
 	newht.PlayCard(myCard, playerid, newtrick, trump)
 	newtrick.Played[playerid] = myCard
 	if myCard.Beats(newtrick.winningCard(), trump) {
@@ -715,7 +715,7 @@ func inline(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit, myCard 
 		_, points = playHandWithCard((playerid+1)%4, newht, newtrick, trump)
 	} else { // trick is over, create a new trick
 		_, points = playHandWithCard(newtrick.WinningPlayer, newht, NewTrick(), trump)
-		Log(4, "Player %d pretend won the hand with a %s", newtrick.WinningPlayer, newtrick.winningCard())
+		//Log(4, "Player %d pretend won the hand with a %s", newtrick.WinningPlayer, newtrick.winningCard())
 		if ht.Owner%2 == newtrick.WinningPlayer%2 {
 			points += newtrick.counters()
 		}
@@ -724,7 +724,7 @@ func inline(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit, myCard 
 }
 
 func playHandWithCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) (sdz.Card, int) {
-	Log(4, "Calling playHandWithCard")
+	//Log(4, "Calling playHandWithCard")
 	decisionMap := potentialCards(playerid, ht, trick.winningCard(), trick.leadSuit(), trump)
 	if len(decisionMap) == 0 {
 		// last trick
@@ -757,7 +757,7 @@ func playHandWithCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Sui
 			bestCard = result.Card
 		}
 	}
-	Log(4, "Best play for player %d is %s worth %d for the winners", playerid, bestCard, bestPoints)
+	//Log(4, "Best play for player %d is %s worth %d for the winners", playerid, bestCard, bestPoints)
 	return bestCard, bestPoints
 }
 
@@ -768,12 +768,12 @@ func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 }
 
 func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Suit, trump sdz.Suit) sdz.Hand {
-	Log(ht.Owner, "PotentialCards called with %d,winning=%s,lead=%s,trump=%s", playerid, winning, lead, trump)
-	Log(ht.Owner, "PotentialCards Player%d - %s", playerid, ht.Cards[playerid])
+	//Log(ht.Owner, "PotentialCards called with %d,winning=%s,lead=%s,trump=%s", playerid, winning, lead, trump)
+	//Log(ht.Owner, "PotentialCards Player%d - %s", playerid, ht.Cards[playerid])
 	validHand := make(sdz.Hand, 0)
 	potentialHand := make(sdz.Hand, 0)
 	handStatus := Nothing
-	for cardIndex, card := range sdz.AllCards() {
+	for cardIndex, card := range sdz.AllCards {
 		val := ht.Cards[playerid][cardIndex]
 		if val == Unknown {
 			if ht.sum(cardIndex) < 2 {
@@ -806,7 +806,7 @@ func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Su
 		validHand = append(validHand, potentialHand...)
 	} else {
 		for _, card := range potentialHand {
-			Log(4, "Potential card %s", card)
+			//Log(4, "Potential card %s", card)
 			cardStatus := Nothing
 			switch {
 			case card.Suit() == lead && card.Beats(winning, trump):
@@ -820,7 +820,7 @@ func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Su
 			}
 			if cardStatus >= handStatus {
 				validHand = append(validHand, card)
-				Log(4, "Adding potential card %s", card)
+				//Log(4, "Adding potential card %s", card)
 			}
 		}
 	}
@@ -828,18 +828,17 @@ func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Su
 }
 
 func (ai *AI) Tell(g *goon.Goon, c appengine.Context, game *Game, action *sdz.Action) *sdz.Action {
-	Log(ai.Playerid, "Action received - %+v", action)
+	//Log(ai.Playerid, "Action received - %+v", action)
 	switch action.Type {
 	case "Bid":
 		if action.Playerid == ai.Playerid {
-			Log(ai.Playerid, "------------------Player %d asked to bid against player %d", ai.Playerid, ai.HighBidder)
+			//Log(ai.Playerid, "------------------Player %d asked to bid against player %d", ai.Playerid, ai.HighBidder)
 			ai.BidAmount, ai.Trump, _ = ai.calculateBid()
 			if ai.NumBidders == 1 && ai.IsPartner(ai.HighBidder) && ai.BidAmount < 21 && ai.BidAmount+5 > 20 {
 				// save our parter
-				Log(ai.Playerid, "Saving our partner with a recommended bid of %d", ai.BidAmount)
+				//Log(ai.Playerid, "Saving our partner with a recommended bid of %d", ai.BidAmount)
 				ai.BidAmount = 21
 			}
-			bidAmountOld := ai.BidAmount
 			switch {
 			case ai.Playerid == ai.HighBidder: // this should only happen if I was the dealer and I got stuck
 				ai.BidAmount = 20
@@ -850,8 +849,8 @@ func (ai *AI) Tell(g *goon.Goon, c appengine.Context, game *Game, action *sdz.Ac
 			case ai.NumBidders == 3: // I'm last to bid, but I want it
 				ai.BidAmount = ai.HighBid + 1
 			}
-			meld, _ := ai.RealHand.Meld(ai.Trump)
-			Log(ai.Playerid, "------------------Player %d bid %d over %d with recommendation of %d and %d meld", ai.Playerid, ai.BidAmount, ai.HighBid, bidAmountOld, meld)
+			//meld, _ := ai.RealHand.Meld(ai.Trump)
+			//Log(ai.Playerid, "------------------Player %d bid %d over %d with recommendation of %d and %d meld", ai.Playerid, ai.BidAmount, ai.HighBid, bidAmountOld, meld)
 			return sdz.CreateBid(ai.BidAmount, ai.Playerid)
 		} else {
 			// received someone else's bid value'
@@ -862,7 +861,7 @@ func (ai *AI) Tell(g *goon.Goon, c appengine.Context, game *Game, action *sdz.Ac
 			ai.NumBidders++
 		}
 	case "Play":
-		Log(ai.Playerid, "Trick = %s", ai.Trick)
+		//Log(ai.Playerid, "Trick = %s", ai.Trick)
 		var response *sdz.Action
 		if action.Playerid == ai.Playerid {
 			response = sdz.CreatePlay(ai.findCardToPlay(action), ai.Playerid)
@@ -872,7 +871,7 @@ func (ai *AI) Tell(g *goon.Goon, c appengine.Context, game *Game, action *sdz.Ac
 		if ai.Trick.leadSuit() == sdz.NASuit || ai.Trick.winningCard() == sdz.NACard {
 			ai.Trick.Lead = action.Playerid
 			ai.Trick.WinningPlayer = action.Playerid
-			Log(ai.Playerid, "Set lead to %s", ai.Trick.leadSuit())
+			//Log(ai.Playerid, "Set lead to %s", ai.Trick.leadSuit())
 		} else if action.PlayedCard.Beats(ai.Trick.winningCard(), ai.Trump) {
 			ai.Trick.WinningPlayer = action.Playerid
 		}
@@ -884,8 +883,8 @@ func (ai *AI) Tell(g *goon.Goon, c appengine.Context, game *Game, action *sdz.Ac
 		return response
 	case "Trump":
 		if action.Playerid == ai.Playerid {
-			meld, _ := ai.RealHand.Meld(ai.Trump)
-			Log(ai.Playerid, "Player %d being asked to name trump on hand %s and have %d meld", ai.Playerid, ai.RealHand, meld)
+			//meld, _ := ai.RealHand.Meld(ai.Trump)
+			//Log(ai.Playerid, "Player %d being asked to name trump on hand %s and have %d meld", ai.Playerid, ai.RealHand, meld)
 			switch {
 			// TODO add case for the end of the game like if opponents will coast out
 			case ai.BidAmount < 15:
@@ -895,21 +894,21 @@ func (ai *AI) Tell(g *goon.Goon, c appengine.Context, game *Game, action *sdz.Ac
 			}
 		} else {
 			ai.Trump = action.Trump
-			Log(ai.Playerid, "Trump is %s", ai.Trump)
+			//Log(ai.Playerid, "Trump is %s", ai.Trump)
 		}
 	case "Throwin":
-		Log(ai.Playerid, "Player %d saw that player %d threw in", ai.Playerid, action.Playerid)
+		//Log(ai.Playerid, "Player %d saw that player %d threw in", ai.Playerid, action.Playerid)
 	case "Deal":
 		ai.reset()
 		ai.RealHand = &action.Hand
-		Log(ai.Playerid, "Set playerid")
-		Log(ai.Playerid, "Dealt Hand = %s", ai.RealHand.String())
+		//Log(ai.Playerid, "Set playerid")
+		//Log(ai.Playerid, "Dealt Hand = %s", ai.RealHand.String())
 		ai.populate()
 		ai.HighBid = 20
 		ai.HighBidder = action.Dealer
 		ai.NumBidders = 0
 	case "Meld":
-		Log(ai.Playerid, "Received meld action - %#v", action)
+		//Log(ai.Playerid, "Received meld action - %#v", action)
 		if action.Playerid == ai.Playerid {
 			return nil // seeing our own meld, we don't care
 		}
@@ -924,11 +923,11 @@ func (ai *AI) Tell(g *goon.Goon, c appengine.Context, game *Game, action *sdz.Ac
 		}
 	case "Message": // nothing to do here, no one to read it
 	case "Trick": // nothing to do here, nothing to display
-		Log(ai.Playerid, "playedCards=%v", ai.HT.PlayedCards)
+		//Log(ai.Playerid, "playedCards=%v", ai.HT.PlayedCards)
 		ai.Trick = NewTrick()
 	case "Score": // TODO: save score to use for future bidding techniques
 	default:
-		Log(ai.Playerid, "Received an action I didn't understand - %v", action)
+		//Log(ai.Playerid, "Received an action I didn't understand - %v", action)
 	}
 	return nil
 }
@@ -1065,7 +1064,7 @@ func (game *Game) NextHand(g *goon.Goon, c appengine.Context) (*Game, error) {
 	game.HighPlayer = game.Dealer
 	game.State = StateBid
 	game.Next = game.Dealer
-	Log(4, "Dealer is %d", game.Dealer)
+	//Log(4, "Dealer is %d", game.Dealer)
 	deck := sdz.CreateDeck()
 	deck.Shuffle()
 	hands := deck.Deal()
@@ -1073,7 +1072,7 @@ func (game *Game) NextHand(g *goon.Goon, c appengine.Context) (*Game, error) {
 		game.Next = game.inc()
 		sort.Sort(hands[x])
 		game.Players[game.Next].SetHand(g, c, game, hands[x], game.Dealer, game.Next)
-		Log(4, "Dealing player %d hand %s", game.Next, game.Players[game.Next].Hand())
+		//Log(4, "Dealing player %d hand %s", game.Next, game.Players[game.Next].Hand())
 	}
 	game.Next = game.inc() // increment so that Dealer + 1 is asked to bid first
 	return game.processAction(g, c, nil, game.Players[game.Next].Tell(g, c, game, sdz.CreateBid(0, game.Next)))
@@ -1244,14 +1243,14 @@ func (game *Game) processAction(g *goon.Goon, c appengine.Context, client *Clien
 				game.Broadcast(g, c, action, action.Playerid)
 				game.Score[game.HighPlayer%2] -= game.HighBid
 				game.BroadcastAll(g, c, sdz.CreateMessage(fmt.Sprintf("Player %d threw in! Scores are now Team0 = %d to Team1 = %d, played %d hands", action.Playerid, game.Score[0], game.Score[1], game.HandsPlayed)))
-				Log(4, "Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)
+				//Log(4, "Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)
 				game.BroadcastAll(g, c, sdz.CreateScore(game.Score, false, false))
 				game.Dealer = (game.Dealer + 1) % 4
-				Log(4, "-----------------------------------------------------------------------------")
+				//Log(4, "-----------------------------------------------------------------------------")
 				return game.NextHand(g, c)
 			case "Trump":
 				game.Trump = action.Trump
-				Log(4, "Trump is set to %s", game.Trump)
+				//Log(4, "Trump is set to %s", game.Trump)
 				game.Broadcast(g, c, action, game.HighPlayer)
 				for x := 0; x < len(game.Players); x++ {
 					meld, meldHand := game.Players[x].Hand().Meld(game.Trump)
@@ -1287,7 +1286,7 @@ func (game *Game) processAction(g *goon.Goon, c appengine.Context, client *Clien
 				game.Next = game.Trick.WinningPlayer
 				game.BroadcastAll(g, c, sdz.CreateMessage(fmt.Sprintf("Player %d wins trick with %s", game.Trick.WinningPlayer, game.Trick.winningCard())))
 				game.BroadcastAll(g, c, sdz.CreateTrick(game.Trick.WinningPlayer))
-				Log(4, "Player %d wins trick with %s", game.Trick.WinningPlayer, game.Trick.winningCard())
+				//Log(4, "Player %d wins trick with %s", game.Trick.WinningPlayer, game.Trick.winningCard())
 				if len(*game.Players[0].Hand()) == 0 {
 					game.Counters[game.Trick.WinningPlayer%2]++ // last trick
 					// end of hand
@@ -1302,7 +1301,7 @@ func (game *Game) processAction(g *goon.Goon, c appengine.Context, client *Clien
 					}
 					// check the score for a winner
 					game.BroadcastAll(g, c, sdz.CreateMessage(fmt.Sprintf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)))
-					Log(4, "Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)
+					//Log(4, "Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)
 					win := make([]bool, 2)
 					gameOver := true
 					if game.Score[game.HighPlayer%2] >= 120 {
@@ -1332,7 +1331,7 @@ func (game *Game) processAction(g *goon.Goon, c appengine.Context, client *Clien
 						return nil, nil // game over
 					}
 					game.Dealer = (game.Dealer + 1) % 4
-					Log(4, "-----------------------------------------------------------------------------")
+					//Log(4, "-----------------------------------------------------------------------------")
 					return game.NextHand(g, c)
 				}
 				game.Trick = *NewTrick()

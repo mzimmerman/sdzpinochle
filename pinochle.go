@@ -35,16 +35,17 @@ const (
 	NAFace      = Face("F")
 )
 
-func AllCards() []Card {
-	cards := make([]Card, 24)
+var AllCards []Card
+
+func init() {
+	AllCards = make([]Card, 24)
 	x := 0
 	for _, suit := range Suits() {
 		for _, face := range Faces() {
-			cards[x] = CreateCard(suit, face)
+			AllCards[x] = CreateCard(suit, face)
 			x++
 		}
 	}
-	return cards
 }
 
 type Card string // two chars Face + String
