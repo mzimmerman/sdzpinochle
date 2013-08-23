@@ -26,16 +26,6 @@ import (
 )
 
 const (
-	ace        = "A"
-	ten        = "T"
-	king       = "K"
-	queen      = "Q"
-	jack       = "J"
-	nine       = "9"
-	spades     = "S"
-	hearts     = "H"
-	clubs      = "C"
-	diamonds   = "D"
 	StateNew   = "new"
 	StateBid   = "bid"
 	StateTrump = "trump"
@@ -252,7 +242,7 @@ func Log(playerid int, m string, v ...interface{}) {
 
 type CardMap [24]int
 
-func (cm *CardMap) inc(x int) {
+func (cm *CardMap) inc(x sdz.Card) {
 	switch cm[x] {
 	case 2:
 		panic("Cannot increment past 2")
@@ -265,7 +255,7 @@ func (cm *CardMap) inc(x int) {
 	}
 }
 
-func (cm *CardMap) dec(x int) {
+func (cm *CardMap) dec(x sdz.Card) {
 	switch cm[x] {
 	case None:
 		//Log(4, "Attempting to decrement %s from %d", card(x), cm[x])
@@ -303,7 +293,7 @@ type HandTracker struct {
 	Owner       int // the playerid of the "owning" player
 }
 
-func (ht *HandTracker) sum(cardIndex int) int {
+func (ht *HandTracker) sum(cardIndex sdz.Card) int {
 	sum := ht.PlayedCards[cardIndex]
 	if sum == None {
 		sum = 0
@@ -343,40 +333,40 @@ func (ht *HandTracker) Debug() {
 	}
 }
 
-func (ht *HandTracker) PlayCard(c sdz.Card, playerid int, trick *Trick, trump sdz.Suit) {
-	cardIndex := index(c)
+func (ht *HandTracker) PlayCard(card sdz.Card, playerid int, trick *Trick, trump sdz.Suit) {
 	//Log(ht.Owner, "In ht.PlayCard for %d-%s on player %d", playerid, c, ht.Owner)
 	ht.Debug()
-	ht.PlayedCards.inc(cardIndex)
-	if val := ht.Cards[playerid][cardIndex]; val != Unknown {
+	ht.PlayedCards.inc(card)
+	if val := ht.Cards[playerid][card]; val != Unknown {
 		if val == None {
 			//Log(4, "Player %d does not have card %s, panicking", playerid, c)
 			panic("panic")
 		} else {
-			ht.Cards[playerid].dec(cardIndex)
+			ht.Cards[playerid].dec(card)
 		}
-		if val == 1 && ht.PlayedCards[cardIndex] == 1 && playerid != ht.Owner {
+		if val == 1 && ht.PlayedCards[card] == 1 && playerid != ht.Owner {
 			// Other player could have only shown one in meld, but has two - now we don't know who has the last one
 			//Log(ht.Owner, "htcardset - deleted card %s for player %d", c, playerid)
-			ht.Cards[playerid][cardIndex] = Unknown
+			ht.Cards[playerid][card] = Unknown
 		}
 	}
-	ht.calculateCard(cardIndex)
+	ht.calculateCard(card)
 	switch {
 	case trick.leadSuit() == sdz.NASuit || trump == sdz.NASuit:
 		// do nothing
-	case c.Suit() != trick.leadSuit() && c.Suit() != trump: // couldn't follow suit, couldn't lay trump
+	case card.Suit() != trick.leadSuit() && card.Suit() != trump: // couldn't follow suit, couldn't lay trump
 		ht.noSuit(playerid, trump)
 		fallthrough
-	case c.Suit() != trick.leadSuit(): // couldn't follow suit
+	case card.Suit() != trick.leadSuit(): // couldn't follow suit
 		ht.noSuit(playerid, trick.leadSuit())
 	case playerid != trick.WinningPlayer: // did not win
-		for _, f := range sdz.Faces() {
-			card := sdz.CreateCard(c.Suit(), f)
-			if card.Beats(trick.winningCard(), trump) {
-				cardIndex := index(card)
-				ht.Cards[playerid][cardIndex] = None
-				ht.calculateCard(cardIndex)
+		for _, f := range sdz.Faces {
+			tempCard := sdz.CreateCard(card.Suit(), f)
+			if tempCard.Beats(trick.winningCard(), trump) {
+				ht.Cards[playerid][tempCard] = None
+				ht.calculateCard(tempCard)
+			} else {
+				break
 			}
 		}
 	}
@@ -385,14 +375,14 @@ func (ht *HandTracker) PlayCard(c sdz.Card, playerid int, trick *Trick, trump sd
 
 func (cm CardMap) String() string {
 	output := "[24]int{"
-	for x, c := range sdz.AllCards {
+	for x := 0; x < sdz.AllCards; x++ {
 		if cm[x] == Unknown {
 			continue
 		}
 		if cm[x] == None {
-			output += fmt.Sprintf("[%d]%s:%d ", x, c, 0)
+			output += fmt.Sprintf("[%d]%s:%d ", x, x, 0)
 		} else {
-			output += fmt.Sprintf("[%d]%s:%d ", x, c, cm[x])
+			output += fmt.Sprintf("[%d]%s:%d ", x, x, cm[x])
 		}
 	}
 	return output + "}"
@@ -404,24 +394,23 @@ func (ai *AI) PlayCard(c sdz.Card, playerid int) {
 
 func (ai *AI) populate() {
 	for _, card := range *ai.RealHand {
-		cardIndex := index(card)
-		ai.HT.Cards[ai.Playerid].inc(cardIndex)
-		ai.HT.calculateCard(cardIndex)
+		ai.HT.Cards[ai.Playerid].inc(card)
+		ai.HT.calculateCard(card)
 	}
 }
 
 func (ht *HandTracker) noSuit(playerid int, suit sdz.Suit) {
 	//Log(ht.Owner, "No suit start")
-	cardIndex := index(sdz.CreateCard(suit, sdz.Ace))
+	card := sdz.Card(suit * 6)
 	for x := 0; x < 6; x++ {
-		ht.Cards[playerid][cardIndex] = None
-		ht.calculateCard(cardIndex)
-		cardIndex++
+		ht.Cards[playerid][card] = None
+		ht.calculateCard(card)
+		card++
 	}
 	//Log(ht.Owner, "No suit end")
 }
 
-func (ht *HandTracker) calculateCard(cardIndex int) {
+func (ht *HandTracker) calculateCard(cardIndex sdz.Card) {
 	sum := ht.sum(cardIndex)
 	//Log(ht.Owner, "htcardset - Sum for %s is %d", card(cardIndex), sum)
 	if sum > 2 || sum < 0 {
@@ -505,26 +494,26 @@ func (ai AI) powerBid(suit sdz.Suit) (count int) {
 		suitMap[card.Suit()]++
 		if card.Suit() == suit {
 			switch card.Face() {
-			case ace:
+			case sdz.Ace:
 				count += 3
-			case ten:
+			case sdz.Ten:
 				count += 2
-			case king:
+			case sdz.King:
 				fallthrough
-			case queen:
+			case sdz.Queen:
 				fallthrough
-			case jack:
+			case sdz.Jack:
 				fallthrough
-			case nine:
+			case sdz.Nine:
 				count += 1
 			}
-		} else if card.Face() == ace {
+		} else if card.Face() == sdz.Ace {
 			count += 2
-		} else if card.Face() == jack || card.Face() == nine {
+		} else if card.Face() == sdz.Jack || card.Face() == sdz.Nine {
 			count -= 1
 		}
 	}
-	for _, x := range sdz.Suits() {
+	for _, x := range sdz.Suits {
 		if x == suit {
 			continue
 		}
@@ -537,7 +526,7 @@ func (ai AI) powerBid(suit sdz.Suit) (count int) {
 
 func (ai AI) calculateBid() (amount int, trump sdz.Suit, show sdz.Hand) {
 	bids := make(map[sdz.Suit]int)
-	for _, suit := range sdz.Suits() {
+	for _, suit := range sdz.Suits {
 		bids[suit], show = ai.RealHand.Meld(suit)
 		bids[suit] = bids[suit] + ai.powerBid(suit)
 		//		Log("Could bid %d in %s", bids[suit], suit)
@@ -706,7 +695,7 @@ func playHandWithCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Sui
 			inline(playerid, ht, trick, trump, card, results)
 		}
 	}
-	bestCard := sdz.NACard
+	var bestCard sdz.Card
 	bestPoints := 0
 	partner := ht.Owner%2 == playerid%2
 	for x := 0; x < numCards; x++ {
@@ -732,10 +721,11 @@ func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Su
 	validHand := make(sdz.Hand, 0)
 	potentialHand := make(sdz.Hand, 0)
 	handStatus := Nothing
-	for cardIndex, card := range sdz.AllCards {
-		val := ht.Cards[playerid][cardIndex]
+	for x := 0; x < sdz.AllCards; x++ {
+		card := sdz.Card(x)
+		val := ht.Cards[playerid][card]
 		if val == Unknown {
-			if ht.sum(cardIndex) < 2 {
+			if ht.sum(card) < 2 {
 				potentialHand = append(potentialHand, card)
 			}
 		} else if val != None {
@@ -871,8 +861,7 @@ func (ai *AI) Tell(g *goon.Goon, c appengine.Context, game *Game, action *sdz.Ac
 		if action.Playerid == ai.Playerid {
 			return nil // seeing our own meld, we don't care
 		}
-		for _, card := range action.Hand {
-			cardIndex := index(card)
+		for _, cardIndex := range action.Hand {
 			val := ai.HT.Cards[action.Playerid][cardIndex]
 			if val == Unknown {
 				ai.HT.Cards[action.Playerid][cardIndex] = 1
