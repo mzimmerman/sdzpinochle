@@ -27,6 +27,7 @@ const (
 	queenaround = 6
 	jackaround  = 4
 	debugLog    = false
+	AllCards    = 24
 )
 
 const (
@@ -65,20 +66,12 @@ const (
 	NACard = -1
 )
 
-var AllCards [24]Card
 var Faces [6]Face
 var Suits [4]Suit
 
 func init() {
 	Faces = [6]Face{Ace, Ten, King, Queen, Jack, Nine}
 	Suits = [4]Suit{Spades, Hearts, Clubs, Diamonds}
-	x := 0
-	for _, suit := range Suits {
-		for _, face := range Faces {
-			AllCards[x] = CreateCard(suit, face)
-			x++
-		}
-	}
 }
 
 type Card int // an integer representation of the card
@@ -220,9 +213,8 @@ func (d Deck) Deal() (hands []Hand) {
 }
 
 func CreateDeck() (deck Deck) {
-	for x := 0; x < 24; x++ {
-		deck[x] = AllCards[x]
-		deck[x+24] = AllCards[x]
+	for x := 0; x < len(deck); x++ {
+		deck[x] = Card(x % AllCards)
 	}
 	return
 }
