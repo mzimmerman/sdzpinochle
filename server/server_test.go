@@ -72,6 +72,33 @@ func (t *testSuite) TestBiddingShort() {
 	t.Not(t.True(22 > action.Bid || action.Bid > 24))
 }
 
+func BenchmarkFindCardToPlay(b *testing.B) {
+	//func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
+	p0 := createAI()
+	p0.SetHand(nil, nil, nil, sdz.Hand{QS, NC, ND, ND, KH, JS, QD, AS, JC, JC, QH, JD}, 0, 0)
+	p1 := createAI()
+	p1.SetHand(nil, nil, nil, sdz.Hand{AD, KS, NH, TD, JD, QH, QC, AD, KD, TC, AS}, 0, 1)
+	p2 := createAI()
+	p2.SetHand(nil, nil, nil, sdz.Hand{KS, NC, NS, AH, KC, AC, TH, TH, TS, KH, KC, QC}, 0, 2)
+	p3 := createAI()
+	p3.SetHand(nil, nil, nil, sdz.Hand{JS, JH, TC, JH, QS, NH, TD, KD, AC, NS, QD, TS}, 0, 3)
+	p1Amt, p1Meld := p1.Hand().Meld(sdz.Diamonds)
+	p2Amt, p2Meld := p2.Hand().Meld(sdz.Diamonds)
+	p3Amt, p3Meld := p3.Hand().Meld(sdz.Diamonds)
+	p0.Tell(nil, nil, nil, sdz.CreateMeld(p1Meld, p1Amt, 1))
+	p0.Tell(nil, nil, nil, sdz.CreateMeld(p2Meld, p2Amt, 2))
+	p0.Tell(nil, nil, nil, sdz.CreateMeld(p3Meld, p3Amt, 3))
+	Log(0, "Starting")
+	Log(0, "PlayedCards=%s", p0.HT.PlayedCards)
+	Log(0, "Cards[0]=%s", p0.HT.Cards[0])
+	Log(0, "Cards[1]=%s", p0.HT.Cards[1])
+	Log(0, "Cards[2]=%s", p0.HT.Cards[2])
+	Log(0, "Cards[3]=%s", p0.HT.Cards[3])
+	action := sdz.CreatePlayRequest(sdz.NACard, sdz.NASuit, sdz.Hearts, 0, p0.Hand())
+	p0.findCardToPlay(action)
+	Log(4, "bench ran")
+}
+
 func BenchmarkFullGame(b *testing.B) {
 	c, err := appenginetesting.NewContext(&appenginetesting.Options{Debug: "critical"})
 	if err != nil {

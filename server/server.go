@@ -45,6 +45,7 @@ var store = sessions.NewCookieStore([]byte("sdzpinochle"))
 
 var sem = make(chan bool, runtime.NumCPU())
 var HTs = make(chan *HandTracker, 1000)
+var Hands = make(chan sdz.Hand, 1000)
 
 func init() {
 	http.HandleFunc("/connect", connect)
@@ -62,6 +63,17 @@ func init() {
 	for x := 0; x < runtime.NumCPU(); x++ {
 		sem <- true
 	}
+}
+
+func getHand() sdz.Hand {
+	var h sdz.Hand
+	select {
+	case h = <-Hands:
+		h = h[:0] // empty the slice
+	default:
+		h = make(sdz.Hand, 0, 24)
+	}
+	return h
 }
 
 func getHT(owner int) *HandTracker {
@@ -694,6 +706,7 @@ func playHandWithCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Sui
 			inline(playerid, ht, trick, trump, card, results)
 		}
 	}
+	Hands <- decisionMap // need to return the Hand object obtained from potentialCards to the pool of resources
 	var bestCard sdz.Card
 	bestPoints := 0
 	partner := ht.Owner%2 == playerid%2
@@ -709,7 +722,8 @@ func playHandWithCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Sui
 }
 
 func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
-	card, _ := playHandWithCard(ai.Playerid, ai.HT, ai.Trick, action.Trump)
+	card, points := playHandWithCard(ai.Playerid, ai.HT, ai.Trick, action.Trump)
+	Log(ai.Playerid, "PlayHandWithCard returned %s for %d points.", card, points)
 	return card
 	//return rankCard(ai.Playerid, ai.HT, ai.Trick, ai.Trump).Played[ai.Playerid]
 }
@@ -717,8 +731,8 @@ func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 func (ht *HandTracker) potentialCards(playerid int, winning sdz.Card, lead sdz.Suit, trump sdz.Suit, lastPlay bool) sdz.Hand {
 	//Log(ht.Owner, "PotentialCards called with %d,winning=%s,lead=%s,trump=%s", playerid, winning, lead, trump)
 	//Log(ht.Owner, "PotentialCards Player%d - %s", playerid, ht.Cards[playerid])
-	validHand := make(sdz.Hand, 0)
-	potentialHand := make(sdz.Hand, 0)
+	validHand := getHand()
+	potentialHand := getHand()
 	handStatus := Nothing
 allCardLoop:
 	for x := 0; x < sdz.AllCards; x++ {
@@ -803,6 +817,7 @@ allCardLoop:
 			}
 		}
 	}
+	Hands <- potentialHand
 	return validHand
 }
 
