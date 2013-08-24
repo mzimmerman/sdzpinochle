@@ -71,7 +71,6 @@ func getHT(owner int) *HandTracker {
 	default:
 		ht = new(HandTracker)
 	}
-	ht.reset(owner)
 	return ht
 }
 
@@ -393,6 +392,7 @@ func (ai *AI) PlayCard(c sdz.Card, playerid int) {
 }
 
 func (ai *AI) populate() {
+	ai.HT.reset(ai.Playerid)
 	for _, card := range *ai.RealHand {
 		ai.HT.Cards[ai.Playerid].inc(card)
 		ai.HT.calculateCard(card)
