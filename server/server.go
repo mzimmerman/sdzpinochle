@@ -672,7 +672,7 @@ func inline(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit, myCard 
 
 func playHandWithCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) (sdz.Card, int) {
 	//Log(4, "Calling playHandWithCard")
-	decisionMap := potentialCards(playerid, ht, trick.winningCard(), trick.leadSuit(), trump)
+	decisionMap := ht.potentialCards(playerid, trick.winningCard(), trick.leadSuit(), trump, len(trick.Played) == 3)
 	if len(decisionMap) == 0 {
 		// last trick
 		if playerid%2 == ht.Owner%2 {
@@ -714,7 +714,7 @@ func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	//return rankCard(ai.Playerid, ai.HT, ai.Trick, ai.Trump).Played[ai.Playerid]
 }
 
-func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Suit, trump sdz.Suit) sdz.Hand {
+func (ht *HandTracker) potentialCards(playerid int, winning sdz.Card, lead sdz.Suit, trump sdz.Suit, lastPlay bool) sdz.Hand {
 	//Log(ht.Owner, "PotentialCards called with %d,winning=%s,lead=%s,trump=%s", playerid, winning, lead, trump)
 	//Log(ht.Owner, "PotentialCards Player%d - %s", playerid, ht.Cards[playerid])
 	validHand := make(sdz.Hand, 0)
@@ -746,7 +746,8 @@ allCardLoop:
 				handStatus = cardStatus
 				validHand = sdz.Hand{card}
 			} else if cardStatus == handStatus {
-				if cardStatus == FollowLose || cardStatus == TrumpLose {
+				if (cardStatus == FollowLose || cardStatus == TrumpLose) ||
+					((cardStatus == FollowWin || cardStatus == TrumpWin) && lastPlay) {
 					// there should be a maximum of two cards in validHand, counter and non-counter
 					for y, vhc := range validHand {
 						//Log(4, "Comparing vhc=%s to card=%s", vhc, card)
@@ -783,7 +784,8 @@ allCardLoop:
 				cardStatus = TrumpLose
 			}
 			if cardStatus >= handStatus {
-				if cardStatus == FollowLose || cardStatus == TrumpLose {
+				if (cardStatus == FollowLose || cardStatus == TrumpLose) ||
+					((cardStatus == FollowWin || cardStatus == TrumpWin) && lastPlay) {
 					// there should be a maximum of two cards in validHand, counter and non-counter
 					for y, vhc := range validHand {
 						//Log(4, "Comparing vhc=%s to card=%s", vhc, card)
