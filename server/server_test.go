@@ -50,7 +50,7 @@ type testSuite struct {
 	pt.Suite
 }
 
-func (t *testSuite) TestRemove() {
+func (t *testSuite) TestRemoveShort() {
 	hand := sdz.Hand{JD, QD, KD, AD, TD, JD, QS, QS, KS, AS, TS, JS}
 	sort.Sort(hand)
 	ai := createAI()
@@ -62,7 +62,7 @@ func (t *testSuite) TestRemove() {
 	t.Equal(10, len(*ai.Hand()))
 }
 
-func (t *testSuite) TestBidding() {
+func (t *testSuite) TestBiddingShort() {
 	// ND ND QD TD TD AD JC QC KC AH AH KS
 	hand := sdz.Hand{ND, ND, QD, TD, TD, AD, JC, QC, KC, AH, AH, KS}
 	sort.Sort(hand)
@@ -87,26 +87,21 @@ func BenchmarkFullGame(b *testing.B) {
 	}
 }
 
-func (t *testSuite) TestPotentialCards() {
-	ai := createAI()
-	ht := ai.HT
-	for card := 0; card < sdz.AllCards; card++ {
-		ht.Cards[0][card] = 0
-	}
+func (t *testSuite) TestPotentialCardsShort() {
+	ht := new(HandTracker)
+	ht.reset(0)
 	ht.Cards[0][AD] = Unknown
 	ht.Cards[0][TD] = 1
 	ht.Cards[0][KD] = 2
 	ht.Cards[0][QD] = None
 
 	potentials := potentialCards(0, ht, sdz.NACard, sdz.NASuit, sdz.Spades)
-	Log(4, "Potentials = %s", potentials)
+
 	t.True(potentials.Contains(AD))
 	t.True(potentials.Contains(TD))
 	t.True(potentials.Contains(KD))
 	t.Equal(ht.Cards[0][QD], None)
 	t.False(potentials.Contains(QD))
-
-	return
 
 	ht.Cards[0][TS] = Unknown
 	potentials = potentialCards(0, ht, KD, sdz.Diamonds, sdz.Spades)
@@ -121,7 +116,7 @@ func (t *testSuite) TestPotentialCards() {
 	ht.Cards[0][TH] = Unknown
 	ht.Cards[0][QH] = Unknown
 	ht.Cards[0][AS] = 1
-	ht.Cards[0][TS] = 0
+	ht.Cards[0][TS] = None
 	potentials = potentialCards(0, ht, KH, sdz.Hearts, sdz.Spades)
 	t.True(potentials.Contains(AH))
 	t.True(potentials.Contains(TH))
@@ -137,11 +132,7 @@ func (t *testSuite) TestPotentialCards() {
 	t.False(potentials.Contains(QH))
 	t.False(potentials.Contains(TS))
 
-	ai = createAI()
-	ht = ai.HT
-	for card := 0; card < sdz.AllCards; card++ {
-		ht.Cards[0][card] = 0
-	}
+	ht.reset(0)
 	ht.Cards[0][AD] = 2
 	ht.Cards[0][TD] = 1
 	ht.Cards[0][JD] = 1
@@ -156,11 +147,7 @@ func (t *testSuite) TestPotentialCards() {
 	potentials = potentialCards(0, ht, sdz.NACard, sdz.NASuit, sdz.Hearts)
 	t.Equal(11, len(potentials))
 
-	ai = createAI()
-	ht = ai.HT
-	for card := 0; card < sdz.AllCards; card++ {
-		ht.Cards[0][card] = 0
-	}
+	ht.reset(0)
 	ht.Cards[0][AD] = 2
 	ht.Cards[0][TD] = 1
 	ht.Cards[0][JD] = 1
@@ -182,11 +169,7 @@ func (t *testSuite) TestPotentialCards() {
 	//Player1 - map[KD:0 QC:0 AC:0 JS:0 JC:0 TC:0 NC:0 NH:0 ND:0 TD:0 KC:0 JH:0 AH:0]
 	//Player2 - map[TH:0 JH:0 JD:1 KS:0 QS:0 NC:0 JS:1 AD:0 QD:1 TS:0 NH:0 AS:0 KD:0 TD:1 KC:0 TC:0 NS:0 AH:0 ND:2 JC:0 QH:0 AC:0 QC:0 KH:0]
 	//Player3 - map[JH:0 AH:0 KD:0 NC:0 JS:0 KC:1 TD:0 AC:0 NH:0 QC:1 ND:0]
-	ai = createAI()
-	ht = ai.HT
-	for card := 0; card < sdz.AllCards; card++ {
-		ht.Cards[0][card] = 0
-	}
+	ht.reset(0)
 	ht.Cards[0][TD] = 2
 	ht.Cards[0][ND] = 2
 	ht.Cards[0][QD] = 1
@@ -196,6 +179,44 @@ func (t *testSuite) TestPotentialCards() {
 	t.Equal(1, len(potentials))
 	t.True(potentials.Contains(JS))
 	t.False(potentials.Contains(TD))
+
+	ht.reset(0)
+	ht.Cards[0][AD] = Unknown
+	ht.Cards[0][TD] = 1
+	ht.Cards[0][KD] = 1
+	ht.Cards[0][QD] = 1
+	ht.Cards[0][JD] = 1
+	// follow suit and lose
+	potentials = potentialCards(0, ht, AD, sdz.Diamonds, sdz.Spades)
+	t.False(potentials.Contains(AD))
+	t.False(potentials.Contains(TD))
+	t.True(potentials.Contains(KD))
+	t.False(potentials.Contains(QD))
+	t.True(potentials.Contains(JD))
+
+	// play trump and lose
+	potentials = potentialCards(0, ht, AD, sdz.Spades, sdz.Diamonds)
+	t.False(potentials.Contains(AD))
+	t.False(potentials.Contains(TD))
+	t.True(potentials.Contains(KD))
+	t.False(potentials.Contains(QD))
+	t.True(potentials.Contains(JD))
+
+	// follow suit and win
+	potentials = potentialCards(0, ht, ND, sdz.Diamonds, sdz.Spades)
+	t.True(potentials.Contains(AD))
+	t.True(potentials.Contains(TD))
+	t.True(potentials.Contains(KD))
+	t.True(potentials.Contains(QD))
+	t.True(potentials.Contains(JD))
+
+	// play trump and win
+	potentials = potentialCards(0, ht, ND, sdz.Spades, sdz.Diamonds)
+	t.True(potentials.Contains(AD))
+	t.True(potentials.Contains(TD))
+	t.True(potentials.Contains(KD))
+	t.True(potentials.Contains(QD))
+	t.True(potentials.Contains(JD))
 
 	//PotentialCards called with 0,winning=AS,lead=D,trump=C,
 	//ht=&main.HandTracker{cards:[4]map[sdzpinochle.Card]int{map[sdzpinochle.Card]int{"NC":0, "AC":0, "AS":0, "KD":0, "QD":0, "QS":0, "TH":0, "JC":0, "AD":0, "ND":0, "KC":0, "TS":0, "NH":0, "TC":0, "TD":0, "QH":0, "NS":0, "JD":0, "QC":0, "KH":0, "JH":0, "KS":0, "AH":0, "JS":0}, map[sdzpinochle.Card]int{"NC":0, "QC":0, "ND":0, "AH":0, "AC":0, "QH":1, "JD":0, "KS":0, "JC":0, "AS":0, "KC":0, "TH":0, "TC":0, "QS":0, "KH":0, "TS":0}, map[sdzpinochle.Card]int{"KS":0, "JD":0, "JC":0, "TH":0, "KH":0, "AS":0, "QD":0, "TC":0, "AC":0, "AH":0, "QH":0, "NC":0, "KD":1, "QC":0, "ND":0, "KC":0, "QS":0, "TS":0}, map[sdzpinochle.Card]int{"TH":0, "AS":0, "AH":0, "TS":0, "KC":0, "NC":0, "QS":0, "TC":0, "ND":0, "AC":0, "KS":0, "QC":0, "KH":0, "JD":0, "QH":0, "JC":0}}, playedCards:map[sdzpinochle.Card]int{"KH":2, "KD":0, "JC":2, "AH":2, "TH":2, "TD":1, "NS":1, "TC":2, "ND":2, "AS":2, "KS":2, "JS":1, "QC":2, "KC":2, "QD":1, "QS":2, "NH":1, "QH":1, "AD":0, "JD":2, "AC":2, "JH":1, "NC":2, "TS":2}}
@@ -405,8 +426,9 @@ func (t *testSuite) TestAITracking() {
 	t.Equal(None, ai.HT.Cards[3][JD])
 }
 
-func (t *testSuite) TestNoSuit() {
-	ht := getHT(0)
+func (t *testSuite) TestNoSuitShort() {
+	ht := new(HandTracker)
+	ht.reset(0)
 	ht.Cards[1][ND] = 1
 	ht.noSuit(1, sdz.Diamonds)
 
@@ -417,11 +439,9 @@ func (t *testSuite) TestNoSuit() {
 	t.Equal(None, ht.Cards[1][TD])
 	t.Equal(None, ht.Cards[1][AD])
 	t.Equal(Unknown, ht.Cards[1][AS])
-
-	HTs <- ht
 }
 
-func (t *testSuite) TestCalculate() {
+func (t *testSuite) TestCalculateShort() {
 	hand := sdz.Hand{ND, ND, QD, TD, TD, AD, JC, QC, KC, AH, AH, KS}
 	sort.Sort(hand)
 	ai := createAI()

@@ -2,6 +2,7 @@
 package sdzpinochle
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -86,6 +87,9 @@ func CreateCard(suit Suit, face Face) Card {
 }
 
 func (c Card) String() string {
+	if c == NACard {
+		return "NA"
+	}
 	return c.Face().String() + c.Suit().String()
 }
 
@@ -136,12 +140,14 @@ func (d *Deck) Shuffle() {
 }
 
 func (h Hand) String() string {
-	cards := "Hand{"
-	for x := 0; x < len(h); x++ {
-		cards += "C(\"" + string(h[x]) + "\"),"
+	var buffer bytes.Buffer
+	buffer.WriteString("Hand{")
+	for x := range h {
+		buffer.WriteString(h[x].String())
+		buffer.WriteString(" ")
 	}
-	cards += "}"
-	return cards
+	buffer.WriteString("}")
+	return buffer.String()
 }
 
 func (h Hand) Len() int {
@@ -161,6 +167,8 @@ func (a Face) Less(b Face) bool {
 
 func (a Suit) String() string {
 	switch a {
+	case NASuit:
+		return "~"
 	case Diamonds:
 		return "D"
 	case Spades:

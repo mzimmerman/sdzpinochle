@@ -33,12 +33,12 @@ const (
 	StatePlay  = "play"
 	cookieName = "sdzpinochle"
 	Nothing    = iota
-	TrumpLose  = iota
-	TrumpWin   = iota
-	FollowLose = iota
-	FollowWin  = iota
-	None       = 3
-	Unknown    = 0
+	TrumpLose
+	TrumpWin
+	FollowLose
+	FollowWin
+	None    = 3
+	Unknown = 0
 )
 
 var store = sessions.NewCookieStore([]byte("sdzpinochle"))
@@ -231,7 +231,6 @@ func receive(w http.ResponseWriter, r *http.Request) {
 }
 
 func Log(playerid int, m string, v ...interface{}) {
-	return
 	if playerid == 4 {
 		fmt.Printf("NP - "+m+"\n", v...)
 	} else {
@@ -373,15 +372,15 @@ func (ht *HandTracker) PlayCard(card sdz.Card, playerid int, trick *Trick, trump
 }
 
 func (cm CardMap) String() string {
-	output := "[24]int{"
+	output := "CardMap={"
 	for x := 0; x < sdz.AllCards; x++ {
 		if cm[x] == Unknown {
 			continue
 		}
 		if cm[x] == None {
-			output += fmt.Sprintf("[%d]%s:%d ", x, x, 0)
+			output += fmt.Sprintf("%s:%d ", sdz.Card(x), 0)
 		} else {
-			output += fmt.Sprintf("[%d]%s:%d ", x, x, cm[x])
+			output += fmt.Sprintf("%s:%d ", sdz.Card(x), cm[x])
 		}
 	}
 	return output + "}"
@@ -687,10 +686,10 @@ func playHandWithCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Sui
 	for _, card := range decisionMap {
 		select {
 		case <-sem:
-			go func() {
-				inline(playerid, ht, trick, trump, card, results)
+			go func(myCard sdz.Card) {
+				inline(playerid, ht, trick, trump, myCard, results)
 				sem <- true
-			}()
+			}(card)
 		default:
 			inline(playerid, ht, trick, trump, card, results)
 		}
@@ -721,6 +720,7 @@ func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Su
 	validHand := make(sdz.Hand, 0)
 	potentialHand := make(sdz.Hand, 0)
 	handStatus := Nothing
+allCardLoop:
 	for x := 0; x < sdz.AllCards; x++ {
 		card := sdz.Card(x)
 		val := ht.Cards[playerid][card]
@@ -746,6 +746,20 @@ func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Su
 				handStatus = cardStatus
 				validHand = sdz.Hand{card}
 			} else if cardStatus == handStatus {
+				if cardStatus == FollowLose || cardStatus == TrumpLose {
+					// there should be a maximum of two cards in validHand, counter and non-counter
+					for y, vhc := range validHand {
+						//Log(4, "Comparing vhc=%s to card=%s", vhc, card)
+						if (vhc.Counter() && card.Counter()) || (!vhc.Counter() && !card.Counter()) {
+							if card > vhc {
+								//Log(4, "Replacing %s with %s", vhc, card)
+								validHand[y] = card
+							}
+							continue allCardLoop
+						}
+					}
+				}
+				//Log(4, "Appending card valid normal")
 				validHand = append(validHand, card)
 			}
 		}
@@ -754,6 +768,7 @@ func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Su
 	if handStatus == Nothing {
 		validHand = append(validHand, potentialHand...)
 	} else {
+	potentialLoop:
 		for _, card := range potentialHand {
 			//Log(4, "Potential card %s", card)
 			cardStatus := Nothing
@@ -768,6 +783,19 @@ func potentialCards(playerid int, ht *HandTracker, winning sdz.Card, lead sdz.Su
 				cardStatus = TrumpLose
 			}
 			if cardStatus >= handStatus {
+				if cardStatus == FollowLose || cardStatus == TrumpLose {
+					// there should be a maximum of two cards in validHand, counter and non-counter
+					for y, vhc := range validHand {
+						//Log(4, "Comparing vhc=%s to card=%s", vhc, card)
+						if (vhc.Counter() && card.Counter()) || (!vhc.Counter() && !card.Counter()) {
+							if card > vhc {
+								//Log(4, "Replacing %s with %s", vhc, card)
+								validHand[y] = card
+							}
+							continue potentialLoop
+						}
+					}
+				}
 				validHand = append(validHand, card)
 				//Log(4, "Adding potential card %s", card)
 			}
