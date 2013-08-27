@@ -83,6 +83,7 @@ func getHT(owner int) *HandTracker {
 	default:
 		ht = new(HandTracker)
 	}
+	ht.Owner = owner
 	return ht
 }
 
@@ -300,6 +301,7 @@ type HandTracker struct {
 	// 1 = has this card
 	// 2 = has two of these cards
 	PlayedCards CardMap
+	TrickNum    int
 	Owner       int // the playerid of the "owning" player
 }
 
@@ -333,19 +335,20 @@ func (oldht *HandTracker) Copy() (newht *HandTracker) {
 		newht.Cards[x] = oldht.Cards[x]
 	}
 	newht.PlayedCards = oldht.PlayedCards
+	newht.TrickNum = oldht.TrickNum
 	return
 }
 
 func (ht *HandTracker) Debug() {
-	//Log(ht.Owner, "ht.PlayedCards = %v", ht.PlayedCards)
+	Log(ht.Owner, "ht.PlayedCards = %v", ht.PlayedCards)
 	for x := 0; x < 4; x++ {
-		//Log(ht.Owner, "Player%d - %s", x, ht.Cards[x])
+		Log(ht.Owner, "Player%d - %s", x, ht.Cards[x])
 	}
 }
 
 func (ht *HandTracker) PlayCard(card sdz.Card, playerid int, trick *Trick, trump sdz.Suit) {
 	//Log(ht.Owner, "In ht.PlayCard for %d-%s on player %d", playerid, c, ht.Owner)
-	ht.Debug()
+	//ht.Debug()
 	ht.PlayedCards.inc(card)
 	if val := ht.Cards[playerid][card]; val != Unknown {
 		if val == None {
@@ -672,7 +675,10 @@ func inline(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit, myCard 
 	if len(newtrick.Played) != 4 {
 		_, points = playHandWithCard((playerid+1)%4, newht, newtrick, trump)
 	} else { // trick is over, create a new trick
-		_, points = playHandWithCard(newtrick.WinningPlayer, newht, NewTrick(), trump)
+		ht.TrickNum++
+		if ht.TrickNum != 12 {
+			_, points = playHandWithCard(newtrick.WinningPlayer, newht, NewTrick(), trump)
+		}
 		//Log(4, "Player %d pretend won the hand with a %s", newtrick.WinningPlayer, newtrick.winningCard())
 		if ht.Owner%2 == newtrick.WinningPlayer%2 {
 			points += newtrick.counters()
@@ -779,7 +785,12 @@ allCardLoop:
 			}
 		}
 	}
-
+	potentialHand.Shuffle()
+	//oldLen := len(potentialHand)
+	//if oldLen != 0 {
+	//	potentialHand = potentialHand[:max(1, len(potentialHand)/3)]
+	//	//Log(ht.Owner, "Reducing potential hand from %d to %d", oldLen, len(potentialHand))
+	//}
 	if handStatus == Nothing {
 		validHand = append(validHand, potentialHand...)
 	} else {
@@ -818,6 +829,7 @@ allCardLoop:
 		}
 	}
 	Hands <- potentialHand
+	//Log(ht.Owner, "Returning %d potential plays", len(validHand))
 	return validHand
 }
 

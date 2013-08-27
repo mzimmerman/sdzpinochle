@@ -71,6 +71,7 @@ var Faces [6]Face
 var Suits [4]Suit
 
 func init() {
+	rand.Seed(time.Now().UnixNano())
 	Faces = [6]Face{Ace, Ten, King, Queen, Jack, Nine}
 	Suits = [4]Suit{Spades, Hearts, Clubs, Diamonds}
 }
@@ -131,7 +132,6 @@ func (d *Deck) Swap(i, j int) {
 
 func (d *Deck) Shuffle() {
 	//	http://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle#The_modern_algorithm
-	rand.Seed(time.Now().UnixNano())
 	for i := len(d) - 1; i >= 1; i-- {
 		if j := rand.Intn(i); i != j {
 			d.Swap(i, j)
@@ -205,6 +205,15 @@ func (a Suit) Less(b Suit) bool { // only for sorting the suits for display in t
 
 func (h Hand) Swap(i, j int) {
 	h[i], h[j] = h[j], h[i]
+}
+
+func (h *Hand) Shuffle() {
+	//	http://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle#The_modern_algorithm
+	for i := len(*h) - 1; i >= 1; i-- {
+		if j := rand.Intn(i); i != j {
+			h.Swap(i, j)
+		}
+	}
 }
 
 func (d Deck) Deal() (hands []Hand) {
