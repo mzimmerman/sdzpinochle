@@ -671,7 +671,7 @@ func inline(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit, myCard 
 	if myCard.Beats(newtrick.winningCard(), trump) {
 		newtrick.WinningPlayer = playerid
 	}
-	points := 0
+	points := 1 // set for last trick, otherwise, it's overwritten
 	if len(newtrick.Played) != 4 {
 		_, points = playHandWithCard((playerid+1)%4, newht, newtrick, trump)
 	} else { // trick is over, create a new trick
@@ -691,14 +691,6 @@ func inline(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit, myCard 
 func playHandWithCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) (sdz.Card, int) {
 	//Log(4, "Calling playHandWithCard")
 	decisionMap := ht.potentialCards(playerid, trick.winningCard(), trick.leadSuit(), trump, len(trick.Played) == 3)
-	if len(decisionMap) == 0 {
-		// last trick
-		if playerid%2 == ht.Owner%2 {
-			return sdz.NACard, 1
-		} else {
-			return sdz.NACard, 0
-		}
-	}
 	numCards := len(decisionMap)
 	results := make(chan Result, numCards)
 	for _, card := range decisionMap {
