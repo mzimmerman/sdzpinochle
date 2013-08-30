@@ -72,7 +72,7 @@ func (t *testSuite) TestBiddingShort() {
 	t.Not(t.True(22 > action.Bid || action.Bid > 24))
 }
 
-func (t *testSuite) TestTrickString() {
+func (t *testSuite) TestTrickStringShort() {
 	trump := sdz.Suit(sdz.Diamonds)
 	trick := new(Trick)
 	t.Equal("-----", trick.String())
