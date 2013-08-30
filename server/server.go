@@ -37,14 +37,16 @@ const (
 	TrumpWin
 	FollowLose
 	FollowWin
-	None    = 3
-	Unknown = 0
+	None    = 0
+	Unknown = 3
 )
 
 var store = sessions.NewCookieStore([]byte("sdzpinochle"))
 
 var sem = make(chan bool, runtime.NumCPU())
+
 var HTs = make(chan *HandTracker, 1000)
+
 var Hands = make(chan sdz.Hand, 1000)
 
 func init() {
@@ -267,6 +269,7 @@ func (cm *CardMap) inc(x sdz.Card) {
 }
 
 func (cm *CardMap) dec(x sdz.Card) {
+	//Log(4, "Before dec, %s = %d", x, cm[x])
 	switch cm[x] {
 	case None:
 		//Log(4, "Attempting to decrement %s from %d", card(x), cm[x])
@@ -278,6 +281,7 @@ func (cm *CardMap) dec(x sdz.Card) {
 	case 2:
 		cm[x]--
 	}
+	//Log(4, "After dec, %s = %d", x, cm[x])
 }
 
 func (ht *HandTracker) reset(owner int) {
@@ -350,20 +354,24 @@ func (ht *HandTracker) PlayCard(card sdz.Card, playerid int, trick *Trick, trump
 	//Log(ht.Owner, "In ht.PlayCard for %d-%s on player %d", playerid, c, ht.Owner)
 	//ht.Debug()
 	ht.PlayedCards.inc(card)
-	if val := ht.Cards[playerid][card]; val != Unknown {
-		if val == None {
-			//Log(4, "Player %d does not have card %s, panicking", playerid, c)
-			panic("panic")
-		} else {
-			ht.Cards[playerid].dec(card)
-		}
-		if val == 1 && ht.PlayedCards[card] == 1 && playerid != ht.Owner {
-			// Other player could have only shown one in meld, but has two - now we don't know who has the last one
-			//Log(ht.Owner, "htcardset - deleted card %s for player %d", c, playerid)
-			ht.Cards[playerid][card] = Unknown
-		}
+	val := ht.Cards[playerid][card]
+	if val == None {
+		Log(4, "Player %d does not have card %s, panicking", playerid, card)
+		panic("panic")
+	}
+	ht.Cards[playerid].dec(card)
+	if val == 1 && ht.PlayedCards[card] == 1 && playerid != ht.Owner {
+		// Other player could have only shown one in meld, but has two - now we don't know who has the last one
+		//if card == TH {
+		//	Log(ht.Owner, "htcardset - deleted card %s for player %d", card, playerid)
+		//}
+		ht.Cards[playerid][card] = Unknown
+		//} else if card == TH {
+		//	Log(ht.Owner, "Not setting %s to unknown, val=%d, played=%d, playerid=%d", card, val, ht.PlayedCards[card], playerid)
+		//	ht.Debug()
 	}
 	ht.calculateCard(card)
+	trick.PlayCard(playerid, card, trump)
 	switch {
 	case trick.leadSuit() == sdz.NASuit || trump == sdz.NASuit:
 		// do nothing
@@ -383,7 +391,6 @@ func (ht *HandTracker) PlayCard(card sdz.Card, playerid int, trick *Trick, trump
 			}
 		}
 	}
-	trick.PlayCard(playerid, card, trump)
 	//Log(ht.Owner, "Player %d played card %s", playerid, c)
 }
 
@@ -427,7 +434,10 @@ func (ht *HandTracker) noSuit(playerid int, suit sdz.Suit) {
 
 func (ht *HandTracker) calculateCard(cardIndex sdz.Card) {
 	sum := ht.sum(cardIndex)
-	//Log(ht.Owner, "htcardset - Sum for %s is %d", card(cardIndex), sum)
+	//if cardIndex == TH {
+	//	Log(ht.Owner, "htcardset - Sum for %s is %d", cardIndex, sum)
+	//	debug.PrintStack()
+	//}
 	if sum > 2 || sum < 0 {
 		sdz.Log("htcardset - Card=%s,sum=%d", cardIndex, sum)
 		Log(ht.Owner, "ht.PlayedCards = %s", ht.PlayedCards)
@@ -444,29 +454,50 @@ func (ht *HandTracker) calculateCard(cardIndex sdz.Card) {
 		}
 	} else {
 		unknown := -1
+		hasCard := -1
 		for x := 0; x < 4; x++ {
+			if sum == 1 && ht.Cards[x][cardIndex] == 1 {
+				hasCard = x
+			}
 			if val := ht.Cards[x][cardIndex]; val == Unknown {
 				if unknown == -1 {
 					unknown = x
 				} else {
 					// at least two unknowns
 					unknown = -1
+					hasCard = -1
 					break
 				}
 			}
 		}
-		if unknown != -1 {
-			if ht.PlayedCards[cardIndex] > 0 || ht.Cards[ht.Owner][cardIndex] == 1 {
-				ht.Cards[unknown][cardIndex] = 2 - sum
-			} else if sum == 0 {
-				ht.Cards[unknown][cardIndex] = 2
-			}
+		//Log(4, "unknown = %d", unknown)
+		if unknown >= 0 {
+			//if ht.PlayedCards[cardIndex] > 0 || ht.Cards[ht.Owner][cardIndex] == 1 {
+			ht.Cards[unknown][cardIndex] = 2 - sum
+			//} else if sum == 0 {
+			//ht.Cards[unknown][cardIndex] = 2
+			//}
+		} else if hasCard >= 0 && sum == 1 {
+			//Log(ht.Owner, "Setting ht.Cards[%d][%s] to 2", hasCard, cardIndex)
+			ht.Cards[hasCard][cardIndex] = 2
 		}
 	}
-	//Log(ht.Owner, "PC[%s]=%d", card(cardIndex), ht.PlayedCards[cardIndex])
-	//for x := 0; x < 4; x++ {
-	//	if val := ht.Cards[x][cardIndex]; val != Unknown {
-	//		Log(ht.Owner, "P%d[%s]=%d", x, card(cardIndex), ht.Cards[x][cardIndex])
+	//if cardIndex == TH {
+	//	if ht.PlayedCards[cardIndex] != Unknown {
+	//		if ht.PlayedCards[cardIndex] == None {
+	//			Log(ht.Owner, "PC[%s]=%d", cardIndex, 0)
+	//		} else {
+	//			Log(ht.Owner, "PC[%s]=%d", cardIndex, ht.PlayedCards[cardIndex])
+	//		}
+	//	}
+	//	for x := 0; x < 4; x++ {
+	//		if val := ht.Cards[x][cardIndex]; val != Unknown {
+	//			if val == None {
+	//				Log(ht.Owner, "P%d[%s]=%d", x, cardIndex, 0)
+	//			} else {
+	//				Log(ht.Owner, "P%d[%s]=%d", x, cardIndex, ht.Cards[x][cardIndex])
+	//			}
+	//		}
 	//	}
 	//}
 }
@@ -493,7 +524,11 @@ func (a *AI) reset() {
 	} else {
 		a.HT.reset(a.Playerid)
 	}
-	a.Trick = new(Trick)
+	if a.Trick == nil {
+		a.Trick = new(Trick)
+	} else {
+		a.Trick.reset()
+	}
 }
 
 func createAI() (a *AI) {
@@ -603,19 +638,27 @@ func (t *Trick) reset() {
 func (t *Trick) String() string {
 	var str bytes.Buffer
 	str.WriteString("-")
-	x := t.Lead
+	if t.Plays == 0 {
+		return "-----"
+	}
+	var printme [4]bool
+	walker := t.Lead - 1
+	for x := 0; x < t.Plays; x++ {
+		walker = (walker + 1) % 4
+		printme[walker] = true
+	}
 	for y := 0; y < 4; y++ {
-		if y == t.Plays {
-			break
+		if printme[y] {
+			if t.Lead == y {
+				str.WriteString("l")
+			}
+			if t.WinningPlayer == y {
+				str.WriteString("w")
+			}
+			str.WriteString(fmt.Sprintf("%s-", t.Played[y]))
+		} else {
+			str.WriteString("-")
 		}
-		if t.Lead == x {
-			str.WriteString("l")
-		}
-		if t.WinningPlayer == x {
-			str.WriteString("w")
-		}
-		str.WriteString(fmt.Sprintf("%s-", t.Played[x]))
-		x = (x + 1) % 4
 	}
 	return str.String()
 }
@@ -770,7 +813,7 @@ allCardLoop:
 			}
 		}
 	}
-	potentialHand.Shuffle()
+	//potentialHand.Shuffle()
 	//oldLen := len(potentialHand)
 	//if oldLen != 0 {
 	//	potentialHand = potentialHand[:max(1, len(potentialHand)/3)]
