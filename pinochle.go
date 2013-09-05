@@ -4,6 +4,7 @@ package sdzpinochle
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -87,6 +88,79 @@ func CreateCard(suit Suit, face Face) Card {
 	return Card(int(suit)*6 + int(face))
 }
 
+func (c Card) MarshalJSON() ([]byte, error) {
+	return json.Marshal(c.String())
+}
+
+func (s *Suit) UnmarshalJSON(data []byte) error {
+	var str string
+	err := json.Unmarshal(data, &str)
+	if err != nil {
+		return err
+	}
+	if len(str) != 1 {
+		return errors.New(fmt.Sprintf("Data %s not a suit", data))
+	}
+	suit := NASuit
+	switch str[0] {
+	case 'D':
+		suit = Diamonds
+	case 'S':
+		suit = Spades
+	case 'H':
+		suit = Hearts
+	case 'C':
+		suit = Clubs
+	default:
+		return errors.New(fmt.Sprintf("Data %s not a suit", data))
+	}
+	*s = Suit(suit)
+	return nil
+}
+
+func (c *Card) UnmarshalJSON(data []byte) error {
+	var str string
+	err := json.Unmarshal(data, &str)
+	if err != nil {
+		return err
+	}
+	if len(str) != 2 {
+		return errors.New(fmt.Sprintf("Data %s not a card", data))
+	}
+	face := NAFace
+	switch str[0] {
+	case 'A':
+		face = Ace
+	case 'T':
+		face = Ten
+	case 'K':
+		face = King
+	case 'Q':
+		face = Queen
+	case 'J':
+		face = Jack
+	case '9':
+		face = Nine
+	default:
+		return errors.New(fmt.Sprintf("Data %s not a card", data))
+	}
+	suit := NASuit
+	switch str[1] {
+	case 'D':
+		suit = Diamonds
+	case 'S':
+		suit = Spades
+	case 'H':
+		suit = Hearts
+	case 'C':
+		suit = Clubs
+	default:
+		return errors.New(fmt.Sprintf("Data %s not a card", data))
+	}
+	*c = Card(suit*6 + face)
+	return nil
+}
+
 func (c Card) String() string {
 	if c == NACard {
 		return "NA"
@@ -163,6 +237,10 @@ func (h Hand) Less(i, j int) bool {
 
 func (a Face) Less(b Face) bool {
 	return a < b
+}
+
+func (s Suit) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.String())
 }
 
 func (a Suit) String() string {
@@ -255,6 +333,54 @@ type Action struct {
 func (action *Action) String() string {
 	data, _ := action.MarshalJSON()
 	return string(data)
+}
+
+func (action *Action) UnmarshalJSON(data []byte) error {
+	victim := new(JSONAction)
+	err := json.Unmarshal(data, &victim)
+	if err != nil {
+		return err
+	}
+	action.Amount = victim.Amount
+	action.Bid = victim.Bid
+	action.Message = victim.Message
+	//action.PlayedCard =
+	action.Playerid = victim.Playerid
+	action.TableId = victim.TableId
+	//action.Trump =
+	action.Type = victim.Type
+	var buf bytes.Buffer
+	if victim.PlayedCard != "" {
+		buf.WriteString("\"")
+		buf.WriteString(victim.PlayedCard)
+		buf.WriteString("\"")
+		err = json.Unmarshal(buf.Bytes(), &action.PlayedCard)
+		if err != nil {
+			return err
+		}
+	}
+	if victim.Trump != "" {
+		buf.Reset()
+		buf.WriteString("\"")
+		buf.WriteString(victim.Trump)
+		buf.WriteString("\"")
+		err = json.Unmarshal(buf.Bytes(), &action.Trump)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type JSONAction struct {
+	Type       string
+	Playerid   int
+	Bid        int
+	PlayedCard string
+	Trump      string
+	Amount     int
+	Message    string
+	TableId    int64
 }
 
 func (action *Action) MarshalJSON() ([]byte, error) {

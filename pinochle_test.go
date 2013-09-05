@@ -1,6 +1,8 @@
 package sdzpinochle
 
 import (
+	"bytes"
+	"encoding/json"
 	pt "github.com/remogatto/prettytest"
 	"sort"
 	"testing"
@@ -100,6 +102,24 @@ func (t *testSuite) TestRemove() {
 	t.True(hand.Remove(JS))
 	t.Equal(len(hand), 0)
 	t.False(hand.Remove(ND))
+}
+
+func (t *testSuite) TestMarshal() {
+	card := Card(AH)
+	result, _ := card.MarshalJSON()
+	t.Equal(0, bytes.Compare(result, []byte("\"AH\"")))
+	suit := card.Suit()
+	result, _ = suit.MarshalJSON()
+	t.Equal(0, bytes.Compare(result, []byte("\"H\"")))
+}
+
+func (t *testSuite) TestUnmarshal() {
+	actionBytes := `{"Hand":["TD","QD","JD","9D","QC","9C","AH","TH","QH","JH","KS","QS"],"Lead":"C","PlayedCard":"AD","Playerid":0,"Trump":"D","Type":"Play","WinningCard":"AC","WinningPlayer":0}`
+	action := new(Action)
+	err := json.Unmarshal([]byte(actionBytes), action)
+	t.Nil(err)
+	t.Equal(action.PlayedCard, Card(AD))
+	t.Equal(action.Trump, Suit(Diamonds))
 }
 
 func (t *testSuite) TestValidPlay() {
