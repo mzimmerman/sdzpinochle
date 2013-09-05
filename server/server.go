@@ -197,7 +197,6 @@ func receive(w http.ResponseWriter, r *http.Request) {
 	cookie, _ := store.Get(r, cookieName)
 	var ok bool
 	client.Id, ok = cookie.Values["ClientId"].(int64)
-
 	if !ok || client.Id == 0 {
 		err := errors.New("Tried to receive a message from an unknown client")
 		logError(c, err)
@@ -256,29 +255,23 @@ func Log(playerid int, m string, v ...interface{}) {
 type CardMap [24]int
 
 func (cm *CardMap) inc(x sdz.Card) {
-	switch cm[x] {
-	case 2:
-		panic("Cannot increment past 2")
-	case Unknown:
-		fallthrough
-	case None:
+	if cm[x] == 2 {
+
+	}
+	if cm[x] == Unknown {
 		cm[x] = 1
-	case 1:
+	} else {
 		cm[x]++
 	}
 }
 
 func (cm *CardMap) dec(x sdz.Card) {
 	//Log(4, "Before dec, %s = %d", x, cm[x])
-	switch cm[x] {
-	case None:
+	if cm[x] == 0 {
 		//Log(4, "Attempting to decrement %s from %d", card(x), cm[x])
 		panic("Cannot decrement past 0")
-	case Unknown:
-	// do nothing
-	case 1:
-		cm[x] = None
-	case 2:
+	}
+	if cm[x] != Unknown {
 		cm[x]--
 	}
 	//Log(4, "After dec, %s = %d", x, cm[x])
@@ -305,23 +298,15 @@ type HandTracker struct {
 	// 1 = has this card
 	// 2 = has two of these cards
 	PlayedCards CardMap
-	TrickNum    int
+	StartTrick  int
+	CurTrick    int
 	Owner       int // the playerid of the "owning" player
 }
 
 func (ht *HandTracker) sum(cardIndex sdz.Card) int {
 	sum := ht.PlayedCards[cardIndex]
-	if sum == None {
-		sum = 0
-	}
-	//Log(ht.Owner, "1-Summing card %s, sum = %d", card(cardIndex), sum)
 	for x := 0; x < len(ht.Cards); x++ {
-		switch ht.Cards[x][cardIndex] {
-		case None:
-		case Unknown:
-			// do nothing
-		default:
-			//Log(ht.Owner, "2-Adding %d to sum for player %d", ht.Cards[x][cardIndex], x)
+		if ht.Cards[x][cardIndex] != Unknown {
 			sum += ht.Cards[x][cardIndex]
 		}
 	}
@@ -339,7 +324,8 @@ func (oldht *HandTracker) Copy() (newht *HandTracker) {
 		newht.Cards[x] = oldht.Cards[x]
 	}
 	newht.PlayedCards = oldht.PlayedCards
-	newht.TrickNum = oldht.TrickNum
+	newht.StartTrick = oldht.StartTrick
+	newht.CurTrick = oldht.CurTrick
 	return
 }
 
@@ -419,6 +405,7 @@ func (ai *AI) populate() {
 		ai.HT.Cards[ai.Playerid].inc(card)
 		ai.HT.calculateCard(card)
 	}
+	ai.HT.calculateHand(ai.Playerid)
 }
 
 func (ht *HandTracker) noSuit(playerid int, suit sdz.Suit) {
@@ -430,6 +417,27 @@ func (ht *HandTracker) noSuit(playerid int, suit sdz.Suit) {
 		card++
 	}
 	//Log(ht.Owner, "No suit end")
+}
+
+func (ht *HandTracker) calculateHand(hand int) {
+	totalCards := 0
+	for x := 0; x < sdz.AllCards; x++ {
+		if ht.Cards[hand][x] != Unknown {
+			totalCards += ht.Cards[hand][x]
+		}
+	}
+	if totalCards > 12 {
+		Log(ht.Owner, "Player %d has more than 12 cards!", hand)
+		panic("Player has more than 12 cards")
+	}
+	if totalCards == 12 {
+		for x := 0; x < sdz.AllCards; x++ {
+			if ht.Cards[hand][x] == Unknown {
+				ht.Cards[hand][x] = None
+				ht.calculateCard(sdz.Card(x))
+			}
+		}
+	}
 }
 
 func (ht *HandTracker) calculateCard(cardIndex sdz.Card) {
@@ -635,6 +643,43 @@ func (t *Trick) reset() {
 	t.Plays = 0
 }
 
+func (trick *Trick) worth(playerid int, trump sdz.Suit) (worth int) {
+	if trick.Plays != 4 {
+		sdz.Log("Trick = %s", trick)
+		panic("worth should only be called at the end of the trick")
+	}
+	for x := range trick.Played {
+		if playerid%2 == x%2 {
+			if trick.Played[x].Suit() == trump {
+				worth--
+			}
+			switch trick.Played[x].Face() {
+			case sdz.Ace:
+				worth -= 2
+			case sdz.Ten:
+				worth--
+			}
+		} else {
+			if trick.Played[x].Suit() == trump {
+				worth++
+			}
+			switch trick.Played[x].Face() {
+			case sdz.Ace:
+				worth += 2
+			case sdz.Ten:
+				worth++
+			}
+
+		}
+	}
+	if trick.WinningPlayer%2 == playerid%2 {
+		worth += trick.counters() * 4
+	} else {
+		worth -= trick.counters() * 4
+	}
+	return
+}
+
 func (t *Trick) String() string {
 	var str bytes.Buffer
 	str.WriteString("-")
@@ -696,6 +741,7 @@ func CardBeatsTrick(card sdz.Card, trick *Trick, trump sdz.Suit) bool {
 type Result struct {
 	Card   sdz.Card
 	Points int
+	Real   bool // true if the result sees the end of the hand in actual points, false if the result is trick.worth() based
 }
 
 func inline(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit, myCard sdz.Card, results chan Result) {
@@ -705,21 +751,31 @@ func inline(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit, myCard 
 	//Log(ht.Owner, "Copying trick %s", newtrick)
 	//Log(4, "Marking card %s as played for %d", myCard, playerid)
 	newht.PlayCard(myCard, playerid, newtrick, trump)
-	points := 1 // set for last trick, otherwise, it's overwritten
+	result := Result{
+		Card: myCard,
+	}
 	if newtrick.Plays < 4 {
-		_, points = playHandWithCard((playerid+1)%4, newht, newtrick, trump)
+		_, result.Points = playHandWithCard((playerid+1)%4, newht, newtrick, trump)
 	} else { // trick is over, create a new trick
 		//Log(4, "Player %d pretend won the hand with a %s", newtrick.WinningPlayer, newtrick.winningCard())
-		ht.TrickNum++
-		if ht.TrickNum != 12 {
+		newht.CurTrick++
+		if newht.CurTrick == 12 { // hand over
+			result.Real = true
+			if ht.Owner%2 == newtrick.WinningPlayer%2 {
+				result.Points = newtrick.counters() + 1
+			} else {
+				result.Points = 0
+			}
+		} else if newht.CurTrick-2 >= ht.StartTrick { // not over but close enough!
+			result.Real = false
+			result.Points = newtrick.worth(ht.Owner, trump)
+		} else {
 			newtrick.reset()
-			_, points = playHandWithCard(newtrick.WinningPlayer, newht, newtrick, trump)
-		} else if ht.Owner%2 == newtrick.WinningPlayer%2 {
-			points += newtrick.counters()
+			_, result.Points = playHandWithCard(newtrick.WinningPlayer, newht, newtrick, trump)
 		}
 	}
+	results <- result
 	HTs <- newht // return the HandTracker to the pool for reuse
-	results <- Result{myCard, points}
 }
 
 func playHandWithCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Suit) (sdz.Card, int) {
@@ -750,6 +806,13 @@ func playHandWithCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Sui
 		if x == 0 || (result.Points >= bestPoints && partner) || (result.Points <= bestPoints && !partner) {
 			bestPoints = result.Points
 			bestCard = result.Card
+			if trick.Plays == 4 {
+				if result.Real {
+					bestPoints += trick.counters()
+				} else {
+					bestPoints += trick.worth(ht.Owner, trump)
+				}
+			}
 		}
 	}
 	//Log(4, "Best play for player %d is %s worth %d for the winners", playerid, bestCard, bestPoints)
@@ -757,8 +820,8 @@ func playHandWithCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Sui
 }
 
 func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
-	card, points := playHandWithCard(ai.Playerid, ai.HT, ai.Trick, action.Trump)
-	Log(ai.Playerid, "PlayHandWithCard returned %s for %d points.", card, points)
+	card, _ := playHandWithCard(ai.Playerid, ai.HT, ai.Trick, action.Trump)
+	//Log(ai.Playerid, "PlayHandWithCard returned %s for %d points.", card, points)
 	return card
 }
 
@@ -771,6 +834,7 @@ func (ht *HandTracker) potentialCards(playerid int, winning sdz.Card, lead sdz.S
 allCardLoop:
 	for x := 0; x < sdz.AllCards; x++ {
 		card := sdz.Card(x)
+		suit := card.Suit()
 		val := ht.Cards[playerid][card]
 		if val == Unknown {
 			if ht.sum(card) < 2 {
@@ -781,18 +845,19 @@ allCardLoop:
 			switch {
 			case winning == sdz.NACard:
 				// do nothing, just be the default case
-			case card.Suit() == lead && card.Beats(winning, trump):
+			case suit == lead && card.Beats(winning, trump):
 				cardStatus = FollowWin
-			case card.Suit() == lead:
+			case suit == lead:
 				cardStatus = FollowLose
-			case card.Suit() == trump && card.Beats(winning, trump):
+			case suit == trump && card.Beats(winning, trump):
 				cardStatus = TrumpWin
-			case card.Suit() == trump:
+			case suit == trump:
 				cardStatus = TrumpLose
 			}
 			if cardStatus > handStatus {
 				handStatus = cardStatus
-				validHand = sdz.Hand{card}
+				validHand = validHand[:1]
+				validHand[0] = card
 			} else if cardStatus == handStatus {
 				if (cardStatus == FollowLose || cardStatus == TrumpLose) ||
 					((cardStatus == FollowWin || cardStatus == TrumpWin) && lastPlay) {
@@ -813,11 +878,13 @@ allCardLoop:
 			}
 		}
 	}
-	//potentialHand.Shuffle()
-	//oldLen := len(potentialHand)
-	//if oldLen != 0 {
-	//	potentialHand = potentialHand[:max(1, len(potentialHand)/3)]
-	//	//Log(ht.Owner, "Reducing potential hand from %d to %d", oldLen, len(potentialHand))
+	//if len(validHand)+len(potentialHand) >= 4 {
+	//	potentialHand.Shuffle()
+	//	oldLen := len(potentialHand)
+	//	if oldLen != 0 {
+	//		potentialHand = potentialHand[:max(1, len(potentialHand)/3)]
+	//		//	//Log(ht.Owner, "Reducing potential hand from %d to %d", oldLen, len(potentialHand))
+	//	}
 	//}
 	if handStatus == Nothing {
 		validHand = append(validHand, potentialHand...)
@@ -826,14 +893,15 @@ allCardLoop:
 		for _, card := range potentialHand {
 			//Log(4, "Potential card %s", card)
 			cardStatus := Nothing
+			suit := card.Suit()
 			switch {
-			case card.Suit() == lead && card.Beats(winning, trump):
+			case suit == lead && card.Beats(winning, trump):
 				cardStatus = FollowWin
-			case card.Suit() == lead:
+			case suit == lead:
 				cardStatus = FollowLose
-			case card.Suit() == trump && card.Beats(winning, trump):
+			case suit == trump && card.Beats(winning, trump):
 				cardStatus = TrumpWin
-			case card.Suit() == trump:
+			case suit == trump:
 				cardStatus = TrumpLose
 			}
 			if cardStatus >= handStatus {
@@ -941,7 +1009,9 @@ func (ai *AI) Tell(g *goon.Goon, c appengine.Context, game *Game, action *sdz.Ac
 			} else if val == 1 {
 				ai.HT.Cards[action.Playerid][cardIndex] = 2
 			}
+			ai.HT.calculateCard(cardIndex)
 		}
+		ai.HT.calculateHand(ai.Playerid)
 	case "Message": // nothing to do here, no one to read it
 	case "Trick": // nothing to do here, nothing to display
 		//Log(ai.Playerid, "playedCards=%v", ai.HT.PlayedCards)

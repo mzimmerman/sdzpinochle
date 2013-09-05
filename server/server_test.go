@@ -133,54 +133,54 @@ func BenchmarkFindCardToPlay(b *testing.B) {
 	//Log(0, "Cards[3]=%s", p0.HT.Cards[3])
 
 	trick := new(Trick)
-	p0.HT.PlayCard(AD, 1, trick, trump)
-	p0.HT.PlayCard(NC, 2, trick, trump)
-	p0.HT.PlayCard(TD, 3, trick, trump)
-	p0.HT.PlayCard(ND, 0, trick, trump)
+	//p0.HT.PlayCard(AD, 1, trick, trump)
+	//p0.HT.PlayCard(NC, 2, trick, trump)
+	//p0.HT.PlayCard(TD, 3, trick, trump)
+	//p0.HT.PlayCard(ND, 0, trick, trump)
 	//Log(0, "Trick1 = %s", trick)
 	trick.reset()
-	p0.HT.PlayCard(AD, 1, trick, trump)
-	p0.HT.PlayCard(QC, 2, trick, trump)
-	p0.HT.PlayCard(KD, 3, trick, trump)
-	p0.HT.PlayCard(ND, 0, trick, trump)
-	//Log(0, "Trick2 = %s", trick)
-	trick.reset()
-	p0.HT.PlayCard(AH, 1, trick, trump)
-	p0.HT.PlayCard(KH, 2, trick, trump)
-	p0.HT.PlayCard(NH, 3, trick, trump)
-	p0.HT.PlayCard(QH, 0, trick, trump)
-	//Log(0, "Trick3 = %s", trick)
-	trick.reset()
-	p0.HT.PlayCard(QH, 1, trick, trump)
-	p0.HT.PlayCard(TH, 2, trick, trump)
-	p0.HT.PlayCard(JH, 3, trick, trump)
-	p0.HT.PlayCard(KH, 0, trick, trump)
-	//Log(0, "Trick4 = %s", trick)
-	trick.reset()
-	p0.HT.PlayCard(AC, 2, trick, trump)
-	p0.HT.PlayCard(TC, 3, trick, trump)
-	p0.HT.PlayCard(NC, 0, trick, trump)
-	p0.HT.PlayCard(QC, 1, trick, trump)
-	//Log(0, "Trick5 = %s", trick)
-	trick.reset()
-	p0.HT.PlayCard(KS, 2, trick, trump)
-	p0.HT.PlayCard(TS, 3, trick, trump)
-	p0.HT.PlayCard(AS, 0, trick, trump)
-	p0.HT.PlayCard(KS, 1, trick, trump)
-	//Log(0, "Trick6 = %s", trick)
-	trick.reset()
-	p0.HT.PlayCard(JC, 0, trick, trump)
-	p0.HT.PlayCard(TC, 1, trick, trump)
-	p0.HT.PlayCard(KC, 2, trick, trump)
-	p0.HT.PlayCard(AC, 3, trick, trump)
-	//Log(0, "Trick7 = %s", trick)
-	trick.reset()
-	p0.HT.PlayCard(JH, 3, trick, trump)
-	p0.HT.PlayCard(JD, 0, trick, trump)
-	p0.HT.PlayCard(NH, 1, trick, trump)
-	p0.HT.PlayCard(TH, 2, trick, trump)
-	//Log(0, "Trick8 = %s", trick)
-	trick.reset()
+	//p0.HT.PlayCard(AD, 1, trick, trump)
+	//p0.HT.PlayCard(QC, 2, trick, trump)
+	//p0.HT.PlayCard(KD, 3, trick, trump)
+	//p0.HT.PlayCard(ND, 0, trick, trump)
+	////Log(0, "Trick2 = %s", trick)
+	//trick.reset()
+	//p0.HT.PlayCard(AH, 1, trick, trump)
+	//p0.HT.PlayCard(KH, 2, trick, trump)
+	//p0.HT.PlayCard(NH, 3, trick, trump)
+	//p0.HT.PlayCard(QH, 0, trick, trump)
+	////Log(0, "Trick3 = %s", trick)
+	//trick.reset()
+	//p0.HT.PlayCard(QH, 1, trick, trump)
+	//p0.HT.PlayCard(TH, 2, trick, trump)
+	//p0.HT.PlayCard(JH, 3, trick, trump)
+	//p0.HT.PlayCard(KH, 0, trick, trump)
+	////Log(0, "Trick4 = %s", trick)
+	//trick.reset()
+	//p0.HT.PlayCard(AC, 2, trick, trump)
+	//p0.HT.PlayCard(TC, 3, trick, trump)
+	//p0.HT.PlayCard(NC, 0, trick, trump)
+	//p0.HT.PlayCard(QC, 1, trick, trump)
+	////Log(0, "Trick5 = %s", trick)
+	//trick.reset()
+	//p0.HT.PlayCard(KS, 2, trick, trump)
+	//p0.HT.PlayCard(TS, 3, trick, trump)
+	//p0.HT.PlayCard(AS, 0, trick, trump)
+	//p0.HT.PlayCard(KS, 1, trick, trump)
+	////Log(0, "Trick6 = %s", trick)
+	//trick.reset()
+	//p0.HT.PlayCard(JC, 0, trick, trump)
+	//p0.HT.PlayCard(TC, 1, trick, trump)
+	//p0.HT.PlayCard(KC, 2, trick, trump)
+	//p0.HT.PlayCard(AC, 3, trick, trump)
+	////Log(0, "Trick7 = %s", trick)
+	//trick.reset()
+	//p0.HT.PlayCard(JH, 3, trick, trump)
+	//p0.HT.PlayCard(JD, 0, trick, trump)
+	//p0.HT.PlayCard(NH, 1, trick, trump)
+	//p0.HT.PlayCard(TH, 2, trick, trump)
+	////Log(0, "Trick8 = %s", trick)
+	//trick.reset()
 	//p0.HT.PlayCard(JC, 0, trick, trump)
 	//p0.HT.PlayCard(JD, 1, trick, trump)
 	//p0.HT.PlayCard(KC, 2, trick, trump)
@@ -205,16 +205,39 @@ func BenchmarkFindCardToPlay(b *testing.B) {
 	//p0.HT.PlayCard(QS, 0, trick, trump)
 	//trick.reset()
 	action := sdz.CreatePlayRequest(sdz.NACard, sdz.NASuit, sdz.Hearts, 0, p0.Hand())
-	p0.findCardToPlay(action)
+	b.ResetTimer()
+	for x := 0; x < b.N; x++ {
+		p0.findCardToPlay(action)
+	}
+}
+
+func BenchmarkKnownCards(b *testing.B) {
+	//func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
+	p0 := createAI()
+	p0.SetHand(nil, nil, nil, sdz.Hand{QS, NC, ND, ND, KH, JS, QD, AS, JC, JC, QH, JD}, 0, 0)
+	p1 := createAI()
+	p1.SetHand(nil, nil, nil, sdz.Hand{AD, KS, NH, TD, JD, QH, QC, AD, KD, TC, AS, AH}, 0, 1)
+	p2 := createAI()
+	p2.SetHand(nil, nil, nil, sdz.Hand{KS, NC, NS, AH, KC, AC, TH, TH, TS, KH, KC, QC}, 0, 2)
+	p3 := createAI()
+	p3.SetHand(nil, nil, nil, sdz.Hand{JS, JH, TC, JH, QS, NH, TD, KD, AC, NS, QD, TS}, 0, 3)
+	p0.Tell(nil, nil, nil, sdz.CreateMeld(*p1.Hand(), 0, 1))
+	p0.Tell(nil, nil, nil, sdz.CreateMeld(*p2.Hand(), 0, 2))
+	p0.Tell(nil, nil, nil, sdz.CreateMeld(*p3.Hand(), 0, 3))
+	action := sdz.CreatePlayRequest(sdz.NACard, sdz.NASuit, sdz.Hearts, 0, p0.Hand())
+	b.ResetTimer()
+	for x := 0; x < b.N; x++ {
+		p0.findCardToPlay(action)
+	}
 }
 
 func BenchmarkFullGame(b *testing.B) {
-	return
 	c, err := appenginetesting.NewContext(&appenginetesting.Options{Debug: "critical"})
 	if err != nil {
 		b.Fatalf("Could not start up appenginetesting")
 	}
 	defer c.Close()
+	b.ResetTimer()
 	for y := 0; y < b.N; y++ {
 		game := NewGame(4)
 		for x := 0; x < len(game.Players); x++ {
@@ -222,6 +245,7 @@ func BenchmarkFullGame(b *testing.B) {
 		}
 		game.NextHand(nil, c)
 	}
+	b.StopTimer() // stopping so not to count the defer call above
 }
 
 func (t *testSuite) TestPotentialCardsShort() {
@@ -506,15 +530,15 @@ func (t *testSuite) TestFindCardToPlay() {
 	//func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	ai := createAI()
 	ai.SetHand(nil, nil, nil, sdz.Hand{AD, AD, TD, JD, TC, KC, QC, TH, JH, NH, KS, QS}, 0, 3)
-	ai.Trump = sdz.Hearts
+	ai.Trump = sdz.Diamonds
 	ai.HT.Cards[0][KH] = 1
 	ai.HT.Cards[0][QH] = 1
 	ai.HT.Cards[1][NH] = 1
 	ai.HT.Cards[2][KD] = 1
 	ai.HT.Cards[2][QD] = 1
-	action := sdz.CreatePlayRequest(sdz.NACard, sdz.NASuit, sdz.Hearts, 3, ai.Hand())
+	action := sdz.CreatePlayRequest(sdz.NACard, sdz.NASuit, ai.Trump, 3, ai.Hand())
 	card := ai.findCardToPlay(action)
-	t.True(card == TD)
+	t.Equal(sdz.Card(TD), card)
 }
 
 func (t *testSuite) TestPlayCard() {
@@ -612,14 +636,14 @@ func (t *testSuite) TestAITracking() {
 	ai.Tell(nil, nil, nil, sdz.CreatePlay(KD, 3))
 
 	play := ai.Tell(nil, nil, nil, sdz.CreatePlayRequest(ai.Trick.winningCard(), ai.Trick.leadSuit(), ai.Trump, ai.PlayerID(), &sdz.Hand{}))
-	t.Equal(TD, play.PlayedCard)
+	t.Equal(sdz.Card(TD), play.PlayedCard)
 	ai.Tell(nil, nil, nil, sdz.CreateTrick(0))
 	ai.Tell(nil, nil, nil, sdz.CreatePlay(JD, 1))
 	ai.Tell(nil, nil, nil, sdz.CreatePlay(KD, 2))
 	ai.Tell(nil, nil, nil, sdz.CreatePlay(KH, 3))
 
 	play = ai.Tell(nil, nil, nil, sdz.CreatePlayRequest(ai.Trick.winningCard(), ai.Trick.leadSuit(), ai.Trump, ai.PlayerID(), &sdz.Hand{}))
-	t.Equal(TD, play.PlayedCard)
+	t.Equal(sdz.Card(TD), play.PlayedCard)
 
 	ai = createAI()
 	hand = sdz.Hand{ND, ND, QD, TD, TD, AD, JC, QC, KC, AH, AH, KS}
