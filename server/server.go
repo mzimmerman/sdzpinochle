@@ -8,7 +8,7 @@ import (
 	"encoding/gob"
 	"github.com/gorilla/sessions"
 	"log"
-	"runtime"
+	//"runtime"
 	//"appengine/datastore"
 	"appengine/mail"
 	"encoding/json"
@@ -43,7 +43,7 @@ const (
 
 var store = sessions.NewCookieStore([]byte("sdzpinochle"))
 
-var sem = make(chan bool, runtime.NumCPU())
+//var sem = make(chan bool, runtime.NumCPU())
 
 var HTs = make(chan *HandTracker, 1000)
 
@@ -62,9 +62,9 @@ func init() {
 	//gob.Register(AI{})
 	gob.Register(new(Human))
 	//gob.Register(Human{})
-	for x := 0; x < runtime.NumCPU(); x++ {
-		sem <- true
-	}
+	//for x := 0; x < runtime.NumCPU(); x++ {
+	//	sem <- true
+	//}
 }
 
 func getHand() sdz.Hand {
@@ -817,15 +817,15 @@ func playHandWithCard(playerid int, ht *HandTracker, trick *Trick, trump sdz.Sui
 	numCards := len(decisionMap)
 	results := make(chan Result, numCards)
 	for _, card := range decisionMap {
-		select {
-		case <-sem:
-			go func(myCard sdz.Card) {
-				inline(playerid, ht, trick, trump, myCard, results)
-				sem <- true
-			}(card)
-		default:
-			inline(playerid, ht, trick, trump, card, results)
-		}
+		//select {
+		//case <-sem:
+		//	go func(myCard sdz.Card) {
+		//		inline(playerid, ht, trick, trump, myCard, results)
+		//		sem <- true
+		//	}(card)
+		//default:
+		inline(playerid, ht, trick, trump, card, results)
+		//}
 	}
 	Hands <- decisionMap // need to return the Hand object obtained from potentialCards to the pool of resources
 	var bestCard sdz.Card
