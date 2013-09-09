@@ -339,37 +339,60 @@ func (ht *HandTracker) Debug() {
 func (ht *HandTracker) PlayCard(card sdz.Card, playerid int, trick *Trick, trump sdz.Suit) {
 	//Log(ht.Owner, "In ht.PlayCard for %d-%s on player %d", playerid, c, ht.Owner)
 	//ht.Debug()
-	ht.PlayedCards.inc(card)
 	val := ht.Cards[playerid][card]
 	if val == None {
-		Log(4, "Player %d does not have card %s, panicking", playerid, card)
+		ht.Debug()
+		Log(ht.Owner, "Player %d does not have card %s, panicking", playerid, card)
 		panic("panic")
 	}
+	ht.PlayedCards.inc(card)
 	ht.Cards[playerid].dec(card)
+	//if card == JD && playerid == 1 {
+	//	Log(ht.Owner, "Decremented %s for player %d from %d to %d", card, playerid, val, ht.Cards[playerid][card])
+	//}
 	if val == 1 && ht.PlayedCards[card] == 1 && playerid != ht.Owner {
 		// Other player could have only shown one in meld, but has two - now we don't know who has the last one
-		//if card == TH {
-		//	Log(ht.Owner, "htcardset - deleted card %s for player %d", card, playerid)
-		//}
 		ht.Cards[playerid][card] = Unknown
-		//} else if card == TH {
+		//if oright == ht && card == JD && ht.Owner == 0 && playerid == 1 {
+		//	Log(ht.Owner, "htcardset - deleted card %s for player %d, setting to Unknown", card, playerid)
+		//	ht.Debug()
+		//}
+		//} else if oright == ht && card == JD && ht.Owner == 0 && playerid == 1 {
 		//	Log(ht.Owner, "Not setting %s to unknown, val=%d, played=%d, playerid=%d", card, val, ht.PlayedCards[card], playerid)
 		//	ht.Debug()
 	}
+	//if oright == ht && playerid == 1 && card == JD {
+	//	Log(ht.Owner, "Before Calculate")
+	//	ht.Debug()
+	//}
 	ht.calculateCard(card)
+	//if oright == ht && playerid == 1 && card == JD {
+	//	Log(ht.Owner, "After Calculate")
+	//	ht.Debug()
+	//}
 	trick.PlayCard(playerid, card, trump)
 	switch {
 	case trick.leadSuit() == sdz.NASuit || trump == sdz.NASuit:
-		// do nothing
+		// do nothing, start of the trick, everything is legal
 	case card.Suit() != trick.leadSuit() && card.Suit() != trump: // couldn't follow suit, couldn't lay trump
 		ht.noSuit(playerid, trump)
+		//if oright == ht && playerid == 1 {
+		//	Log(ht.Owner, "Setting all %s to None for playerid=%d", trump, playerid)
+		//}
 		fallthrough
 	case card.Suit() != trick.leadSuit(): // couldn't follow suit
 		ht.noSuit(playerid, trick.leadSuit())
-	case playerid != trick.WinningPlayer: // did not win
+		//if oright == ht && playerid == 1 {
+		//	Log(ht.Owner, "Setting all %s to None for playerid=%d", trick.leadSuit(), playerid)
+		//}
+	}
+	if playerid != trick.WinningPlayer { // did not win
 		for _, f := range sdz.Faces {
 			tempCard := sdz.CreateCard(card.Suit(), f)
 			if tempCard.Beats(trick.winningCard(), trump) {
+				//if oright == ht && playerid == 1 {
+				//	Log(ht.Owner, "Setting %s to None for playerid=%d because it could have won", tempCard, playerid)
+				//}
 				ht.Cards[playerid][tempCard] = None
 				ht.calculateCard(tempCard)
 			} else {
@@ -461,36 +484,43 @@ func (ht *HandTracker) calculateCard(cardIndex sdz.Card) {
 			}
 		}
 	} else {
-		unknown := -1
-		hasCard := -1
-		for x := 0; x < 4; x++ {
-			if sum == 1 && ht.Cards[x][cardIndex] == 1 {
-				hasCard = x
-			}
-			if val := ht.Cards[x][cardIndex]; val == Unknown {
-				if unknown == -1 {
-					unknown = x
-				} else {
-					// at least two unknowns
-					unknown = -1
-					hasCard = -1
-					break
-				}
-			}
-		}
-		//Log(4, "unknown = %d", unknown)
-		if unknown >= 0 {
-			//if ht.PlayedCards[cardIndex] > 0 || ht.Cards[ht.Owner][cardIndex] == 1 {
-			ht.Cards[unknown][cardIndex] = 2 - sum
-			//} else if sum == 0 {
-			//ht.Cards[unknown][cardIndex] = 2
-			//}
-		} else if hasCard >= 0 && sum == 1 {
-			//Log(ht.Owner, "Setting ht.Cards[%d][%s] to 2", hasCard, cardIndex)
-			ht.Cards[hasCard][cardIndex] = 2
-		}
+		//TODO: implement "has at least one" status
+		//unknown := -1
+		//hasCard := -1
+		//for x := 0; x < 4; x++ {
+		//	if sum == 1 && ht.Cards[x][cardIndex] == 1 {
+		//		hasCard = x
+		//	}
+		//	if val := ht.Cards[x][cardIndex]; val == Unknown {
+		//		if unknown == -1 {
+		//			unknown = x
+		//		} else {
+		//			// at least two unknowns
+		//			unknown = -1
+		//			hasCard = -1
+		//			break
+		//		}
+		//	}
+		//}
+		////Log(4, "unknown = %d", unknown)
+		//if unknown >= 0 {
+		//	//if ht.PlayedCards[cardIndex] > 0 || ht.Cards[ht.Owner][cardIndex] == 1 {
+		//	ht.Cards[unknown][cardIndex] = 2 - sum
+		//	if ht == oright && unknown == 2 {
+		//		Log(ht.Owner, "Set playerid=%d to have card %s at value = %d", unknown, cardIndex, 2-sum)
+		//	}
+		//	//} else if sum == 0 {
+		//	//ht.Cards[unknown][cardIndex] = 2
+		//	//}
+		//} else if hasCard >= 0 && sum == 1 {
+		//	//Log(ht.Owner, "Setting ht.Cards[%d][%s] to 2", hasCard, cardIndex)
+		//	ht.Cards[hasCard][cardIndex] = 2
+		//	if ht == oright && hasCard == 2 {
+		//		Log(ht.Owner, "Playerid=%d is the only one to have card %s, set value to 2", hasCard, cardIndex)
+		//	}
+		//}
 	}
-	//if cardIndex == TH {
+	//if cardIndex == JD && ht == oright {
 	//	if ht.PlayedCards[cardIndex] != Unknown {
 	//		if ht.PlayedCards[cardIndex] == None {
 	//			Log(ht.Owner, "PC[%s]=%d", cardIndex, 0)
@@ -1101,7 +1131,6 @@ type Game struct {
 func (x *Game) Load(c <-chan datastore.Property) error {
 	for {
 		prop := <-c
-		log.Printf("Property is %s", prop.Name)
 		if prop.Name == "" {
 			return nil
 		}
@@ -1392,7 +1421,7 @@ func (game *Game) processAction(g *goon.Goon, c appengine.Context, client *Clien
 					game.BroadcastAll(g, c, sdz.CreateMessage(fmt.Sprintf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)))
 					//Log(4, "Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)
 					win := make([]bool, 2)
-					gameOver := true
+					gameOver := false
 					if game.Score[game.HighPlayer%2] >= 120 {
 						win[game.HighPlayer%2] = true
 						gameOver = true

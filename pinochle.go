@@ -37,7 +37,7 @@ const (
 	Hearts   = iota
 	Clubs    = iota
 	Diamonds = iota
-	NASuit   = -1
+	NASuit   = iota
 )
 
 const (
@@ -65,7 +65,7 @@ const (
 	QD     = iota
 	JD     = iota
 	ND     = iota
-	NACard = -1
+	NACard = iota
 )
 
 var Faces [6]Face
@@ -218,7 +218,7 @@ func (h Hand) String() string {
 	buffer.WriteString("Hand{")
 	for x := range h {
 		buffer.WriteString(h[x].String())
-		buffer.WriteString(" ")
+		buffer.WriteString(", ")
 	}
 	buffer.WriteString("}")
 	return buffer.String()
