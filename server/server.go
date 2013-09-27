@@ -878,7 +878,7 @@ func playHandWithCard(ht *HandTracker, trump sdz.Suit) (sdz.Card, int) {
 	if ht.Trick.Plays == 4 {
 		panic("playHandWithCard && trick.Plays == 4")
 	}
-	decisionMap := ht.potentialCards(ht.Trick.Next, ht.Trick.winningCard(), ht.Trick.leadSuit(), trump, ht.Trick.Plays == 3)
+	decisionMap := ht.potentialCards(ht.Trick.winningCard(), ht.Trick.leadSuit(), trump, ht.Trick.Plays == 3)
 	numCards := len(decisionMap)
 	results := make(chan Result, numCards)
 	for _, card := range decisionMap {
@@ -917,7 +917,7 @@ func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	return card
 }
 
-func (ht *HandTracker) potentialCards(playerid int, winning sdz.Card, lead sdz.Suit, trump sdz.Suit, lastPlay bool) sdz.Hand {
+func (ht *HandTracker) potentialCards(winning sdz.Card, lead sdz.Suit, trump sdz.Suit, lastPlay bool) sdz.Hand {
 	//Log(ht.Owner, "PotentialCards called with %d,winning=%s,lead=%s,trump=%s", playerid, winning, lead, trump)
 	//Log(ht.Owner, "PotentialCards Player%d - %s", playerid, ht.Cards[playerid])
 	validHand := getHand()
@@ -927,7 +927,7 @@ allCardLoop:
 	for x := 0; x < sdz.AllCards; x++ {
 		card := sdz.Card(x)
 		suit := card.Suit()
-		val := ht.Cards[playerid][card]
+		val := ht.Cards[ht.Trick.Next][card]
 		if val == Unknown {
 			if ht.sum(card) < 2 {
 				potentialHand = append(potentialHand, card)
@@ -1017,7 +1017,7 @@ allCardLoop:
 		}
 	}
 	Hands <- potentialHand
-	Log(ht.Owner, "Returning %d potential plays of %s for playerid %d", len(validHand), validHand, playerid)
+	Log(ht.Owner, "Returning %d potential plays of %s for playerid %d", len(validHand), validHand, ht.Trick.Next)
 	ht.Debug()
 	return validHand
 }
