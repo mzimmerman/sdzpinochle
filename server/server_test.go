@@ -683,7 +683,6 @@ func (t *testSuite) TestAITracking() {
 	t.Equal(ai.HT.PlayedCards[QD], 1)
 	t.Equal(ai.HT.Cards[0][QD], 1)
 
-	ai.HT.Debug()
 	play := ai.Tell(nil, nil, nil, sdz.CreatePlayRequest(ai.HT.Trick.winningCard(), ai.HT.Trick.leadSuit(), ai.Trump, ai.PlayerID(), &sdz.Hand{}))
 	t.Equal(sdz.Card(TD), play.PlayedCard)
 	ai.Tell(nil, nil, nil, sdz.CreateTrick(0))

@@ -786,6 +786,55 @@ type Result struct {
 	Points int
 }
 
+//type PlayWalker struct {
+//	Walker int
+//	Parent   *PlayWalker
+//	Children []*PlayWalker
+//	Card     sdz.Card
+//	HT       *HandTracker
+//	Playerid int
+//	Results  []int // from the perspective of ht.Owner
+//}
+
+//func playHandWithCard(playerid int, ht *HandTracker, trump sdz.Suit) sdz.Card {
+//	pw := &PlayWalker{
+//		HT:       ht,
+//		Card:     sdz.NACard,
+//		Playerid: playerid,
+//	}
+//	end := time.Now().Add(time.Second * 5)
+//	for {
+//		if time.Now() > end {
+//			// TODO unravel it all
+//			return sdz.NACard
+//		}
+//		if pw.Children == nil { // load children, all possible cards
+//			decisionMap := pw.HT.potentialCards(pw.Playerid, pw.HT.Trick.winningCard(), pw.HT.Trick.leadSuit(), trump, pw.HT.Trick.Plays == 3)
+//			pw.Children = make([]*PlayWalker, len(decisionMap))
+//			pw.Results = make([]int, len(decisionMap))
+//			for x := range decisionMap {
+//				pw.Children[x] := &PlayWalker{
+//					HT:       pw.HT.Copy(),
+//					Card:     decisionMap[x],
+//					Playerid: (playerid + 1) % 4,
+//					Parent : pw,
+//				}
+//				pw.Children[x].HT.PlayCard(pw.Children[x].Card,pw.Children[x].Playerid,trump)
+
+//			}
+//		}
+//		if pw.Parent != nil && pw.Parent.Walker < len(pw.Parent.Children) { // go up one immediately to continue all siblings first
+//			pw = pw.Parent
+//			continue
+//		}
+//		if pw.Walker < len(pw.Children) { // siblings all handled, visit the child
+//			pw = pw.Children[pw.Walker]
+//			pw.Parent.Walker++
+//			continue
+//		}
+//	}
+//}
+
 func inline(playerid int, ht *HandTracker, trump sdz.Suit, myCard sdz.Card, results chan Result) {
 	newht := ht.Copy()
 	Log(ht.Owner, "Marking card %s as played for %d", myCard, playerid)
