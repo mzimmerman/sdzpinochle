@@ -77,35 +77,40 @@ func (t *testSuite) TestTrickStringShort() {
 	trump := sdz.Suit(sdz.Diamonds)
 	trick := new(Trick)
 	t.Equal("-----", trick.String())
-	trick.PlayCard(0, TC, trump)
+	trick.PlayCard(TC, trump)
 	t.Equal("-lwTC----", trick.String())
-	trick.PlayCard(1, AC, trump)
+	trick.PlayCard(AC, trump)
 	t.Equal("-lTC-wAC---", trick.String())
-	trick.PlayCard(2, KD, trump)
+	trick.PlayCard(KD, trump)
 	t.Equal("-lTC-AC-wKD--", trick.String())
-	trick.PlayCard(3, QS, trump)
+	trick.PlayCard(QS, trump)
 	t.Equal("-lTC-AC-wKD-QS-", trick.String())
 	trick.reset()
+	trick.Next = 1
 	t.Equal("-----", trick.String())
-	trick.PlayCard(1, TC, trump)
+	trick.PlayCard(TC, trump)
 	t.Equal("--lwTC---", trick.String())
-	trick.PlayCard(2, AC, trump)
+	trick.PlayCard(AC, trump)
 	t.Equal("--lTC-wAC--", trick.String())
-	trick.PlayCard(3, KD, trump)
+	trick.PlayCard(KD, trump)
 	t.Equal("--lTC-AC-wKD-", trick.String())
-	trick.PlayCard(0, QS, trump)
+	trick.PlayCard(QS, trump)
 	t.Equal("-QS-lTC-AC-wKD-", trick.String())
 	trick.reset()
-	trick.PlayCard(1, AD, trump)
+	trick.Next = 1 // 3 won the last trick, but we're starting with 1
+	trick.PlayCard(AD, trump)
 	t.Equal("--lwAD---", trick.String())
 	trick.reset()
-	trick.PlayCard(2, AD, trump)
+	trick.Next = 2
+	trick.PlayCard(AD, trump)
 	t.Equal("---lwAD--", trick.String())
 	trick.reset()
-	trick.PlayCard(3, AD, trump)
+	trick.Next = 3
+	trick.PlayCard(AD, trump)
 	t.Equal("----lwAD-", trick.String())
 	trick.reset()
-	trick.PlayCard(0, AD, trump)
+	trick.Next = 0
+	trick.PlayCard(AD, trump)
 	t.Equal("-lwAD----", trick.String())
 }
 
@@ -601,14 +606,15 @@ func (t *testSuite) TestPlayCard() {
 	p0.Tell(nil, nil, nil, sdz.CreateMeld(p2Meld, p2Amt, 2))
 	p0.Tell(nil, nil, nil, sdz.CreateMeld(p3Meld, p3Amt, 3))
 
-	trick := new(Trick)
+	p0.HT.Trick.Next = 2
 	t.True(p0.HT.Cards[2][TH] == Unknown)
 	t.True(p0.HT.PlayedCards[TH] == None)
-	p0.HT.PlayCard(TH, 2, trump)
+	p0.HT.PlayCard(TH, trump)
 	t.True(p0.HT.Cards[2][TH] == Unknown)
 	t.True(p0.HT.PlayedCards[TH] == 1)
-	trick.reset()
-	p0.HT.PlayCard(TH, 2, trump)
+	p0.HT.Trick.reset()
+	p0.HT.Trick.Next = 2
+	p0.HT.PlayCard(TH, trump)
 	t.True(p0.HT.Cards[3][TH] == None)
 	t.True(p0.HT.Cards[2][TH] == None)
 	t.True(p0.HT.Cards[1][TH] == None)
@@ -810,7 +816,8 @@ func (t *testSuite) TestCalculateShort() {
 
 	t.Equal(ai.HT.Cards[2][KS], Unknown)
 	t.Equal(ai.HT.Cards[1][KS], 1)
-	ai.HT.PlayCard(KS, 2, sdz.Spades)
+	ai.HT.Trick.Next = 2
+	ai.HT.PlayCard(KS, sdz.Spades)
 	t.Equal(ai.HT.Cards[1][KS], 1)
 	t.Equal(ai.HT.Cards[2][KS], None)
 }
