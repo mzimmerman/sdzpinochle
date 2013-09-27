@@ -538,12 +538,19 @@ func (t *testSuite) TestFindCardToPlay() {
 	ai.HT.Cards[2][KD] = 1
 	ai.HT.Cards[2][QD] = 1
 	action := sdz.CreatePlayRequest(sdz.NACard, sdz.NASuit, ai.Trump, 3, ai.Hand())
-	card := ai.findCardToPlay(action)
-	t.Equal(sdz.Card(TD), card)
+	switch ai.findCardToPlay(action) {
+	case AD:
+		fallthrough
+	case JD:
+		t.MustFail()
+	default:
+		// all other plays are acceptable depending on strategy
+		t.True(true)
+	}
 }
 
 func (t *testSuite) TestGame() {
-	c, err := appenginetesting.NewContext(&appenginetesting.Options{Debug: "critical"})
+	c, err := appenginetesting.NewContext(&appenginetesting.Options{Debug: "debug"})
 	if err != nil {
 		t.Error("Could not start appenginetesting")
 		t.MustFail()
@@ -597,11 +604,11 @@ func (t *testSuite) TestPlayCard() {
 	trick := new(Trick)
 	t.True(p0.HT.Cards[2][TH] == Unknown)
 	t.True(p0.HT.PlayedCards[TH] == None)
-	p0.HT.PlayCard(TH, 2, trick, trump)
+	p0.HT.PlayCard(TH, 2, trump)
 	t.True(p0.HT.Cards[2][TH] == Unknown)
 	t.True(p0.HT.PlayedCards[TH] == 1)
 	trick.reset()
-	p0.HT.PlayCard(TH, 2, trick, trump)
+	p0.HT.PlayCard(TH, 2, trump)
 	t.True(p0.HT.Cards[3][TH] == None)
 	t.True(p0.HT.Cards[2][TH] == None)
 	t.True(p0.HT.Cards[1][TH] == None)
@@ -670,15 +677,21 @@ func (t *testSuite) TestAITracking() {
 	ai.Tell(nil, nil, nil, sdz.CreatePlay(JD, 1))
 	ai.Tell(nil, nil, nil, sdz.CreatePlay(QD, 2))
 	ai.Tell(nil, nil, nil, sdz.CreatePlay(KD, 3))
+	t.Equal(ai.HT.Cards[2][QD], None)
+	t.Equal(ai.HT.Cards[3][QD], None)
+	t.Equal(ai.HT.Cards[1][QD], None)
+	t.Equal(ai.HT.PlayedCards[QD], 1)
+	t.Equal(ai.HT.Cards[0][QD], 1)
 
-	play := ai.Tell(nil, nil, nil, sdz.CreatePlayRequest(ai.Trick.winningCard(), ai.Trick.leadSuit(), ai.Trump, ai.PlayerID(), &sdz.Hand{}))
+	ai.HT.Debug()
+	play := ai.Tell(nil, nil, nil, sdz.CreatePlayRequest(ai.HT.Trick.winningCard(), ai.HT.Trick.leadSuit(), ai.Trump, ai.PlayerID(), &sdz.Hand{}))
 	t.Equal(sdz.Card(TD), play.PlayedCard)
 	ai.Tell(nil, nil, nil, sdz.CreateTrick(0))
 	ai.Tell(nil, nil, nil, sdz.CreatePlay(JD, 1))
 	ai.Tell(nil, nil, nil, sdz.CreatePlay(KD, 2))
 	ai.Tell(nil, nil, nil, sdz.CreatePlay(KH, 3))
 
-	play = ai.Tell(nil, nil, nil, sdz.CreatePlayRequest(ai.Trick.winningCard(), ai.Trick.leadSuit(), ai.Trump, ai.PlayerID(), &sdz.Hand{}))
+	play = ai.Tell(nil, nil, nil, sdz.CreatePlayRequest(ai.HT.Trick.winningCard(), ai.HT.Trick.leadSuit(), ai.Trump, ai.PlayerID(), &sdz.Hand{}))
 	t.Equal(sdz.Card(TD), play.PlayedCard)
 
 	ai = createAI()
@@ -795,4 +808,10 @@ func (t *testSuite) TestCalculateShort() {
 	//ai.HT.Cards[3][JC] = 1
 	//ai.HT.calculateCard(JC)
 	//t.Equal(2, ai.HT.Cards[3][JC])
+
+	t.Equal(ai.HT.Cards[2][KS], Unknown)
+	t.Equal(ai.HT.Cards[1][KS], 1)
+	ai.HT.PlayCard(KS, 2, sdz.Spades)
+	t.Equal(ai.HT.Cards[1][KS], 1)
+	t.Equal(ai.HT.Cards[2][KS], None)
 }
