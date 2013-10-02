@@ -532,7 +532,7 @@ func (t *testSuite) TestFindCardToPlayShort() {
 	t.True(card == AD || card == QS)
 }
 
-func (t *testSuite) TestFindCardToPlay() {
+func (t *testSuite) TestFindCardToPlayLong() {
 	//func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	ai := createAI()
 	ai.SetHand(nil, nil, nil, sdz.Hand{AD, AD, TD, JD, TC, KC, QC, TH, JH, NH, KS, QS}, 0, 3)

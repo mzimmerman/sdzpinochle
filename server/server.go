@@ -26,6 +26,12 @@ import (
 )
 
 const (
+	PWNew        = iota // PlayWalker is "blank"
+	PWPopulated         // PlayWalker has children
+	PWExtended          // PlayWalker has grandchildren from all children
+	PWCalculated        // PlayWalker picked his best child :)
+)
+const (
 	StateNew   = "new"
 	StateBid   = "bid"
 	StateTrump = "trump"
@@ -356,10 +362,10 @@ func (ht *HandTracker) Debug() {
 	Log(ht.Owner, "CurrentTrick = %d, StartTrick = %d", ht.CurTrick, ht.StartTrick)
 }
 
-func (ht *HandTracker) PlayCard(card sdz.Card, trump sdz.Suit) {
-	//Log(ht.Owner, "In ht.PlayCard for %d-%s on player %d", playerid, c, ht.Owner)
+func (ht *HandTracker) PlayCard(card sdz.Card, trump sdz.Suit) int { // return the Trick's worth in terms of the "Next" player
 	//ht.Debug()
 	playerid := ht.Trick.Next
+	//Log(ht.Owner, "In ht.PlayCard for %d-%s on player %d", playerid, card, ht.Owner)
 	val := ht.Cards[playerid][card]
 	if val == None {
 		ht.Debug()
@@ -424,6 +430,7 @@ func (ht *HandTracker) PlayCard(card sdz.Card, trump sdz.Suit) {
 			}
 		}
 	}
+	return ht.Trick.worth(playerid, trump)
 	//Log(ht.Owner, "Player %d played card %s", playerid, c)
 }
 
@@ -693,8 +700,8 @@ func (t *Trick) reset() {
 
 func (trick *Trick) worth(playerid int, trump sdz.Suit) (worth int) {
 	if trick.Plays != 4 {
-		sdz.Log("Trick = %s", trick)
-		panic("worth should only be called at the end of the trick")
+		// return 0 when it's not a complete trick, it's not worth anything as it's not over
+		return
 	}
 	for x := range trick.Played {
 		if playerid%2 == x%2 {
@@ -786,133 +793,199 @@ func CardBeatsTrick(card sdz.Card, trick *Trick, trump sdz.Suit) bool {
 	return card.Beats(trick.winningCard(), trump)
 }
 
-type Result struct {
-	Card   sdz.Card
-	Points int
-}
-
-//type PlayWalker struct {
-//	Walker int
-//	Parent   *PlayWalker
-//	Children []*PlayWalker
-//	Card     sdz.Card
-//	HT       *HandTracker
-//	Playerid int
-//	Results  []int // from the perspective of ht.Owner
+//type Result struct {
+//	Card   sdz.Card
+//	Points int
 //}
 
-//func playHandWithCard(playerid int, ht *HandTracker, trump sdz.Suit) sdz.Card {
-//	pw := &PlayWalker{
-//		HT:       ht,
-//		Card:     sdz.NACard,
-//		Playerid: playerid,
-//	}
-//	end := time.Now().Add(time.Second * 5)
-//	for {
-//		if time.Now() > end {
-//			// TODO unravel it all
-//			return sdz.NACard
-//		}
-//		if pw.Children == nil { // load children, all possible cards
-//			decisionMap := pw.HT.potentialCards(pw.Playerid, pw.HT.Trick.winningCard(), pw.HT.Trick.leadSuit(), trump, pw.HT.Trick.Plays == 3)
-//			pw.Children = make([]*PlayWalker, len(decisionMap))
-//			pw.Results = make([]int, len(decisionMap))
-//			for x := range decisionMap {
-//				pw.Children[x] := &PlayWalker{
-//					HT:       pw.HT.Copy(),
-//					Card:     decisionMap[x],
-//					Playerid: (playerid + 1) % 4,
-//					Parent : pw,
-//				}
-//				pw.Children[x].HT.PlayCard(pw.Children[x].Card,pw.Children[x].Playerid,trump)
+type PlayWalker struct {
+	Walker   int
+	State    int // PlayWalker is (PW)New, Populated, Extended, or Calculated
+	Parent   *PlayWalker
+	Children []*PlayWalker
+	Card     sdz.Card
+	HT       *HandTracker
+	Playerid int
+	Result   int // from the perspective of the current player
+}
 
+func playHandWithCard(ht *HandTracker, trump sdz.Suit) sdz.Card {
+	count := 0
+	pw := &PlayWalker{
+		HT:   ht,
+		Card: sdz.NACard,
+	}
+	end := false
+	endTimer := time.AfterFunc(time.Second*10, func() { end = true })
+	for {
+		if end { // take as much time as we can, calculate the best card(s) to play
+			for pw.Parent != nil { // go to the PlayWalker root
+				pw = pw.Parent
+			}
+			bestChild := 0
+			for {
+				//if pw.Children == nil || pw.Walker != len(pw.Children) { // incomplete PlayWalker tree
+				//	// pw.Best = 0 -- already 0 due to initialization
+				//	pw = pw.Parent
+				//	continue
+				//}
+				if pw.State <= PWPopulated { // set my result, I am a dead child
+					//Log(ht.Owner, "Five")
+					pw.Result = pw.HT.Trick.worth(pw.HT.Trick.Next, trump)
+					Log(ht.Owner, "Scoring dead trick %s as value %d", pw.HT.Trick, pw.Result)
+					pw.State = PWCalculated
+					pw = pw.Parent
+				} else if pw.State == PWExtended {
+					//Log(ht.Owner, "Six")
+					if pw.Walker < len(pw.Children) { // visit the children first
+						pw = pw.Children[pw.Walker]
+						pw.Parent.Walker++
+					} else {
+						bestChild = 0
+						for x := 1; x < len(pw.Children); x++ {
+							if pw.Children[x].Result > pw.Children[bestChild].Result {
+								bestChild = x
+							}
+						}
+						if pw.Parent == nil { // I'm the root
+							// return the best card
+							Log(ht.Owner, "Created %d PlayWalkers, found best card %s", count, pw.Children[bestChild].Card)
+							return pw.Children[bestChild].Card
+						}
+						if pw.HT.Trick.Lead == pw.HT.Trick.Next {
+							pw.Result = pw.HT.Trick.worth(pw.HT.Trick.Next, trump) + pw.Children[bestChild].Result
+							Log(ht.Owner, "Scoring trick %s as player %d and adding %d for result %d", pw.HT.Trick, pw.HT.Trick.Next, pw.Children[bestChild].Result, pw.Result)
+						} else { // pass the trick information upstream
+							pw.Children[bestChild].HT.Trick.Next = pw.HT.Trick.Next
+							pw.HT.Trick = pw.Children[bestChild].HT.Trick
+							pw.Result = pw.HT.Trick.worth(pw.HT.Trick.Next, trump)
+							Log(ht.Owner, "Scoring child's trick %s as player %d and adding %d for result %d", pw.HT.Trick, pw.HT.Trick.Next, pw.Children[bestChild].Result, pw.Result)
+						}
+						pw.State = PWCalculated
+						pw = pw.Parent
+					}
+				} else if pw.State == PWCalculated {
+					//Log(ht.Owner, "Seven")
+					pw = pw.Parent
+				} else {
+					//Log(ht.Owner, "Eight - PW = %#v", pw)
+					panic("bah")
+				}
+			}
+		}
+		if pw.State == PWNew { // load children, all possible cards
+			//Log(4, "One")
+			decisionMap := pw.HT.potentialCards(pw.HT.Trick.winningCard(), pw.HT.Trick.leadSuit(), trump, pw.HT.Trick.Plays == 3)
+			pw.Children = make([]*PlayWalker, len(decisionMap))
+			for x := range decisionMap {
+				pw.Children[x] = &PlayWalker{
+					HT:     pw.HT.Copy(),
+					Card:   decisionMap[x],
+					Parent: pw,
+				}
+				count++
+				if pw.HT.Trick.Plays == 4 {
+					pw.Result = pw.HT.Trick.worth(ht.Trick.Next, trump)
+					pw.Children[x].HT.Trick.reset()
+				}
+				pw.Children[x].HT.PlayCard(pw.Children[x].Card, trump)
+			}
+			pw.State = PWPopulated
+			if pw.Parent != nil && pw.Parent.Walker == len(pw.Parent.Children) {
+				pw.Parent.State = PWExtended
+				pw.Parent.Walker = 0
+			}
+		} else if pw.State == PWPopulated && pw.Parent != nil && pw.Parent.State == PWPopulated { // go up one immediately to continue all siblings first
+			//Log(4, "Two")
+			pw = pw.Parent
+		} else if pw.State == PWPopulated { // siblings all handled, visit the child
+			//Log(ht.Owner, "Three, PW = %#v", pw)
+			if len(pw.Children) == 0 { // theoretical end of the hand, can set end as all possibilities have been calculated
+				end = true
+				endTimer.Stop()
+			} else {
+				pw = pw.Children[pw.Walker]
+				pw.Parent.Walker++
+			}
+		} else if pw.State == PWExtended {
+			//Log(4, "Four")
+		}
+	}
+}
+
+//func inline(ht *HandTracker, trump sdz.Suit, myCard sdz.Card, results chan Result) {
+//	newht := ht.Copy()
+//	Log(ht.Owner, "Marking card %s as played for %d", myCard, ht.Trick.Next)
+//	newht.PlayCard(myCard, trump)
+//	//Log(ht.Owner, "Old trick = %s, new trick = %s", ht.Trick, newht.Trick)
+//	result := Result{
+//		Card: myCard,
+//	}
+//	if newht.Trick.Plays < 4 {
+//		Log(ht.Owner, "Player %d moving to next player in the trick - %s", newht.Trick.Next, newht.Trick)
+//		_, result.Points = playHandWithCard(newht, trump)
+//	} else { // trick is over, create a new trick
+//		//Log(4, "Player %d pretend won the hand with a %s", newtrick.WinningPlayer, newtrick.winningCard())
+//		newht.CurTrick++
+//		if newht.CurTrick == 12 { // hand over
+//			if ht.Owner%2 == newht.Trick.WinningPlayer%2 {
+//				result.Points = newht.Trick.counters() + 1
+//			} else {
+//				result.Points = 0
+//			}
+//		} else if newht.CurTrick-2 >= ht.StartTrick { // not over but close enough!
+//			result.Points = newht.Trick.worth(ht.Owner, trump)
+//		} else {
+//			Log(ht.Owner, "Fake winner of trick %s is %d", newht.Trick, newht.Trick.WinningPlayer)
+//			newht.Trick.reset()
+//			_, result.Points = playHandWithCard(newht, trump)
+//		}
+//	}
+//	Log(ht.Owner, "Results for playing %s by playerid %d are %d", result.Card, ht.Trick.Next, result.Points)
+//	results <- result
+//	htstack.Push(newht)
+//}
+
+//func playHandWithCard(ht *HandTracker, trump sdz.Suit) (sdz.Card, int) {
+//	Log(ht.Owner, "Calling playHandWithCard on trick #%d - %s for playerid %d", ht.CurTrick, ht.Trick, ht.Trick.Next)
+//	if ht.Trick.Plays == 4 {
+//		panic("playHandWithCard && trick.Plays == 4")
+//	}
+//	decisionMap := ht.potentialCards(ht.Trick.winningCard(), ht.Trick.leadSuit(), trump, ht.Trick.Plays == 3)
+//	numCards := len(decisionMap)
+//	results := make(chan Result, numCards)
+//	for _, card := range decisionMap {
+//		//select {
+//		//case <-sem:
+//		//	go func(myCard sdz.Card) {
+//		//		inline(playerid, ht, trick, trump, myCard, results)
+//		//		sem <- true
+//		//	}(card)
+//		//default:
+//		inline(ht, trump, card, results)
+//		//}
+//	}
+//	Hands <- decisionMap // need to return the Hand object obtained from potentialCards to the pool of resources
+//	var bestCard sdz.Card
+//	bestPoints := 0
+//	partner := ht.Owner%2 == ht.Trick.Next%2
+//	for x := 0; x < numCards; x++ {
+//		result := <-results
+//		if x == 0 || (result.Points >= bestPoints && partner) || (result.Points <= bestPoints && !partner) {
+//			bestPoints = result.Points
+//			bestCard = result.Card
+//			if ht.Trick.Plays == 4 {
+//				bestPoints += ht.Trick.worth(ht.Owner, trump)
 //			}
 //		}
-//		if pw.Parent != nil && pw.Parent.Walker < len(pw.Parent.Children) { // go up one immediately to continue all siblings first
-//			pw = pw.Parent
-//			continue
-//		}
-//		if pw.Walker < len(pw.Children) { // siblings all handled, visit the child
-//			pw = pw.Children[pw.Walker]
-//			pw.Parent.Walker++
-//			continue
-//		}
 //	}
+//	//Log(4, "Best play for player %d is %s worth %d for the winners", playerid, bestCard, bestPoints)
+//	return bestCard, bestPoints
 //}
-
-func inline(ht *HandTracker, trump sdz.Suit, myCard sdz.Card, results chan Result) {
-	newht := ht.Copy()
-	Log(ht.Owner, "Marking card %s as played for %d", myCard, ht.Trick.Next)
-	newht.PlayCard(myCard, trump)
-	//Log(ht.Owner, "Old trick = %s, new trick = %s", ht.Trick, newht.Trick)
-	result := Result{
-		Card: myCard,
-	}
-	if newht.Trick.Plays < 4 {
-		Log(ht.Owner, "Player %d moving to next player in the trick - %s", newht.Trick.Next, newht.Trick)
-		_, result.Points = playHandWithCard(newht, trump)
-	} else { // trick is over, create a new trick
-		//Log(4, "Player %d pretend won the hand with a %s", newtrick.WinningPlayer, newtrick.winningCard())
-		newht.CurTrick++
-		if newht.CurTrick == 12 { // hand over
-			if ht.Owner%2 == newht.Trick.WinningPlayer%2 {
-				result.Points = newht.Trick.counters() + 1
-			} else {
-				result.Points = 0
-			}
-		} else if newht.CurTrick-2 >= ht.StartTrick { // not over but close enough!
-			result.Points = newht.Trick.worth(ht.Owner, trump)
-		} else {
-			Log(ht.Owner, "Fake winner of trick %s is %d", newht.Trick, newht.Trick.WinningPlayer)
-			newht.Trick.reset()
-			_, result.Points = playHandWithCard(newht, trump)
-		}
-	}
-	Log(ht.Owner, "Results for playing %s by playerid %d are %d", result.Card, ht.Trick.Next, result.Points)
-	results <- result
-	htstack.Push(newht)
-}
-
-func playHandWithCard(ht *HandTracker, trump sdz.Suit) (sdz.Card, int) {
-	Log(ht.Owner, "Calling playHandWithCard on trick #%d - %s for playerid %d", ht.CurTrick, ht.Trick, ht.Trick.Next)
-	if ht.Trick.Plays == 4 {
-		panic("playHandWithCard && trick.Plays == 4")
-	}
-	decisionMap := ht.potentialCards(ht.Trick.winningCard(), ht.Trick.leadSuit(), trump, ht.Trick.Plays == 3)
-	numCards := len(decisionMap)
-	results := make(chan Result, numCards)
-	for _, card := range decisionMap {
-		//select {
-		//case <-sem:
-		//	go func(myCard sdz.Card) {
-		//		inline(playerid, ht, trick, trump, myCard, results)
-		//		sem <- true
-		//	}(card)
-		//default:
-		inline(ht, trump, card, results)
-		//}
-	}
-	Hands <- decisionMap // need to return the Hand object obtained from potentialCards to the pool of resources
-	var bestCard sdz.Card
-	bestPoints := 0
-	partner := ht.Owner%2 == ht.Trick.Next%2
-	for x := 0; x < numCards; x++ {
-		result := <-results
-		if x == 0 || (result.Points >= bestPoints && partner) || (result.Points <= bestPoints && !partner) {
-			bestPoints = result.Points
-			bestCard = result.Card
-			if ht.Trick.Plays == 4 {
-				bestPoints += ht.Trick.worth(ht.Owner, trump)
-			}
-		}
-	}
-	//Log(4, "Best play for player %d is %s worth %d for the winners", playerid, bestCard, bestPoints)
-	return bestCard, bestPoints
-}
 
 func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	ai.HT.Trick.Next = action.Playerid
-	card, _ := playHandWithCard(ai.HT, action.Trump)
+	card := playHandWithCard(ai.HT, action.Trump)
 	//Log(ai.Playerid, "PlayHandWithCard returned %s for %d points.", card, points)
 	return card
 }
@@ -1018,7 +1091,7 @@ allCardLoop:
 	}
 	Hands <- potentialHand
 	Log(ht.Owner, "Returning %d potential plays of %s for playerid %d", len(validHand), validHand, ht.Trick.Next)
-	ht.Debug()
+	//ht.Debug()
 	return validHand
 }
 
