@@ -816,7 +816,10 @@ func playHandWithCard(ht *HandTracker, trump sdz.Suit) sdz.Card {
 		Card: sdz.NACard,
 	}
 	end := false
-	endTimer := time.AfterFunc(time.Second*10, func() { end = true })
+	endTimer := time.AfterFunc(time.Second*10, func() {
+		end = true
+		Log(4, "Compute time exceeded for play")
+	})
 	for {
 		if end { // take as much time as we can, calculate the best card(s) to play
 			for pw.Parent != nil { // go to the PlayWalker root
@@ -903,6 +906,7 @@ func playHandWithCard(ht *HandTracker, trump sdz.Suit) sdz.Card {
 			if len(pw.Children) == 0 { // theoretical end of the hand, can set end as all possibilities have been calculated
 				end = true
 				endTimer.Stop()
+				Log(4, "Ran out of cards to play, must be the end of the hand")
 			} else {
 				pw = pw.Children[pw.Walker]
 				pw.Parent.Walker++
