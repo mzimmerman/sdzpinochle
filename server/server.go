@@ -247,7 +247,7 @@ func receive(w http.ResponseWriter, r *http.Request) {
 }
 
 func Log(playerid int, m string, v ...interface{}) {
-	//return
+	return
 	if playerid == 4 {
 		fmt.Printf("NP - "+m+"\n", v...)
 	} else {
@@ -258,9 +258,6 @@ func Log(playerid int, m string, v ...interface{}) {
 type CardMap [24]int
 
 func (cm *CardMap) inc(x sdz.Card) {
-	if cm[x] == 2 {
-
-	}
 	if cm[x] == Unknown {
 		cm[x] = 1
 	} else {
@@ -844,12 +841,54 @@ func (pw *PlayWalker) PlayTrail() string {
 	return str.String()
 }
 
+// Deal fills in the gaps in the HT object based off the status of the hand
+// it is used so potentialCards doesn't play sequences that aren't possible due to having to follow the rules of pinochle
+func (pw *PlayWalker) Deal() {
+	unknownCards := getHand()
+	sum := 0
+	Log(pw.HT.Owner, "Calling Deal()")
+	pw.HT.Debug()
+	for x := 0; x < sdz.AllCards; x++ {
+		sum = pw.HT.sum(sdz.Card(x))
+		if sum == 2 {
+			continue
+		}
+		Log(pw.HT.Owner, "Sum for %s = %d", sdz.Card(x), sum)
+		for {
+			if sum == 0 {
+				break
+			}
+			unknownCards = append(unknownCards, sdz.Card(x))
+			sum--
+		}
+	}
+	unknownCards.Shuffle()
+	player := pw.HT.Trick.Next
+	card := sdz.Card(sdz.NACard)
+	for {
+		if len(unknownCards) == 0 {
+			return // all cards dealt
+		}
+		for _, card = range unknownCards {
+			if pw.HT.Cards[player][card] == Unknown || pw.HT.Cards[player][card] == 1 {
+				Log(pw.HT.Owner, "Adding %s to player %d, value = %d", card, player, pw.HT.Cards[player][card])
+				pw.HT.Cards[player].inc(card)
+				pw.HT.calculateCard(card)
+				break
+			}
+		}
+		unknownCards.Remove(card)
+		player = (player + 1) % 4
+	}
+}
+
 func playHandWithCard(ht *HandTracker, trump sdz.Suit) sdz.Card {
 	count := 0
 	pw := &PlayWalker{
-		HT:   ht,
+		HT:   ht.Copy(),
 		Card: sdz.NACard,
 	}
+	pw.Deal()
 	//end := false
 	//time.AfterFunc(time.Second*30, func() {
 	//	//end = true
