@@ -247,7 +247,7 @@ func receive(w http.ResponseWriter, r *http.Request) {
 }
 
 func Log(playerid int, m string, v ...interface{}) {
-	return
+	//return
 	if playerid == 4 {
 		fmt.Printf("NP - "+m+"\n", v...)
 	} else {
@@ -855,18 +855,22 @@ func (pw *PlayWalker) Deal() {
 		}
 		Log(pw.HT.Owner, "Sum for %s = %d", sdz.Card(x), sum)
 		for {
-			if sum == 0 {
+			if sum == 2 {
 				break
 			}
 			unknownCards = append(unknownCards, sdz.Card(x))
-			sum--
+			sum++
 		}
 	}
-	unknownCards.Shuffle()
+	Log(pw.HT.Owner, "Have to add %s to players' hands", unknownCards)
+	//unknownCards.Shuffle()
 	player := pw.HT.Trick.Next
 	card := sdz.Card(sdz.NACard)
+largeLoop:
 	for {
 		if len(unknownCards) == 0 {
+			Log(pw.HT.Owner, "Ending Deal()")
+			pw.HT.Debug()
 			return // all cards dealt
 		}
 		for _, card = range unknownCards {
@@ -874,11 +878,15 @@ func (pw *PlayWalker) Deal() {
 				Log(pw.HT.Owner, "Adding %s to player %d, value = %d", card, player, pw.HT.Cards[player][card])
 				pw.HT.Cards[player].inc(card)
 				pw.HT.calculateCard(card)
-				break
+				Log(pw.HT.Owner, "Removing card %s from unknownHand", card)
+				unknownCards.Remove(card)
+				player = (player + 1) % 4
+				continue largeLoop
 			}
 		}
-		unknownCards.Remove(card)
-		player = (player + 1) % 4
+		Log(pw.HT.Owner, "Nowhere for %s to go!", card)
+		pw.HT.Debug()
+		panic("Nowhere for to go!")
 	}
 }
 
@@ -907,9 +915,7 @@ func playHandWithCard(ht *HandTracker, trump sdz.Suit) sdz.Card {
 			pw.HT.Trick.Plays = trickPlays
 			if len(decisionMap) == 0 {
 				if pw.HT.PlayCount != 48 {
-					pw.State = PWCalculated
-					pw.Result = -1000
-					pw = pw.Parent
+					panic("hand is at the end but 48 plays haven't been made!")
 				}
 				Log(ht.Owner, "************** Hand is at the end! - %s", pw.PlayTrail())
 				pw.State = PWExtended
