@@ -622,6 +622,30 @@ func (t *testSuite) TestPlayCard() {
 	t.True(p0.HT.PlayedCards[TH] == 2)
 }
 
+func (t *testSuite) TestFindCardToPlayFull() {
+	trump := sdz.Suit(sdz.Diamonds)
+	p0 := createAI()
+	p1 := createAI()
+	p2 := createAI()
+	p3 := createAI()
+	p0.SetHand(nil, nil, nil, sdz.Hand{TD, TD, QD, TC, QC, AH, AH, KH, NH, TS, KS, QS}, 0, 0)
+	p1.SetHand(nil, nil, nil, sdz.Hand{KD, QD, JD, JD, ND, TC, KC, QC, KH, NH, QS, NS}, 0, 1)
+	p2.SetHand(nil, nil, nil, sdz.Hand{AD, AD, KD, ND, NC, NC, TH, JH, AS, JS, JS, NS}, 0, 2)
+	p3.SetHand(nil, nil, nil, sdz.Hand{AC, AC, KC, JC, JC, TH, QH, QH, JH, AS, TS, KS}, 0, 3)
+	p1Amt, p1Meld := p1.Hand().Meld(trump)
+	p2Amt, p2Meld := p2.Hand().Meld(trump)
+	p3Amt, p3Meld := p3.Hand().Meld(trump)
+	p0.Tell(nil, nil, nil, sdz.CreateMeld(p1Meld, p1Amt, 1))
+	p0.Tell(nil, nil, nil, sdz.CreateMeld(p2Meld, p2Amt, 2))
+	p0.Tell(nil, nil, nil, sdz.CreateMeld(p3Meld, p3Amt, 3))
+	p0.HT.Trick.Next = 2
+	p0.HT.PlayCard(AD, trump)
+	p0.HT.PlayCard(JC, trump)
+	t.True(playHandWithCard(p0.HT, trump) == TD)
+	p0.HT.PlayCard(TD, trump)
+
+}
+
 func (t *testSuite) TestAITracking() {
 	ai := createAI()
 	hand := sdz.Hand{ND, ND, QD, TD, TD, AD, JC, QC, KC, AH, AH, KS}
@@ -726,6 +750,60 @@ func (t *testSuite) TestNoSuitShort() {
 	t.Equal(None, ht.Cards[1][TD])
 	t.Equal(None, ht.Cards[1][AD])
 	t.Equal(Unknown, ht.Cards[1][AS])
+}
+
+func (t *testSuite) TestPlayWalkerString() {
+	trump := sdz.Suit(sdz.Diamonds)
+	ht := new(HandTracker)
+	ht.reset(0)
+	ht.Cards[0][AS] = 1
+	ht.Cards[0][TH] = 1
+	ht.Cards[0][KS] = 0
+	ht.Cards[0][QH] = 1
+	ht.Cards[0][JS] = 2
+	ht.Cards[0][NH] = 1
+	ht.Cards[0][AD] = 1
+	ht.Cards[0][TC] = 1
+	ht.Cards[0][KD] = 1
+	ht.Cards[0][QC] = 1
+	ht.Cards[0][JD] = 1
+	ht.Cards[0][NC] = 1
+	type ts struct {
+		Cards  []sdz.Card
+		Result []string
+	}
+	tests := []ts{
+		ts{
+			[]sdz.Card{AS, TS, KS, QS},
+			[]string{"-lwAS---- ", "-lwAS-TS--- ", "-lwAS-TS-KS-- ", "-lwAS-TS-KS-QS- "},
+		},
+		ts{
+			[]sdz.Card{JS, NS, AS, TS},
+			[]string{"-lwAS-TS-KS-QS- -lwJS---- ", "-lwAS-TS-KS-QS- -lwJS-9S--- ", "-lwAS-TS-KS-QS- -lJS-9S-wAS-- ", "-lwAS-TS-KS-QS- -lJS-9S-wAS-TS- "},
+		},
+		ts{
+			[]sdz.Card{KS, QS, JS, NS},
+			[]string{"-lwAS-TS-KS-QS- -lJS-9S-wAS-TS- ---lwKS-- ", "-lwAS-TS-KS-QS- -lJS-9S-wAS-TS- ---lwKS-QS- ", "-lwAS-TS-KS-QS- -lJS-9S-wAS-TS- -JS--lwKS-QS- ", "-lwAS-TS-KS-QS- -lJS-9S-wAS-TS- -JS-9S-lwKS-QS- "},
+		},
+	}
+	ht.Trick = new(Trick)
+	pw := &PlayWalker{
+		HT:   ht,
+		Card: sdz.NACard,
+	}
+	t.Equal("----- ", pw.PlayTrail())
+	for x := range tests {
+		for y := range tests[x].Cards {
+			pw.Children = []*PlayWalker{&PlayWalker{
+				HT:     pw.HT.Copy(),
+				Card:   tests[x].Cards[y],
+				Parent: pw,
+			}}
+			pw = pw.Children[0]
+			pw.HT.PlayCard(pw.Card, trump)
+			t.Equal(tests[x].Result[y], pw.PlayTrail())
+		}
+	}
 }
 
 func (t *testSuite) TestCalculateShort() {

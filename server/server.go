@@ -247,7 +247,7 @@ func receive(w http.ResponseWriter, r *http.Request) {
 }
 
 func Log(playerid int, m string, v ...interface{}) {
-	return
+	//return
 	if playerid == 4 {
 		fmt.Printf("NP - "+m+"\n", v...)
 	} else {
@@ -321,10 +321,9 @@ type HandTracker struct {
 	// 1 = has this card
 	// 2 = has two of these cards
 	PlayedCards CardMap
-	StartTrick  int
-	CurTrick    int
 	Owner       int // the playerid of the "owning" player
 	Trick       *Trick
+	PlayCount   int
 }
 
 func (ht *HandTracker) sum(cardIndex sdz.Card) int {
@@ -348,8 +347,7 @@ func (oldht *HandTracker) Copy() (newht *HandTracker) {
 		newht.Cards[x] = oldht.Cards[x]
 	}
 	newht.PlayedCards = oldht.PlayedCards
-	newht.StartTrick = oldht.StartTrick
-	newht.CurTrick = oldht.CurTrick
+	newht.PlayCount = oldht.PlayCount
 	*newht.Trick = *oldht.Trick
 	return
 }
@@ -359,10 +357,10 @@ func (ht *HandTracker) Debug() {
 	for x := 0; x < 4; x++ {
 		Log(ht.Owner, "Player%d - %s", x, ht.Cards[x])
 	}
-	Log(ht.Owner, "CurrentTrick = %d, StartTrick = %d", ht.CurTrick, ht.StartTrick)
+	Log(ht.Owner, "PlayCount = %d", ht.PlayCount)
 }
 
-func (ht *HandTracker) PlayCard(card sdz.Card, trump sdz.Suit) int { // return the Trick's worth in terms of the "Next" player
+func (ht *HandTracker) PlayCard(card sdz.Card, trump sdz.Suit) {
 	//ht.Debug()
 	playerid := ht.Trick.Next
 	//Log(ht.Owner, "In ht.PlayCard for %d-%s on player %d", playerid, card, ht.Owner)
@@ -430,8 +428,8 @@ func (ht *HandTracker) PlayCard(card sdz.Card, trump sdz.Suit) int { // return t
 			}
 		}
 	}
-	return ht.Trick.worth(playerid, trump)
-	//Log(ht.Owner, "Player %d played card %s", playerid, c)
+	ht.PlayCount++
+	Log(ht.Owner, "Player %d played card %s, PlayCount=%d", playerid, card, ht.PlayCount)
 }
 
 func (cm CardMap) String() string {
@@ -675,6 +673,9 @@ type Trick struct {
 }
 
 func (t *Trick) PlayCard(card sdz.Card, trump sdz.Suit) {
+	if t.Plays == 4 {
+		t.reset()
+	}
 	t.Played[t.Next] = card
 	if t.Plays == 0 {
 		t.Lead = t.Next
@@ -689,13 +690,26 @@ func (t *Trick) PlayCard(card sdz.Card, trump sdz.Suit) {
 	}
 	//Log(4, "After trick.PlayCard - %s", t)
 	//Log(4, "After trick.PlayCard - %#v", t)
-	if t.Plays > 4 {
-		panic("Plays is > 4")
-	}
 }
 
 func (t *Trick) reset() {
 	t.Plays = 0
+}
+
+func (trick *Trick) counterWorth() int {
+	if trick.Plays != 4 {
+		Log(4, "Trick %s is not finished", trick)
+		panic("Trick")
+	}
+	playerid := trick.Next - 1
+	if playerid == -1 {
+		playerid = len(trick.Played) - 1
+	}
+	if trick.WinningPlayer%2 == playerid%2 {
+		return trick.counters()
+	} else {
+		return -trick.counters()
+	}
 }
 
 func (trick *Trick) worth(playerid int, trump sdz.Suit) (worth int) {
@@ -805,8 +819,29 @@ type PlayWalker struct {
 	Children []*PlayWalker
 	Card     sdz.Card
 	HT       *HandTracker
-	Playerid int
 	Result   int // from the perspective of the current player
+	CurTrick *Trick
+}
+
+func (pw *PlayWalker) PlayTrail() string {
+	tricks := make([]*Trick, 0)
+	walker := pw
+	tricks = append([]*Trick{walker.HT.Trick}, tricks...)
+	for {
+		if walker.Parent == nil {
+			break
+		}
+		walker = walker.Parent
+		if walker.HT.PlayCount%4 == 0 && walker.HT.PlayCount > 0 {
+			tricks = append([]*Trick{walker.HT.Trick}, tricks...)
+		}
+	}
+	var str bytes.Buffer
+	for x := range tricks {
+		str.WriteString(tricks[x].String())
+		str.WriteString(" ")
+	}
+	return str.String()
 }
 
 func playHandWithCard(ht *HandTracker, trump sdz.Suit) sdz.Card {
@@ -815,70 +850,33 @@ func playHandWithCard(ht *HandTracker, trump sdz.Suit) sdz.Card {
 		HT:   ht,
 		Card: sdz.NACard,
 	}
-	end := false
-	endTimer := time.AfterFunc(time.Second*10, func() {
-		end = true
-		Log(4, "Compute time exceeded for play")
-	})
+	//end := false
+	//time.AfterFunc(time.Second*30, func() {
+	//	//end = true
+	//	panic("Compute time exceeded for play")
+	//})
 	for {
-		if end { // take as much time as we can, calculate the best card(s) to play
-			for pw.Parent != nil { // go to the PlayWalker root
-				pw = pw.Parent
-			}
-			bestChild := 0
-			for {
-				//if pw.Children == nil || pw.Walker != len(pw.Children) { // incomplete PlayWalker tree
-				//	// pw.Best = 0 -- already 0 due to initialization
-				//	pw = pw.Parent
-				//	continue
-				//}
-				if pw.State <= PWPopulated { // set my result, I am a dead child
-					//Log(ht.Owner, "Five")
-					pw.Result = pw.HT.Trick.worth(pw.HT.Trick.Next, trump)
-					Log(ht.Owner, "Scoring dead trick %s as value %d", pw.HT.Trick, pw.Result)
-					pw.State = PWCalculated
-					pw = pw.Parent
-				} else if pw.State == PWExtended {
-					//Log(ht.Owner, "Six")
-					if pw.Walker < len(pw.Children) { // visit the children first
-						pw = pw.Children[pw.Walker]
-						pw.Parent.Walker++
-					} else {
-						bestChild = 0
-						for x := 1; x < len(pw.Children); x++ {
-							if pw.Children[x].Result > pw.Children[bestChild].Result {
-								bestChild = x
-							}
-						}
-						if pw.Parent == nil { // I'm the root
-							// return the best card
-							Log(ht.Owner, "Created %d PlayWalkers, found best card %s", count, pw.Children[bestChild].Card)
-							return pw.Children[bestChild].Card
-						}
-						if pw.HT.Trick.Lead == pw.HT.Trick.Next {
-							pw.Result = pw.HT.Trick.worth(pw.HT.Trick.Next, trump) + pw.Children[bestChild].Result
-							Log(ht.Owner, "Scoring trick %s as player %d and adding %d for result %d", pw.HT.Trick, pw.HT.Trick.Next, pw.Children[bestChild].Result, pw.Result)
-						} else { // pass the trick information upstream
-							pw.Children[bestChild].HT.Trick.Next = pw.HT.Trick.Next
-							pw.HT.Trick = pw.Children[bestChild].HT.Trick
-							pw.Result = pw.HT.Trick.worth(pw.HT.Trick.Next, trump)
-							Log(ht.Owner, "Scoring child's trick %s as player %d and adding %d for result %d", pw.HT.Trick, pw.HT.Trick.Next, pw.Children[bestChild].Result, pw.Result)
-						}
-						pw.State = PWCalculated
-						pw = pw.Parent
-					}
-				} else if pw.State == PWCalculated {
-					//Log(ht.Owner, "Seven")
-					pw = pw.Parent
-				} else {
-					//Log(ht.Owner, "Eight - PW = %#v", pw)
-					panic("bah")
-				}
-			}
-		}
+		//Log(ht.Owner, "PlayCount looping with %d - %s", pw.HT.PlayCount, pw.PlayTrail())
+		//pw.HT.Debug()
 		if pw.State == PWNew { // load children, all possible cards
 			//Log(4, "One")
+			trickPlays := pw.HT.Trick.Plays
+			if pw.HT.Trick.Plays == 4 {
+				pw.HT.Trick.Plays = 0
+			}
 			decisionMap := pw.HT.potentialCards(pw.HT.Trick.winningCard(), pw.HT.Trick.leadSuit(), trump, pw.HT.Trick.Plays == 3)
+			pw.HT.Trick.Plays = trickPlays
+			if len(decisionMap) == 0 {
+				if pw.HT.PlayCount != 48 {
+					pw.State = PWCalculated
+					pw.Result = -1000
+					pw = pw.Parent
+				}
+				Log(ht.Owner, "************** Hand is at the end! - %s", pw.PlayTrail())
+				pw.State = PWExtended
+				pw = pw.Parent
+				continue
+			}
 			pw.Children = make([]*PlayWalker, len(decisionMap))
 			for x := range decisionMap {
 				pw.Children[x] = &PlayWalker{
@@ -888,31 +886,89 @@ func playHandWithCard(ht *HandTracker, trump sdz.Suit) sdz.Card {
 				}
 				count++
 				if pw.HT.Trick.Plays == 4 {
-					pw.Result = pw.HT.Trick.worth(ht.Trick.Next, trump)
 					pw.Children[x].HT.Trick.reset()
 				}
 				pw.Children[x].HT.PlayCard(pw.Children[x].Card, trump)
+				//Log(ht.Owner, "Created trick %s", pw.Children[x].HT.Trick)
 			}
+			//Log(ht.Owner, "Visiting child of walker %#v - %s", pw, pw.PlayTrail())
 			pw.State = PWPopulated
-			if pw.Parent != nil && pw.Parent.Walker == len(pw.Parent.Children) {
-				pw.Parent.State = PWExtended
-				pw.Parent.Walker = 0
-			}
-		} else if pw.State == PWPopulated && pw.Parent != nil && pw.Parent.State == PWPopulated { // go up one immediately to continue all siblings first
-			//Log(4, "Two")
-			pw = pw.Parent
-		} else if pw.State == PWPopulated { // siblings all handled, visit the child
-			//Log(ht.Owner, "Three, PW = %#v", pw)
-			if len(pw.Children) == 0 { // theoretical end of the hand, can set end as all possibilities have been calculated
-				end = true
-				endTimer.Stop()
-				Log(4, "Ran out of cards to play, must be the end of the hand")
-			} else {
+			pw = pw.Children[pw.Walker]
+			pw.Parent.Walker++
+		} else if pw.State == PWPopulated { // children populated
+			if pw.Walker < len(pw.Children) { // visit the child
 				pw = pw.Children[pw.Walker]
 				pw.Parent.Walker++
+			} else {
+				pw.State = PWExtended
+				if pw.Parent == nil { // back at the root, end!
+					break
+				}
+				pw = pw.Parent
 			}
+		}
+	}
+	// the whole hand is played, now we score it
+	bestChild := 0
+	for {
+		//if pw.Children == nil || pw.Walker != len(pw.Children) { // incomplete PlayWalker tree
+		//	// pw.Best = 0 -- already 0 due to initialization
+		//	pw = pw.Parent
+		//	continue
+		//}
+		if pw.State <= PWPopulated { // set my result, I am a dead child
+			//Log(ht.Owner, "Five")
+			//pw.Result = pw.HT.Trick.worth(pw.HT.Trick.Next, trump)
+			if pw.HT.Trick.Plays == 4 {
+				pw.Result = pw.HT.Trick.counterWorth()
+			}
+			Log(ht.Owner, "Scoring dead trick %s as value %d", pw.HT.Trick, pw.Result)
+			pw.State = PWCalculated
+			pw = pw.Parent
 		} else if pw.State == PWExtended {
-			//Log(4, "Four")
+			//Log(ht.Owner, "Six")
+			if pw.Walker < len(pw.Children) { // visit the children first
+				pw = pw.Children[pw.Walker]
+				pw.Parent.Walker++
+			} else {
+				bestChild = 0
+				Log(ht.Owner, "Starting best child loop")
+				for x := 0; x < len(pw.Children); x++ {
+					if (pw.Children[x].Result > pw.Children[bestChild].Result && ht.Owner%2 == pw.HT.Trick.Next%2) || pw.Children[x].Result < pw.Children[bestChild].Result {
+						bestChild = x
+					}
+					Log(ht.Owner, "Child is %s with result %d", pw.Children[x].PlayTrail(), pw.Children[x].Result)
+				}
+				Log(ht.Owner, "Best child was %s with result %d", pw.Children[bestChild].PlayTrail(), pw.Children[bestChild].Result)
+				if pw.Parent == nil { // I'm the root
+					// return the best card
+					Log(ht.Owner, "Created %d PlayWalkers, found best card %s with value %d", count, pw.Children[bestChild].Card, pw.Children[bestChild].Result)
+					return pw.Children[bestChild].Card
+				}
+				Log(ht.Owner, "Working on PlayWalker %#v with Card %s, CurTrick %s, and pw.HT.Trick %s", pw, pw.Card, pw.CurTrick, pw.HT.Trick)
+				if pw.HT.Trick.Plays == len(pw.HT.Trick.Played) {
+					pw.CurTrick = pw.HT.Trick
+					pw.Result = pw.CurTrick.counterWorth() + pw.Children[bestChild].Result
+					//pw.Result = pw.HT.Trick.worth(pw.HT.Trick.Next, trump) + pw.Children[bestChild].Result
+					Log(ht.Owner, "Scoring final trick %s and adding %d for result %d", pw.HT.Trick, pw.Children[bestChild].Result, pw.Result)
+				} else { // pass the trick information upstream
+					//pw.Children[bestChild].HT.Trick.Next = pw.HT.Trick.Next
+					//pw.HT.Trick = pw.Children[bestChild].HT.Trick
+					pw.CurTrick = pw.Children[bestChild].CurTrick
+					pw.CurTrick.Next = pw.HT.Trick.Next
+					pw.Result = pw.CurTrick.counterWorth() + pw.Children[bestChild].Result
+					//pw.Result = pw.HT.Trick.worth(pw.HT.Trick.Next, trump)
+					Log(ht.Owner, "Scoring non-final trick %s and adding %d for result %d", pw.CurTrick, pw.Children[bestChild].Result, pw.Result)
+				}
+				pw.State = PWCalculated
+				pw = pw.Parent
+			}
+		} else if pw.State == PWCalculated {
+			//Log(ht.Owner, "Seven")
+			pw = pw.Parent
+		} else {
+			//Log(ht.Owner, "Eight - PW = %#v", pw)
+			panic("bah")
 		}
 	}
 }
@@ -1006,9 +1062,7 @@ allCardLoop:
 		suit := card.Suit()
 		val := ht.Cards[ht.Trick.Next][card]
 		if val == Unknown {
-			if ht.sum(card) < 2 {
-				potentialHand = append(potentialHand, card)
-			}
+			potentialHand = append(potentialHand, card)
 		} else if val != None {
 			cardStatus := Nothing
 			switch {
@@ -1094,8 +1148,11 @@ allCardLoop:
 		}
 	}
 	Hands <- potentialHand
-	Log(ht.Owner, "Returning %d potential plays of %s for playerid %d", len(validHand), validHand, ht.Trick.Next)
-	//ht.Debug()
+	//Log(ht.Owner, "Returning %d potential plays of %s for playerid %d on trick %s", len(validHand), validHand, ht.Trick.Next, ht.Trick)
+	//if len(validHand) == 0 && ht.PlayCount != 48 {
+	//	ht.Debug()
+	//	panic("hand is not at the end but still returning 0 potential cards")
+	//}
 	return validHand
 }
 
