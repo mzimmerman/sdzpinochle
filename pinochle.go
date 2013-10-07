@@ -17,55 +17,55 @@ func Log(m string, v ...interface{}) {
 }
 
 const (
-	Ace         = iota
-	Ten         = iota
-	King        = iota
-	Queen       = iota
-	Jack        = iota
-	Nine        = iota
-	NAFace      = -1
-	acearound   = 10
-	kingaround  = 8
-	queenaround = 6
-	jackaround  = 4
-	debugLog    = false
-	AllCards    = 24
+	Ace         Face = iota
+	Ten         Face = iota
+	King        Face = iota
+	Queen       Face = iota
+	Jack        Face = iota
+	Nine        Face = iota
+	NAFace      Face = -1
+	acearound        = 10
+	kingaround       = 8
+	queenaround      = 6
+	jackaround       = 4
+	debugLog         = false
+	AllCards         = 24
 )
 
 const (
-	Spades   = iota
-	Hearts   = iota
-	Clubs    = iota
-	Diamonds = iota
-	NASuit   = iota
+	Spades   Suit = iota
+	Hearts   Suit = iota
+	Clubs    Suit = iota
+	Diamonds Suit = iota
+	NASuit   Suit = iota
 )
 
 const (
-	AS     = iota
-	TS     = iota
-	KS     = iota
-	QS     = iota
-	JS     = iota
-	NS     = iota
-	AH     = iota
-	TH     = iota
-	KH     = iota
-	QH     = iota
-	JH     = iota
-	NH     = iota
-	AC     = iota
-	TC     = iota
-	KC     = iota
-	QC     = iota
-	JC     = iota
-	NC     = iota
-	AD     = iota
-	TD     = iota
-	KD     = iota
-	QD     = iota
-	JD     = iota
-	ND     = iota
-	NACard = iota
+	AS     Card = iota
+	TS     Card = iota
+	KS     Card = iota
+	QS     Card = iota
+	JS     Card = iota
+	NS     Card = iota
+	AH     Card = iota
+	TH     Card = iota
+	KH     Card = iota
+	QH     Card = iota
+	JH     Card = iota
+	NH     Card = iota
+	AC     Card = iota
+	TC     Card = iota
+	KC     Card = iota
+	QC     Card = iota
+	JC     Card = iota
+	NC     Card = iota
+	AD     Card = iota
+	TD     Card = iota
+	KD     Card = iota
+	QD     Card = iota
+	JD     Card = iota
+	ND     Card = iota
+	NACard Card = iota
 )
 
 var Faces [6]Face
@@ -157,7 +157,7 @@ func (c *Card) UnmarshalJSON(data []byte) error {
 	default:
 		return errors.New(fmt.Sprintf("Data %s not a card", data))
 	}
-	*c = Card(suit*6 + face)
+	*c = Card(int(suit)*6 + int(face))
 	return nil
 }
 

@@ -513,6 +513,52 @@ func (t *testSuite) TestPotentialCardsShort() {
 //	HTs <- ht
 //}
 
+func (t *testSuite) TestPlayWalkerDeal() {
+	ai := createAI()
+	ai.SetHand(nil, nil, nil, sdz.Hand{TD, TD, QD, TC, QC, AH, AH, KH, NH, TS, KS, QS}, 0, 0)
+	pw := &PlayWalker{HT: ai.HT.Copy()}
+	pw.Deal()
+	for x := range pw.HT.Cards {
+		for y := range pw.HT.Cards[x] {
+			t.True(pw.HT.Cards[x][y] != Unknown)
+		}
+	}
+	ai.HT.Cards[3][AC] = 2
+	ai.HT.Cards[3][KC] = 1
+	ai.HT.Cards[3][JC] = 2
+	ai.HT.Cards[3][TH] = 1
+	ai.HT.Cards[3][QH] = 2
+	ai.HT.Cards[3][JH] = 1
+	ai.HT.Cards[3][AS] = 1
+	ai.HT.Cards[3][TS] = 1
+	ai.HT.Cards[3][QS] = None
+	ai.HT.Cards[3][JS] = None
+	ai.HT.Cards[3][NS] = None
+	ai.HT.Cards[3][KH] = None
+	ai.HT.Cards[3][NH] = None
+	ai.HT.Cards[3][TC] = None
+	ai.HT.Cards[3][QC] = None
+	ai.HT.Cards[3][NC] = None
+	ai.HT.Cards[3][AD] = None
+	ai.HT.Cards[3][KD] = None
+	ai.HT.Cards[3][QD] = None
+	ai.HT.Cards[3][JD] = None
+	ai.HT.Cards[3][ND] = None
+	//ai.HT.Cards[3][KS] = 1 - he should have this one as this is the only "unknown" for him
+	for card := 0; card < sdz.AllCards; card++ {
+		ai.HT.calculateCard(sdz.Card(card))
+	}
+	Log(4, "Before...")
+	ai.HT.Debug()
+	pw = &PlayWalker{HT: ai.HT.Copy()}
+	pw.Deal()
+	for x := range pw.HT.Cards {
+		for y := range pw.HT.Cards[x] {
+			t.True(pw.HT.Cards[x][y] != Unknown)
+		}
+	}
+}
+
 func (t *testSuite) TestFindCardToPlayShort() {
 	//func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	ai := createAI()
@@ -520,6 +566,8 @@ func (t *testSuite) TestFindCardToPlayShort() {
 	for card := range ai.HT.PlayedCards {
 		ai.HT.PlayedCards[card] = 2
 	}
+	ai.HT.PlayCount = 48 - 8 // 8 cards have not been played according to below
+	trump := sdz.Hearts
 	ai.HT.PlayedCards[AD] = 1
 	ai.HT.PlayedCards[QS] = 1
 	ai.HT.PlayedCards[KH] = 1
@@ -527,7 +575,13 @@ func (t *testSuite) TestFindCardToPlayShort() {
 	ai.HT.PlayedCards[NH] = None
 	ai.HT.PlayedCards[KD] = 1
 	ai.HT.PlayedCards[QD] = 1
-	action := sdz.CreatePlayRequest(sdz.NACard, sdz.NASuit, sdz.Hearts, 3, ai.Hand())
+	for x := 0; x < sdz.AllCards; x++ {
+		ai.HT.calculateCard(sdz.Card(x))
+	}
+	Log(4, "Before...........")
+	ai.HT.Debug()
+	ai.HT.Trick.Next = 3
+	action := sdz.CreatePlayRequest(sdz.NACard, sdz.NASuit, trump, 3, ai.Hand())
 	card := ai.findCardToPlay(action)
 	t.True(card == AD || card == QS)
 }

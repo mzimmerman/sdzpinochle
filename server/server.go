@@ -354,7 +354,7 @@ func (ht *HandTracker) Debug() {
 	for x := 0; x < 4; x++ {
 		Log(ht.Owner, "Player%d - %s", x, ht.Cards[x])
 	}
-	Log(ht.Owner, "PlayCount = %d", ht.PlayCount)
+	Log(ht.Owner, "PlayCount = %d, Next=%d", ht.PlayCount, ht.Trick.Next)
 }
 
 func (ht *HandTracker) PlayCard(card sdz.Card, trump sdz.Suit) {
@@ -464,7 +464,7 @@ func (ht *HandTracker) noSuit(playerid int, suit sdz.Suit) {
 	//Log(ht.Owner, "No suit end")
 }
 
-func (ht *HandTracker) calculateHand(hand int) {
+func (ht *HandTracker) calculateHand(hand int) int {
 	totalCards := 0
 	for x := 0; x < sdz.AllCards; x++ {
 		if ht.Cards[hand][x] != Unknown {
@@ -483,6 +483,7 @@ func (ht *HandTracker) calculateHand(hand int) {
 			}
 		}
 	}
+	return totalCards
 }
 
 func (ht *HandTracker) calculateCard(cardIndex sdz.Card) {
@@ -542,6 +543,7 @@ func (ht *HandTracker) calculateCard(cardIndex sdz.Card) {
 		//	}
 		//}
 	}
+
 	//if cardIndex == JD && ht == oright {
 	//	if ht.PlayedCards[cardIndex] != Unknown {
 	//		if ht.PlayedCards[cardIndex] == None {
@@ -863,31 +865,76 @@ func (pw *PlayWalker) Deal() {
 		}
 	}
 	Log(pw.HT.Owner, "Have to add %s to players' hands", unknownCards)
-	//unknownCards.Shuffle()
-	player := pw.HT.Trick.Next
+	unknownCards.Shuffle()
+	playerWalker := pw.HT.Trick.Next
 	card := sdz.Card(sdz.NACard)
+	addHands := make([]sdz.Hand, 4)
+	baseNeedCards := (48 - pw.HT.PlayCount) / 4
+	addExtra := 1
+	needs := make([]int, 4)
+	for x := range addHands {
+		if (pw.HT.PlayCount+x)%4 == 0 {
+			addExtra = 0
+		}
+		numNeedsCards := baseNeedCards + addExtra - pw.HT.calculateHand(playerWalker)
+		Log(pw.HT.Owner, "Player %d needs %d cards added to his hand to make %d", playerWalker, numNeedsCards, baseNeedCards+addExtra)
+		needs[playerWalker] = numNeedsCards
+		playerWalker = (playerWalker + 1) % 4
+	}
 largeLoop:
 	for {
+		Log(pw.HT.Owner, "Entering large loop")
 		if len(unknownCards) == 0 {
-			Log(pw.HT.Owner, "Ending Deal()")
-			pw.HT.Debug()
-			return // all cards dealt
+			Log(pw.HT.Owner, "Exiting largeLoop, no more cards left")
+			break // all cards identified homes
+		}
+		if needs[playerWalker] == len(addHands[playerWalker]) {
+			Log(pw.HT.Owner, "Done adding cards to %d", playerWalker)
+			playerWalker = (playerWalker + 1) % 4
+			continue
 		}
 		for _, card = range unknownCards {
-			if pw.HT.Cards[player][card] == Unknown || pw.HT.Cards[player][card] == 1 {
-				Log(pw.HT.Owner, "Adding %s to player %d, value = %d", card, player, pw.HT.Cards[player][card])
-				pw.HT.Cards[player].inc(card)
-				pw.HT.calculateCard(card)
+			if pw.HT.Cards[playerWalker][card] == Unknown || pw.HT.Cards[playerWalker][card] == 1 {
+				Log(pw.HT.Owner, "Adding %s to player %d, value = %d", card, playerWalker, pw.HT.Cards[playerWalker][card])
+				addHands[playerWalker] = append(addHands[playerWalker], card)
 				Log(pw.HT.Owner, "Removing card %s from unknownHand", card)
 				unknownCards.Remove(card)
-				player = (player + 1) % 4
 				continue largeLoop
+			} else {
+				Log(pw.HT.Owner, "Player %d can't take %s", playerWalker, card)
 			}
 		}
-		Log(pw.HT.Owner, "Nowhere for %s to go!", card)
+		// didn't find a location in the current player
+		for x := range addHands {
+			if x == playerWalker {
+				continue
+			}
+			for y, tmpCard := range addHands[x] {
+				if pw.HT.Cards[playerWalker][tmpCard] == Unknown || pw.HT.Cards[playerWalker][tmpCard] == 1 {
+					addHands[playerWalker] = append(addHands[playerWalker], tmpCard)
+					addHands[x][y] = card
+					Log(pw.HT.Owner, "Moving %s to player %d from player %d", tmpCard, playerWalker, x)
+					Log(pw.HT.Owner, "Adding %s to player %d", card, x)
+					Log(pw.HT.Owner, "Removing card %s from unknownHand", card)
+					unknownCards.Remove(card)
+					continue largeLoop
+				}
+			}
+		}
+		// didn't find a card we could switch with, give up!  It's a bug!
 		pw.HT.Debug()
-		panic("Nowhere for to go!")
+		panic(fmt.Sprintf("Nowhere for %s to go!", card))
+
 	}
+	// found homes for all cards, let's put them there!
+	for x := range addHands {
+		for _, card := range addHands[x] {
+			pw.HT.Cards[x].inc(card)
+			pw.HT.calculateCard(card)
+		}
+	}
+	Log(pw.HT.Owner, "Ending Deal()")
+	pw.HT.Debug()
 }
 
 func playHandWithCard(ht *HandTracker, trump sdz.Suit) sdz.Card {
