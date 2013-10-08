@@ -12,31 +12,31 @@ import (
 )
 
 const (
-	AS     = iota
-	TS     = iota
-	KS     = iota
-	QS     = iota
-	JS     = iota
-	NS     = iota
-	AH     = iota
-	TH     = iota
-	KH     = iota
-	QH     = iota
-	JH     = iota
-	NH     = iota
-	AC     = iota
-	TC     = iota
-	KC     = iota
-	QC     = iota
-	JC     = iota
-	NC     = iota
-	AD     = iota
-	TD     = iota
-	KD     = iota
-	QD     = iota
-	JD     = iota
-	ND     = iota
-	NACard = -1
+	AS     sdz.Card = iota
+	TS     sdz.Card = iota
+	KS     sdz.Card = iota
+	QS     sdz.Card = iota
+	JS     sdz.Card = iota
+	NS     sdz.Card = iota
+	AH     sdz.Card = iota
+	TH     sdz.Card = iota
+	KH     sdz.Card = iota
+	QH     sdz.Card = iota
+	JH     sdz.Card = iota
+	NH     sdz.Card = iota
+	AC     sdz.Card = iota
+	TC     sdz.Card = iota
+	KC     sdz.Card = iota
+	QC     sdz.Card = iota
+	JC     sdz.Card = iota
+	NC     sdz.Card = iota
+	AD     sdz.Card = iota
+	TD     sdz.Card = iota
+	KD     sdz.Card = iota
+	QD     sdz.Card = iota
+	JD     sdz.Card = iota
+	ND     sdz.Card = iota
+	NACard sdz.Card = -1
 )
 
 func TestFoo(t *testing.T) {
@@ -257,43 +257,38 @@ func BenchmarkFullGame(b *testing.B) {
 func (t *testSuite) TestPotentialCardsShort() {
 	ht := new(HandTracker)
 	ht.reset(0)
-	ht.Cards[0][AD] = Unknown
 	ht.Cards[0][TD] = 1
 	ht.Cards[0][KD] = 2
-	ht.Cards[0][QD] = None
+	//ht.Cards[0][QD] = None
 
 	potentials := ht.potentialCards(sdz.NACard, sdz.NASuit, sdz.Spades, false)
 
-	t.True(potentials.Contains(AD))
 	t.True(potentials.Contains(TD))
 	t.True(potentials.Contains(KD))
 	t.Equal(ht.Cards[0][QD], None)
 	t.False(potentials.Contains(QD))
 
-	ht.Cards[0][TS] = Unknown
 	potentials = ht.potentialCards(KD, sdz.Diamonds, sdz.Spades, false)
 
-	t.True(potentials.Contains(AD))
 	t.True(potentials.Contains(TD))
 	t.False(potentials.Contains(KD))
 	t.False(potentials.Contains(TS))
 
-	ht.Cards[0][AH] = Unknown
-	ht.Cards[0][TH] = Unknown
-	ht.Cards[0][QH] = Unknown
 	ht.Cards[0][AS] = 1
-	ht.Cards[0][TS] = None
+	//ht.Cards[0][TS] = None
 	potentials = ht.potentialCards(KH, sdz.Hearts, sdz.Spades, false)
-	t.True(potentials.Contains(AH))
-	t.True(potentials.Contains(TH))
+	t.False(potentials.Contains(AH))
+	t.False(potentials.Contains(TH))
 	t.True(potentials.Contains(AS))
-	t.True(potentials.Contains(QH))
+	t.False(potentials.Contains(QH))
 	t.False(potentials.Contains(TS))
+	t.False(potentials.Contains(KD))
+	t.False(potentials.Contains(TD))
 
 	ht.Cards[0][AH] = 1
 	potentials = ht.potentialCards(KH, sdz.Hearts, sdz.Spades, false)
 	t.True(potentials.Contains(AH))
-	t.True(potentials.Contains(TH))
+	t.False(potentials.Contains(TH))
 	t.False(potentials.Contains(AS))
 	t.False(potentials.Contains(QH))
 	t.False(potentials.Contains(TS))
@@ -314,28 +309,6 @@ func (t *testSuite) TestPotentialCardsShort() {
 	t.Equal(11, len(potentials))
 
 	ht.reset(0)
-	ht.Cards[0][AD] = 2
-	ht.Cards[0][TD] = 1
-	ht.Cards[0][JD] = 1
-	ht.Cards[0][TC] = 1
-	ht.Cards[0][KC] = 1
-	ht.Cards[0][QC] = 1
-	ht.Cards[0][TH] = 1
-	ht.Cards[0][JH] = 1
-	ht.Cards[0][NH] = 1
-	ht.Cards[0][KS] = 1
-	ht.Cards[0][QS] = 1
-	potentials = ht.potentialCards(sdz.NACard, sdz.NASuit, sdz.Hearts, false)
-	t.Equal(11, len(potentials))
-
-	//Playerid:2, Bid:0, PlayedCard:"", WinningCard:"JS", Lead:"S", Trump:"C", Amount:0, Message:"", Hand:sdzpinochle.Hand{"TD", "TD", "QD", "JD", "ND", "ND", "JS"}, Option:0, GameOver:false, Win:false, Score:[]int(nil), Dealer:0, WinningPlayer:0}
-
-	//Starting calculate() - map[KD:1 NS:1 QS:1 JH:2 ND:0 AC:2 JS:1 JD:0 KS:1 QD:0 JC:0 AD:0 KH:1 QC:1 NC:2 QH:1 TH:1 TD:1 AH:2 AS:1 KC:0 TS:0 TC:1 NH:2]
-	//Player0 - map[JS:0 NH:0 ND:0 AH:0 KH:0 KS:0 QC:0 NC:0 AC:0 KC:1 TD:0 JH:0 KD:1]
-	//Player1 - map[KD:0 QC:0 AC:0 JS:0 JC:0 TC:0 NC:0 NH:0 ND:0 TD:0 KC:0 JH:0 AH:0]
-	//Player2 - map[TH:0 JH:0 JD:1 KS:0 QS:0 NC:0 JS:1 AD:0 QD:1 TS:0 NH:0 AS:0 KD:0 TD:1 KC:0 TC:0 NS:0 AH:0 ND:2 JC:0 QH:0 AC:0 QC:0 KH:0]
-	//Player3 - map[JH:0 AH:0 KD:0 NC:0 JS:0 KC:1 TD:0 AC:0 NH:0 QC:1 ND:0]
-	ht.reset(0)
 	ht.Cards[0][TD] = 2
 	ht.Cards[0][ND] = 2
 	ht.Cards[0][QD] = 1
@@ -347,14 +320,12 @@ func (t *testSuite) TestPotentialCardsShort() {
 	t.False(potentials.Contains(TD))
 
 	ht.reset(0)
-	ht.Cards[0][AD] = Unknown
 	ht.Cards[0][TD] = 1
 	ht.Cards[0][KD] = 1
 	ht.Cards[0][QD] = 1
 	ht.Cards[0][JD] = 1
 	// follow suit and lose
 	potentials = ht.potentialCards(AD, sdz.Diamonds, sdz.Spades, false)
-	t.False(potentials.Contains(AD))
 	t.False(potentials.Contains(TD))
 	t.True(potentials.Contains(KD))
 	t.False(potentials.Contains(QD))
@@ -370,7 +341,6 @@ func (t *testSuite) TestPotentialCardsShort() {
 
 	// follow suit and win
 	potentials = ht.potentialCards(ND, sdz.Diamonds, sdz.Spades, false)
-	t.True(potentials.Contains(AD))
 	t.True(potentials.Contains(TD))
 	t.True(potentials.Contains(KD))
 	t.True(potentials.Contains(QD))
@@ -378,7 +348,6 @@ func (t *testSuite) TestPotentialCardsShort() {
 
 	// play trump and win
 	potentials = ht.potentialCards(ND, sdz.Spades, sdz.Diamonds, false)
-	t.True(potentials.Contains(AD))
 	t.True(potentials.Contains(TD))
 	t.True(potentials.Contains(KD))
 	t.True(potentials.Contains(QD))
@@ -386,7 +355,6 @@ func (t *testSuite) TestPotentialCardsShort() {
 
 	// now we do the 4 blocks over again, but this time it's the last play
 	ht.reset(0)
-	ht.Cards[0][AD] = Unknown
 	ht.Cards[0][TD] = 1
 	ht.Cards[0][KD] = 1
 	ht.Cards[0][QD] = 1
@@ -422,23 +390,6 @@ func (t *testSuite) TestPotentialCardsShort() {
 	t.True(potentials.Contains(KD))
 	t.False(potentials.Contains(QD))
 	t.True(potentials.Contains(JD))
-
-	//PotentialCards called with 0,winning=AS,lead=D,trump=C,
-	//ht=&main.HandTracker{cards:[4]map[sdzpinochle.Card]int{map[sdzpinochle.Card]int{"NC":0, "AC":0, "AS":0, "KD":0, "QD":0, "QS":0, "TH":0, "JC":0, "AD":0, "ND":0, "KC":0, "TS":0, "NH":0, "TC":0, "TD":0, "QH":0, "NS":0, "JD":0, "QC":0, "KH":0, "JH":0, "KS":0, "AH":0, "JS":0}, map[sdzpinochle.Card]int{"NC":0, "QC":0, "ND":0, "AH":0, "AC":0, "QH":1, "JD":0, "KS":0, "JC":0, "AS":0, "KC":0, "TH":0, "TC":0, "QS":0, "KH":0, "TS":0}, map[sdzpinochle.Card]int{"KS":0, "JD":0, "JC":0, "TH":0, "KH":0, "AS":0, "QD":0, "TC":0, "AC":0, "AH":0, "QH":0, "NC":0, "KD":1, "QC":0, "ND":0, "KC":0, "QS":0, "TS":0}, map[sdzpinochle.Card]int{"TH":0, "AS":0, "AH":0, "TS":0, "KC":0, "NC":0, "QS":0, "TC":0, "ND":0, "AC":0, "KS":0, "QC":0, "KH":0, "JD":0, "QH":0, "JC":0}}, playedCards:map[sdzpinochle.Card]int{"KH":2, "KD":0, "JC":2, "AH":2, "TH":2, "TD":1, "NS":1, "TC":2, "ND":2, "AS":2, "KS":2, "JS":1, "QC":2, "KC":2, "QD":1, "QS":2, "NH":1, "QH":1, "AD":0, "JD":2, "AC":2, "JH":1, "NC":2, "TS":2}}
-	//ht = NewHandTracker(0, make(sdz.Hand, 0))
-	//for _, card := range sdz.AllCards() {
-	//	ht.Cards[0][card] = 0
-	//}
-	//ht.Cards[0][TD] = 2
-	//ht.Cards[0][ND] = 2
-	//ht.Cards[0][QD] = 1
-	//ht.Cards[0][JD] = 1
-	//ht.Cards[0][JS] = 1
-	//potentials = potentialCards(0, ht, JS, sdz.Spades, sdz.Clubs)
-	//t.Equal(1, len(potentials))
-	//t.True(potentials[JS])
-	//t.False(potentials[TD])
-
 }
 
 //func convert(oldMap map[sdz.Card]int) CardMap {
@@ -513,14 +464,14 @@ func (t *testSuite) TestPotentialCardsShort() {
 //	HTs <- ht
 //}
 
-func (t *testSuite) TestPlayWalkerDeal() {
+func (t *testSuite) TestHandTrackerDeal() {
 	ai := createAI()
 	ai.SetHand(nil, nil, nil, sdz.Hand{TD, TD, QD, TC, QC, AH, AH, KH, NH, TS, KS, QS}, 0, 0)
-	pw := &PlayWalker{HT: ai.HT.Copy()}
-	pw.Deal()
-	for x := range pw.HT.Cards {
-		for y := range pw.HT.Cards[x] {
-			t.True(pw.HT.Cards[x][y] != Unknown)
+	ht := ai.HT.Copy()
+	ht.Deal()
+	for x := range ht.Cards {
+		for y := range ht.Cards[x] {
+			t.True(ht.Cards[x][y] != Unknown)
 		}
 	}
 	ai.HT.Cards[3][AC] = 2
@@ -548,13 +499,11 @@ func (t *testSuite) TestPlayWalkerDeal() {
 	for card := 0; card < sdz.AllCards; card++ {
 		ai.HT.calculateCard(sdz.Card(card))
 	}
-	Log(4, "Before...")
-	ai.HT.Debug()
-	pw = &PlayWalker{HT: ai.HT.Copy()}
-	pw.Deal()
-	for x := range pw.HT.Cards {
-		for y := range pw.HT.Cards[x] {
-			t.True(pw.HT.Cards[x][y] != Unknown)
+	ht = ai.HT.Copy()
+	ht.Deal()
+	for x := range ht.Cards {
+		for y := range ht.Cards[x] {
+			t.True(ht.Cards[x][y] != Unknown)
 		}
 	}
 }

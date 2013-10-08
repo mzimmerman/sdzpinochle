@@ -845,17 +845,17 @@ func (pw *PlayWalker) PlayTrail() string {
 
 // Deal fills in the gaps in the HT object based off the status of the hand
 // it is used so potentialCards doesn't play sequences that aren't possible due to having to follow the rules of pinochle
-func (pw *PlayWalker) Deal() {
+func (ht *HandTracker) Deal() {
 	unknownCards := getHand()
 	sum := 0
-	Log(pw.HT.Owner, "Calling Deal()")
-	pw.HT.Debug()
+	Log(ht.Owner, "Calling Deal()")
+	ht.Debug()
 	for x := 0; x < sdz.AllCards; x++ {
-		sum = pw.HT.sum(sdz.Card(x))
+		sum = ht.sum(sdz.Card(x))
 		if sum == 2 {
 			continue
 		}
-		Log(pw.HT.Owner, "Sum for %s = %d", sdz.Card(x), sum)
+		Log(ht.Owner, "Sum for %s = %d", sdz.Card(x), sum)
 		for {
 			if sum == 2 {
 				break
@@ -864,44 +864,44 @@ func (pw *PlayWalker) Deal() {
 			sum++
 		}
 	}
-	Log(pw.HT.Owner, "Have to add %s to players' hands", unknownCards)
+	Log(ht.Owner, "Have to add %s to players' hands", unknownCards)
 	unknownCards.Shuffle()
-	playerWalker := pw.HT.Trick.Next
+	playerWalker := ht.Trick.Next
 	card := sdz.Card(sdz.NACard)
 	addHands := make([]sdz.Hand, 4)
-	baseNeedCards := (48 - pw.HT.PlayCount) / 4
+	baseNeedCards := (48 - ht.PlayCount) / 4
 	addExtra := 1
 	needs := make([]int, 4)
 	for x := range addHands {
-		if (pw.HT.PlayCount+x)%4 == 0 {
+		if (ht.PlayCount+x)%4 == 0 {
 			addExtra = 0
 		}
-		numNeedsCards := baseNeedCards + addExtra - pw.HT.calculateHand(playerWalker)
-		Log(pw.HT.Owner, "Player %d needs %d cards added to his hand to make %d", playerWalker, numNeedsCards, baseNeedCards+addExtra)
+		numNeedsCards := baseNeedCards + addExtra - ht.calculateHand(playerWalker)
+		Log(ht.Owner, "Player %d needs %d cards added to his hand to make %d", playerWalker, numNeedsCards, baseNeedCards+addExtra)
 		needs[playerWalker] = numNeedsCards
 		playerWalker = (playerWalker + 1) % 4
 	}
 largeLoop:
 	for {
-		Log(pw.HT.Owner, "Entering large loop")
+		Log(ht.Owner, "Entering large loop")
 		if len(unknownCards) == 0 {
-			Log(pw.HT.Owner, "Exiting largeLoop, no more cards left")
+			Log(ht.Owner, "Exiting largeLoop, no more cards left")
 			break // all cards identified homes
 		}
 		if needs[playerWalker] == len(addHands[playerWalker]) {
-			Log(pw.HT.Owner, "Done adding cards to %d", playerWalker)
+			Log(ht.Owner, "Done adding cards to %d", playerWalker)
 			playerWalker = (playerWalker + 1) % 4
 			continue
 		}
 		for _, card = range unknownCards {
-			if pw.HT.Cards[playerWalker][card] == Unknown || pw.HT.Cards[playerWalker][card] == 1 {
-				Log(pw.HT.Owner, "Adding %s to player %d, value = %d", card, playerWalker, pw.HT.Cards[playerWalker][card])
+			if ht.Cards[playerWalker][card] == Unknown || ht.Cards[playerWalker][card] == 1 {
+				Log(ht.Owner, "Adding %s to player %d, value = %d", card, playerWalker, ht.Cards[playerWalker][card])
 				addHands[playerWalker] = append(addHands[playerWalker], card)
-				Log(pw.HT.Owner, "Removing card %s from unknownHand", card)
+				Log(ht.Owner, "Removing card %s from unknownHand", card)
 				unknownCards.Remove(card)
 				continue largeLoop
 			} else {
-				Log(pw.HT.Owner, "Player %d can't take %s", playerWalker, card)
+				Log(ht.Owner, "Player %d can't take %s", playerWalker, card)
 			}
 		}
 		// didn't find a location in the current player
@@ -910,31 +910,31 @@ largeLoop:
 				continue
 			}
 			for y, tmpCard := range addHands[x] {
-				if pw.HT.Cards[playerWalker][tmpCard] == Unknown || pw.HT.Cards[playerWalker][tmpCard] == 1 {
+				if ht.Cards[playerWalker][tmpCard] == Unknown || ht.Cards[playerWalker][tmpCard] == 1 {
 					addHands[playerWalker] = append(addHands[playerWalker], tmpCard)
 					addHands[x][y] = card
-					Log(pw.HT.Owner, "Moving %s to player %d from player %d", tmpCard, playerWalker, x)
-					Log(pw.HT.Owner, "Adding %s to player %d", card, x)
-					Log(pw.HT.Owner, "Removing card %s from unknownHand", card)
+					Log(ht.Owner, "Moving %s to player %d from player %d", tmpCard, playerWalker, x)
+					Log(ht.Owner, "Adding %s to player %d", card, x)
+					Log(ht.Owner, "Removing card %s from unknownHand", card)
 					unknownCards.Remove(card)
 					continue largeLoop
 				}
 			}
 		}
 		// didn't find a card we could switch with, give up!  It's a bug!
-		pw.HT.Debug()
+		ht.Debug()
 		panic(fmt.Sprintf("Nowhere for %s to go!", card))
 
 	}
 	// found homes for all cards, let's put them there!
 	for x := range addHands {
 		for _, card := range addHands[x] {
-			pw.HT.Cards[x].inc(card)
-			pw.HT.calculateCard(card)
+			ht.Cards[x].inc(card)
+			ht.calculateCard(card)
 		}
 	}
-	Log(pw.HT.Owner, "Ending Deal()")
-	pw.HT.Debug()
+	Log(ht.Owner, "Ending Deal()")
+	ht.Debug()
 }
 
 func playHandWithCard(ht *HandTracker, trump sdz.Suit) sdz.Card {
@@ -943,7 +943,7 @@ func playHandWithCard(ht *HandTracker, trump sdz.Suit) sdz.Card {
 		HT:   ht.Copy(),
 		Card: sdz.NACard,
 	}
-	pw.Deal()
+	pw.HT.Deal()
 	//end := false
 	//time.AfterFunc(time.Second*30, func() {
 	//	//end = true
@@ -1146,7 +1146,6 @@ func (ht *HandTracker) potentialCards(winning sdz.Card, lead sdz.Suit, trump sdz
 	//Log(ht.Owner, "PotentialCards called with %d,winning=%s,lead=%s,trump=%s", playerid, winning, lead, trump)
 	//Log(ht.Owner, "PotentialCards Player%d - %s", playerid, ht.Cards[playerid])
 	validHand := getHand()
-	potentialHand := getHand()
 	handStatus := Nothing
 allCardLoop:
 	for x := 0; x < sdz.AllCards; x++ {
@@ -1154,7 +1153,7 @@ allCardLoop:
 		suit := card.Suit()
 		val := ht.Cards[ht.Trick.Next][card]
 		if val == Unknown {
-			potentialHand = append(potentialHand, card)
+			panic(fmt.Sprintf("potentialCards can't deal with unknown for card %s on player %d", card, ht.Trick.Next))
 		} else if val != None {
 			cardStatus := Nothing
 			switch {
@@ -1177,14 +1176,15 @@ allCardLoop:
 				if (cardStatus == FollowLose || cardStatus == TrumpLose) ||
 					((cardStatus == FollowWin || cardStatus == TrumpWin) && lastPlay) {
 					// there should be a maximum of two cards in validHand, counter and non-counter
+					//Log(ht.Owner, "ValidHand=%s", validHand)
 					for y, vhc := range validHand {
 						//Log(4, "Comparing vhc=%s to card=%s", vhc, card)
 						if (vhc.Counter() && card.Counter()) || (!vhc.Counter() && !card.Counter()) {
 							if card > vhc {
 								//Log(4, "Replacing %s with %s", vhc, card)
 								validHand[y] = card
+								continue allCardLoop
 							}
-							continue allCardLoop
 						}
 					}
 				}
@@ -1193,53 +1193,6 @@ allCardLoop:
 			}
 		}
 	}
-	//if len(validHand)+len(potentialHand) >= 4 {
-	//	potentialHand.Shuffle()
-	//	oldLen := len(potentialHand)
-	//	if oldLen != 0 {
-	//		potentialHand = potentialHand[:max(1, len(potentialHand)/3)]
-	//		//	//Log(ht.Owner, "Reducing potential hand from %d to %d", oldLen, len(potentialHand))
-	//	}
-	//}
-	if handStatus == Nothing {
-		validHand = append(validHand, potentialHand...)
-	} else {
-	potentialLoop:
-		for _, card := range potentialHand {
-			//Log(4, "Potential card %s", card)
-			cardStatus := Nothing
-			suit := card.Suit()
-			switch {
-			case suit == lead && card.Beats(winning, trump):
-				cardStatus = FollowWin
-			case suit == lead:
-				cardStatus = FollowLose
-			case suit == trump && card.Beats(winning, trump):
-				cardStatus = TrumpWin
-			case suit == trump:
-				cardStatus = TrumpLose
-			}
-			if cardStatus >= handStatus {
-				if (cardStatus == FollowLose || cardStatus == TrumpLose) ||
-					((cardStatus == FollowWin || cardStatus == TrumpWin) && lastPlay) {
-					// there should be a maximum of two cards in validHand, counter and non-counter
-					for y, vhc := range validHand {
-						//Log(4, "Comparing vhc=%s to card=%s", vhc, card)
-						if (vhc.Counter() && card.Counter()) || (!vhc.Counter() && !card.Counter()) {
-							if card > vhc {
-								//Log(4, "Replacing %s with %s", vhc, card)
-								validHand[y] = card
-							}
-							continue potentialLoop
-						}
-					}
-				}
-				validHand = append(validHand, card)
-				//Log(4, "Adding potential card %s", card)
-			}
-		}
-	}
-	Hands <- potentialHand
 	//Log(ht.Owner, "Returning %d potential plays of %s for playerid %d on trick %s", len(validHand), validHand, ht.Trick.Next, ht.Trick)
 	//if len(validHand) == 0 && ht.PlayCount != 48 {
 	//	ht.Debug()
