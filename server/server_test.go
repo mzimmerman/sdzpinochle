@@ -258,17 +258,23 @@ func (t *testSuite) TestPotentialCardsShort() {
 	ht := new(HandTracker)
 	ht.reset(0)
 	ht.Cards[0][TD] = 1
-	ht.Cards[0][KD] = 2
+	ht.Cards[0][KD] = 1
 	//ht.Cards[0][QD] = None
-
-	potentials := ht.potentialCards(sdz.NACard, sdz.NASuit, sdz.Spades, false)
+	ht.PlayCount = 0
+	ht.Trick.Next = 0
+	ht.Trick.reset()
+	potentials := ht.potentialCards(sdz.Spades)
 
 	t.True(potentials.Contains(TD))
 	t.True(potentials.Contains(KD))
 	t.Equal(ht.Cards[0][QD], None)
 	t.False(potentials.Contains(QD))
 
-	potentials = ht.potentialCards(KD, sdz.Diamonds, sdz.Spades, false)
+	ht.PlayCount = 0
+	ht.Trick.Next = 3
+	ht.Trick.reset()
+	ht.PlayCard(KD, sdz.Spades)
+	potentials = ht.potentialCards(sdz.Spades)
 
 	t.True(potentials.Contains(TD))
 	t.False(potentials.Contains(KD))
@@ -276,7 +282,11 @@ func (t *testSuite) TestPotentialCardsShort() {
 
 	ht.Cards[0][AS] = 1
 	//ht.Cards[0][TS] = None
-	potentials = ht.potentialCards(KH, sdz.Hearts, sdz.Spades, false)
+	ht.PlayCount = 0
+	ht.Trick.Next = 3
+	ht.Trick.reset()
+	ht.PlayCard(KH, sdz.Spades)
+	potentials = ht.potentialCards(sdz.Spades)
 	t.False(potentials.Contains(AH))
 	t.False(potentials.Contains(TH))
 	t.True(potentials.Contains(AS))
@@ -286,7 +296,11 @@ func (t *testSuite) TestPotentialCardsShort() {
 	t.False(potentials.Contains(TD))
 
 	ht.Cards[0][AH] = 1
-	potentials = ht.potentialCards(KH, sdz.Hearts, sdz.Spades, false)
+	ht.PlayCount = 0
+	ht.Trick.Next = 3
+	ht.Trick.reset()
+	ht.PlayCard(KH, sdz.Spades)
+	potentials = ht.potentialCards(sdz.Spades)
 	t.True(potentials.Contains(AH))
 	t.False(potentials.Contains(TH))
 	t.False(potentials.Contains(AS))
@@ -305,7 +319,10 @@ func (t *testSuite) TestPotentialCardsShort() {
 	ht.Cards[0][NH] = 1
 	ht.Cards[0][KS] = 1
 	ht.Cards[0][QS] = 1
-	potentials = ht.potentialCards(sdz.NACard, sdz.NASuit, sdz.Hearts, false)
+	ht.PlayCount = 0
+	ht.Trick.Next = 0
+	ht.Trick.reset()
+	potentials = ht.potentialCards(sdz.Hearts)
 	t.Equal(11, len(potentials))
 
 	ht.reset(0)
@@ -314,7 +331,10 @@ func (t *testSuite) TestPotentialCardsShort() {
 	ht.Cards[0][QD] = 1
 	ht.Cards[0][JD] = 1
 	ht.Cards[0][JS] = 1
-	potentials = ht.potentialCards(JS, sdz.Spades, sdz.Clubs, false)
+	ht.PlayCount = 0
+	ht.Trick.Next = 3
+	ht.PlayCard(JS, sdz.Clubs)
+	potentials = ht.potentialCards(sdz.Clubs)
 	t.Equal(1, len(potentials))
 	t.True(potentials.Contains(JS))
 	t.False(potentials.Contains(TD))
@@ -325,14 +345,20 @@ func (t *testSuite) TestPotentialCardsShort() {
 	ht.Cards[0][QD] = 1
 	ht.Cards[0][JD] = 1
 	// follow suit and lose
-	potentials = ht.potentialCards(AD, sdz.Diamonds, sdz.Spades, false)
+	ht.PlayCount = 0
+	ht.Trick.Next = 3
+	ht.PlayCard(AD, sdz.Spades)
+	potentials = ht.potentialCards(sdz.Spades)
 	t.False(potentials.Contains(TD))
 	t.True(potentials.Contains(KD))
 	t.False(potentials.Contains(QD))
 	t.True(potentials.Contains(JD))
 
 	// play trump and lose
-	potentials = ht.potentialCards(AD, sdz.Spades, sdz.Diamonds, false)
+	ht.PlayCount = 0
+	ht.Trick.Next = 3
+	ht.PlayCard(AD, sdz.Diamonds)
+	potentials = ht.potentialCards(sdz.Diamonds)
 	t.False(potentials.Contains(AD))
 	t.False(potentials.Contains(TD))
 	t.True(potentials.Contains(KD))
@@ -340,14 +366,22 @@ func (t *testSuite) TestPotentialCardsShort() {
 	t.True(potentials.Contains(JD))
 
 	// follow suit and win
-	potentials = ht.potentialCards(ND, sdz.Diamonds, sdz.Spades, false)
+	ht.PlayCount = 0
+	ht.Trick.Next = 3
+	ht.Trick.reset()
+	ht.PlayCard(ND, sdz.Spades)
+	potentials = ht.potentialCards(sdz.Spades)
 	t.True(potentials.Contains(TD))
 	t.True(potentials.Contains(KD))
 	t.True(potentials.Contains(QD))
 	t.True(potentials.Contains(JD))
 
 	// play trump and win
-	potentials = ht.potentialCards(ND, sdz.Spades, sdz.Diamonds, false)
+	ht.PlayCount = 0
+	ht.Trick.Next = 3
+	ht.Trick.reset()
+	ht.PlayCard(ND, sdz.Diamonds)
+	potentials = ht.potentialCards(sdz.Diamonds)
 	t.True(potentials.Contains(TD))
 	t.True(potentials.Contains(KD))
 	t.True(potentials.Contains(QD))
@@ -360,7 +394,11 @@ func (t *testSuite) TestPotentialCardsShort() {
 	ht.Cards[0][QD] = 1
 	ht.Cards[0][JD] = 1
 	// follow suit and lose
-	potentials = ht.potentialCards(AD, sdz.Diamonds, sdz.Spades, true)
+	ht.PlayCount = 2
+	ht.Trick.Next = 3
+	ht.Trick.reset()
+	ht.PlayCard(AD, sdz.Spades)
+	potentials = ht.potentialCards(sdz.Spades)
 	t.False(potentials.Contains(AD))
 	t.False(potentials.Contains(TD))
 	t.True(potentials.Contains(KD))
@@ -368,7 +406,12 @@ func (t *testSuite) TestPotentialCardsShort() {
 	t.True(potentials.Contains(JD))
 
 	// play trump and lose
-	potentials = ht.potentialCards(AD, sdz.Spades, sdz.Diamonds, true)
+	ht.PlayCount = 1
+	ht.Trick.Next = 2
+	ht.Trick.reset()
+	ht.PlayCard(JS, sdz.Diamonds)
+	ht.PlayCard(AD, sdz.Diamonds)
+	potentials = ht.potentialCards(sdz.Diamonds)
 	t.False(potentials.Contains(AD))
 	t.False(potentials.Contains(TD))
 	t.True(potentials.Contains(KD))
@@ -376,7 +419,11 @@ func (t *testSuite) TestPotentialCardsShort() {
 	t.True(potentials.Contains(JD))
 
 	// follow suit and win
-	potentials = ht.potentialCards(ND, sdz.Diamonds, sdz.Spades, true)
+	ht.PlayCount = 2
+	ht.Trick.Next = 3
+	ht.Trick.reset()
+	ht.PlayCard(ND, sdz.Spades)
+	potentials = ht.potentialCards(sdz.Spades)
 	t.False(potentials.Contains(AD))
 	t.False(potentials.Contains(TD))
 	t.True(potentials.Contains(KD))
@@ -384,7 +431,12 @@ func (t *testSuite) TestPotentialCardsShort() {
 	t.True(potentials.Contains(JD))
 
 	// play trump and win
-	potentials = ht.potentialCards(ND, sdz.Spades, sdz.Diamonds, true)
+	ht.PlayCount = 1
+	ht.Trick.Next = 2
+	ht.Trick.reset()
+	ht.PlayCard(JS, sdz.Diamonds)
+	ht.PlayCard(ND, sdz.Diamonds)
+	potentials = ht.potentialCards(sdz.Diamonds)
 	t.False(potentials.Contains(AD))
 	t.False(potentials.Contains(TD))
 	t.True(potentials.Contains(KD))

@@ -955,10 +955,10 @@ func playHandWithCard(ht *HandTracker, trump sdz.Suit) sdz.Card {
 		if pw.State == PWNew { // load children, all possible cards
 			//Log(4, "One")
 			trickPlays := pw.HT.Trick.Plays
-			if pw.HT.Trick.Plays == 4 {
-				pw.HT.Trick.Plays = 0
+			if pw.HT.PlayCount%4 == 0 {
+				pw.HT.Trick.reset()
 			}
-			decisionMap := pw.HT.potentialCards(pw.HT.Trick.winningCard(), pw.HT.Trick.leadSuit(), trump, pw.HT.Trick.Plays == 3)
+			decisionMap := pw.HT.potentialCards(trump)
 			pw.HT.Trick.Plays = trickPlays
 			if len(decisionMap) == 0 {
 				if pw.HT.PlayCount != 48 {
@@ -1142,11 +1142,13 @@ func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	return card
 }
 
-func (ht *HandTracker) potentialCards(winning sdz.Card, lead sdz.Suit, trump sdz.Suit, lastPlay bool) sdz.Hand {
+func (ht *HandTracker) potentialCards(trump sdz.Suit) sdz.Hand {
 	//Log(ht.Owner, "PotentialCards called with %d,winning=%s,lead=%s,trump=%s", playerid, winning, lead, trump)
 	//Log(ht.Owner, "PotentialCards Player%d - %s", playerid, ht.Cards[playerid])
 	validHand := getHand()
 	handStatus := Nothing
+	winning := ht.Trick.winningCard()
+	lead := ht.Trick.leadSuit()
 allCardLoop:
 	for x := 0; x < sdz.AllCards; x++ {
 		card := sdz.Card(x)
@@ -1174,7 +1176,7 @@ allCardLoop:
 				validHand[0] = card
 			} else if cardStatus == handStatus {
 				if (cardStatus == FollowLose || cardStatus == TrumpLose) ||
-					((cardStatus == FollowWin || cardStatus == TrumpWin) && lastPlay) {
+					((cardStatus == FollowWin || cardStatus == TrumpWin) && ht.PlayCount%4 == 3) {
 					// there should be a maximum of two cards in validHand, counter and non-counter
 					//Log(ht.Owner, "ValidHand=%s", validHand)
 					for y, vhc := range validHand {
