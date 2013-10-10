@@ -807,7 +807,7 @@ func (t *testSuite) TestNoSuitShort() {
 	t.Equal(Unknown, ht.Cards[1][AS])
 }
 
-func (t *testSuite) TestPlayWalkerString() {
+func (t *testSuite) TestPlayWalkerStringShort() {
 	trump := sdz.Suit(sdz.Diamonds)
 	ht := new(HandTracker)
 	ht.reset(0)
