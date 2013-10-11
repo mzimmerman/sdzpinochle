@@ -519,7 +519,11 @@ func (t *testSuite) TestPotentialCardsShort() {
 func (t *testSuite) TestHandTrackerDeal() {
 	ai := createAI()
 	ai.SetHand(nil, nil, nil, sdz.Hand{TD, TD, QD, TC, QC, AH, AH, KH, NH, TS, KS, QS}, 0, 0)
-	ht := ai.HT.Copy()
+	ht, err := ai.HT.Copy()
+	if err != nil {
+		t.Error("Ran out of memory")
+		return
+	}
 	ht.Deal()
 	for x := range ht.Cards {
 		for y := range ht.Cards[x] {
@@ -551,7 +555,23 @@ func (t *testSuite) TestHandTrackerDeal() {
 	for card := 0; card < sdz.AllCards; card++ {
 		ai.HT.calculateCard(sdz.Card(card))
 	}
-	ht = ai.HT.Copy()
+	ht.Deal()
+	for x := range ht.Cards {
+		for y := range ht.Cards[x] {
+			t.True(ht.Cards[x][y] != Unknown)
+		}
+	}
+
+	ai.SetHand(nil, nil, nil, sdz.Hand{AD, AD, TD, JD, TC, KC, QC, TH, JH, NH, KS, QS}, 0, 3)
+	ai.Trump = sdz.Diamonds
+	ai.HT.Cards[0][KH] = 1
+	ai.HT.Cards[0][QH] = 1
+	ai.HT.Cards[1][NH] = 1
+	ai.HT.Cards[2][KD] = 1
+	ai.HT.Cards[2][QD] = 1
+	//for card := 0; card < sdz.AllCards; card++ {
+	//	ai.HT.calculateCard(sdz.Card(card))
+	//}
 	ht.Deal()
 	for x := range ht.Cards {
 		for y := range ht.Cards[x] {
@@ -597,6 +617,9 @@ func (t *testSuite) TestFindCardToPlayLong() {
 	ai.HT.Cards[1][NH] = 1
 	ai.HT.Cards[2][KD] = 1
 	ai.HT.Cards[2][QD] = 1
+	for x := 0; x < sdz.AllCards; x++ {
+		ai.HT.calculateCard(sdz.Card(x))
+	}
 	action := sdz.CreatePlayRequest(sdz.NACard, sdz.NASuit, ai.Trump, 3, ai.Hand())
 	switch ai.findCardToPlay(action) {
 	case AD:
@@ -613,9 +636,13 @@ func (t *testSuite) TestGame() {
 	c, err := appenginetesting.NewContext(&appenginetesting.Options{Debug: "debug"})
 	if err != nil {
 		t.Error("Could not start appenginetesting")
-		t.MustFail()
+		return
 	}
 	defer c.Close()
+	if c == nil {
+		t.Error("Could not start testing framework")
+		return
+	}
 	g := goon.FromContext(c)
 	game := NewGame(4)
 	game.Dealer = 0
@@ -847,13 +874,18 @@ func (t *testSuite) TestPlayWalkerStringShort() {
 		Card: sdz.NACard,
 	}
 	t.Equal("----- ", pw.PlayTrail())
+	var err error
 	for x := range tests {
 		for y := range tests[x].Cards {
 			pw.Children = []*PlayWalker{&PlayWalker{
-				HT:     pw.HT.Copy(),
 				Card:   tests[x].Cards[y],
 				Parent: pw,
 			}}
+			pw.Children[0].HT, err = pw.HT.Copy()
+			if err != nil {
+				t.Error("Ran out of memory")
+				return
+			}
 			pw = pw.Children[0]
 			pw.HT.PlayCard(pw.Card, trump)
 			t.Equal(tests[x].Result[y], pw.PlayTrail())
