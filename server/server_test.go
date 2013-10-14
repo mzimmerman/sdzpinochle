@@ -654,10 +654,10 @@ func (t *testSuite) TestGame() {
 	game.Players[3].SetHand(g, c, game, sdz.Hand{AC, AC, KC, JC, JC, TH, QH, QH, JH, AS, TS, KS}, 0, 3)
 	game.Players[0] = createAI()
 	game.Players[0].SetHand(g, c, game, sdz.Hand{TD, TD, QD, TC, QC, AH, AH, KH, NH, TS, KS, QS}, 0, 0)
-	game.Meld = make([]int, len(game.Players)/2)
+	game.Meld = make([]uint8, len(game.Players)/2)
 	game.Trick = Trick{}
 	game.CountMeld = make([]bool, len(game.Players)/2)
-	game.Counters = make([]int, len(game.Players)/2)
+	game.Counters = make([]uint8, len(game.Players)/2)
 	game.HighBid = 20
 	game.HighPlayer = game.Dealer
 	game.State = StateBid

@@ -77,9 +77,9 @@ func init() {
 	Suits = [4]Suit{Spades, Hearts, Clubs, Diamonds}
 }
 
-type Card int // an integer representation of the card
-type Suit int
-type Face int
+type Card int8 // an integer representation of the card
+type Suit int8
+type Face int8
 
 type Deck [48]Card
 type Hand []Card
@@ -200,7 +200,7 @@ func (c Card) Face() Face {
 	return Face(int(c) % 6)
 }
 
-func (d *Deck) Swap(i, j int) {
+func (d *Deck) Swap(i, j uint8) {
 	d[i], d[j] = d[j], d[i]
 }
 
@@ -208,7 +208,7 @@ func (d *Deck) Shuffle() {
 	//	http://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle#The_modern_algorithm
 	for i := len(d) - 1; i >= 1; i-- {
 		if j := rand.Intn(i); i != j {
-			d.Swap(i, j)
+			d.Swap(uint8(i), uint8(j))
 		}
 	}
 }
@@ -316,18 +316,18 @@ func CreateDeck() (deck Deck) {
 
 type Action struct {
 	Type                    string
-	Playerid                int
-	Bid                     int
+	Playerid                uint8
+	Bid                     uint8
 	PlayedCard, WinningCard Card
 	Lead, Trump             Suit
-	Amount                  int
+	Amount                  uint8
 	Message                 string
 	Hand                    Hand
 	TableId                 int64
 	GameOver, Win           bool
-	Score                   []int
-	Dealer                  int
-	WinningPlayer           int
+	Score                   []int16
+	Dealer                  uint8
+	WinningPlayer           uint8
 }
 
 func (action *Action) String() string {
@@ -374,11 +374,11 @@ func (action *Action) UnmarshalJSON(data []byte) error {
 
 type JSONAction struct {
 	Type       string
-	Playerid   int
-	Bid        int
+	Playerid   uint8
+	Bid        uint8
 	PlayedCard string
 	Trump      string
-	Amount     int
+	Amount     uint8
 	Message    string
 	TableId    int64
 }
@@ -428,59 +428,59 @@ func CreateMessage(m string) *Action {
 	return &Action{Type: "Message", Message: m}
 }
 
-func CreateBid(bid, playerid int) *Action {
+func CreateBid(bid, playerid uint8) *Action {
 	return &Action{Type: "Bid", Bid: bid, Playerid: playerid}
 }
 
-func CreatePlayRequest(winning Card, lead, trump Suit, playerid int, hand *Hand) *Action {
+func CreatePlayRequest(winning Card, lead, trump Suit, playerid uint8, hand *Hand) *Action {
 	return &Action{Type: "Play", WinningCard: winning, Lead: lead, Trump: trump, Playerid: playerid, Hand: *hand}
 }
 
-func CreatePlay(card Card, playerid int) *Action {
+func CreatePlay(card Card, playerid uint8) *Action {
 	return &Action{Type: "Play", PlayedCard: card, Playerid: playerid}
 }
 
-func CreateTrump(trump Suit, playerid int) *Action {
+func CreateTrump(trump Suit, playerid uint8) *Action {
 	return &Action{Type: "Trump", Trump: trump, Playerid: playerid}
 }
 
-func CreateTrick(winningPlayer int) *Action {
+func CreateTrick(winningPlayer uint8) *Action {
 	return &Action{Type: "Trick", Playerid: winningPlayer}
 }
 
-func CreateThrowin(playerid int) *Action {
+func CreateThrowin(playerid uint8) *Action {
 	return &Action{Type: "Throwin", Playerid: playerid}
 }
 
-func CreateMeld(hand Hand, amount, playerid int) *Action {
+func CreateMeld(hand Hand, amount, playerid uint8) *Action {
 	return &Action{Type: "Meld", Hand: hand, Amount: amount, Playerid: playerid}
 }
 
-func CreateDisconnect(playerid int) *Action {
+func CreateDisconnect(playerid uint8) *Action {
 	return &Action{Type: "Disconnect", Playerid: playerid}
 }
 
-func CreateDeal(hand Hand, playerid, dealer int) *Action {
+func CreateDeal(hand Hand, playerid, dealer uint8) *Action {
 	return &Action{Type: "Deal", Hand: hand, Playerid: playerid, Dealer: dealer}
 }
 
-func CreateScore(score []int, gameOver, win bool) *Action {
+func CreateScore(score []int16, gameOver, win bool) *Action {
 	return &Action{Type: "Score", Score: score, Win: win, GameOver: gameOver}
 }
 
 type PlayerImpl struct {
-	Playerid int
+	Playerid uint8
 }
 
-func (p PlayerImpl) PlayerID() int {
+func (p PlayerImpl) PlayerID() uint8 {
 	return p.Playerid
 }
 
-func (p PlayerImpl) Team() int {
+func (p PlayerImpl) Team() uint8 {
 	return p.Playerid % 2
 }
 
-func (p PlayerImpl) IsPartner(player int) bool {
+func (p PlayerImpl) IsPartner(player uint8) bool {
 	return p.Playerid%2 == player%2
 }
 
@@ -585,8 +585,8 @@ func (h Hand) CountSuit(suit Suit) (count int) {
 	return
 }
 
-func (h Hand) Count() (cards map[Card]int) {
-	cards = make(map[Card]int)
+func (h Hand) Count() (cards map[Card]uint8) {
+	cards = make(map[Card]uint8)
 	for _, face := range Faces {
 		for _, suit := range Suits {
 			cards[CreateCard(suit, face)] = 0
@@ -598,28 +598,28 @@ func (h Hand) Count() (cards map[Card]int) {
 	return
 }
 
-func max(a, b int) int {
+func max(a, b uint8) uint8 {
 	if a > b {
 		return a
 	}
 	return b
 }
 
-func min(a, b int) int {
+func min(a, b uint8) uint8 {
 	if a < b {
 		return a
 	}
 	return b
 }
 
-func (h Hand) Meld(trump Suit) (meld int, result Hand) {
+func (h Hand) Meld(trump Suit) (meld uint8, result Hand) {
 	// hand does not have to be sorted
 	count := h.Count()
 	if debugLog {
 		fmt.Printf("Count is %v\n", count)
 	}
-	show := make(map[Card]int)
-	around := make(map[Face]int)
+	show := make(map[Card]uint8)
+	around := make(map[Face]uint8)
 	for _, value := range Faces {
 		around[value] = 2
 	}
@@ -635,7 +635,7 @@ func (h Hand) Meld(trump Suit) (meld int, result Hand) {
 			switch {
 			// double straight
 			case count[CreateCard(suit, Ace)] == 2 && count[CreateCard(suit, Ten)] == 2 && count[CreateCard(suit, King)] == 2 && count[CreateCard(suit, Queen)] == 2 && count[CreateCard(suit, Jack)] == 2:
-				meld += 150
+				meld += 120
 				for _, face := range Faces {
 					show[CreateCard(suit, face)] = 2
 				}
@@ -697,7 +697,7 @@ func (h Hand) Meld(trump Suit) (meld int, result Hand) {
 	}
 	for _, face := range []Face{Ace, King, Queen, Jack} {
 		if around[face] > 0 {
-			var worth int
+			var worth uint8
 			switch face {
 			case Ace:
 				worth = acearound
