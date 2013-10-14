@@ -70,6 +70,7 @@ const (
 
 var Faces [6]Face
 var Suits [4]Suit
+var CardPrimes = [24]SmallHand{2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89}
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
@@ -83,6 +84,7 @@ type Face int8
 
 type Deck [48]Card
 type Hand []Card
+type SmallHand uint64
 
 func CreateCard(suit Suit, face Face) Card {
 	return Card(int(suit)*6 + int(face))
@@ -211,6 +213,19 @@ func (d *Deck) Shuffle() {
 			d.Swap(uint8(i), uint8(j))
 		}
 	}
+}
+
+func (h *SmallHand) String() string {
+	var buffer bytes.Buffer
+	buffer.WriteString("SmallHand{")
+	for card := AS; card < AllCards; card++ {
+		if h.Contains(card) {
+			buffer.WriteString(card.String())
+			buffer.WriteString(", ")
+		}
+	}
+	buffer.WriteString("}")
+	return buffer.String()
 }
 
 func (h Hand) String() string {
@@ -555,11 +570,23 @@ func ValidPlay(playedCard, winningCard Card, leadSuit Suit, hand *Hand, trump Su
 	return true
 }
 
+func (h *SmallHand) Contains(card Card) bool {
+	return *h%CardPrimes[card] == 0
+}
+
 func (h *Hand) Contains(card Card) bool {
 	for _, c := range *h {
 		if c == card {
 			return true
 		}
+	}
+	return false
+}
+
+func (h *SmallHand) Remove(card Card) bool {
+	if h.Contains(card) {
+		*h = *h / CardPrimes[card]
+		return true
 	}
 	return false
 }
@@ -635,7 +662,7 @@ func (h Hand) Meld(trump Suit) (meld uint8, result Hand) {
 			switch {
 			// double straight
 			case count[CreateCard(suit, Ace)] == 2 && count[CreateCard(suit, Ten)] == 2 && count[CreateCard(suit, King)] == 2 && count[CreateCard(suit, Queen)] == 2 && count[CreateCard(suit, Jack)] == 2:
-				meld += 120
+				meld += 150
 				for _, face := range Faces {
 					show[CreateCard(suit, face)] = 2
 				}

@@ -204,7 +204,7 @@ func (t *testSuite) TestMeld() {
 		map[Suit]int{Spades: 47, Hearts: 34, Clubs: 34, Diamonds: 47},
 		map[Suit]int{Spades: 27, Hearts: 14, Clubs: 14, Diamonds: 18},
 		map[Suit]int{Spades: 12, Hearts: 8, Clubs: 8, Diamonds: 22},
-		map[Suit]int{Spades: 4, Hearts: 4, Clubs: 4, Diamonds: 120},
+		map[Suit]int{Spades: 4, Hearts: 4, Clubs: 4, Diamonds: 150},
 		map[Suit]int{Spades: 12, Hearts: 11, Clubs: 10, Diamonds: 25},
 		map[Suit]int{Spades: 52, Hearts: 50, Clubs: 50, Diamonds: 50},
 		map[Suit]int{Spades: 66, Hearts: 64, Clubs: 64, Diamonds: 65},
