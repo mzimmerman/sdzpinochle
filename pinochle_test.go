@@ -73,12 +73,6 @@ func (t *testSuite) TestDeal() {
 	t.True(checkForDupes(h, t))
 }
 
-func (t *testSuite) TestMin() {
-	t.Equal(min(1, 2), 1)
-	t.Equal(min(2, 1), 1)
-	t.Equal(min(5, 5), 5)
-}
-
 func (t *testSuite) TestRemove() {
 	hand := Hand{JD, QD, KD, AD, TD, JD, QS, QS, KS, AS, TS, JS}
 	sort.Sort(hand)
@@ -145,16 +139,16 @@ func (t *testSuite) TestValidPlay() {
 func (t *testSuite) TestCount() {
 	hand := Hand{JD, QD, KD, AD, JD, JS, QD, KS, AS, TS, JS, TD}
 	count := hand.Count()
-	t.Equal(count[JS], 2)
-	t.Equal(count[KD], 1)
-	t.Equal(count[AD], 1)
-	t.Equal(count[TD], 1)
-	t.Equal(count[QS], 0)
-	t.Equal(count[KS], 1)
-	t.Equal(count[AS], 1)
-	t.Equal(count[TS], 1)
-	t.Equal(count[JS], 2)
-	t.Equal(count[JH], 0)
+	t.Equal(count[JS], uint8(2))
+	t.Equal(count[KD], uint8(1))
+	t.Equal(count[AD], uint8(1))
+	t.Equal(count[TD], uint8(1))
+	t.Equal(count[QS], uint8(0))
+	t.Equal(count[KS], uint8(1))
+	t.Equal(count[AS], uint8(1))
+	t.Equal(count[TS], uint8(1))
+	t.Equal(count[JS], uint8(2))
+	t.Equal(count[JH], uint8(0))
 }
 
 func (t *testSuite) TestMeld2() {
@@ -210,7 +204,7 @@ func (t *testSuite) TestMeld() {
 		map[Suit]int{Spades: 47, Hearts: 34, Clubs: 34, Diamonds: 47},
 		map[Suit]int{Spades: 27, Hearts: 14, Clubs: 14, Diamonds: 18},
 		map[Suit]int{Spades: 12, Hearts: 8, Clubs: 8, Diamonds: 22},
-		map[Suit]int{Spades: 4, Hearts: 4, Clubs: 4, Diamonds: 150},
+		map[Suit]int{Spades: 4, Hearts: 4, Clubs: 4, Diamonds: 120},
 		map[Suit]int{Spades: 12, Hearts: 11, Clubs: 10, Diamonds: 25},
 		map[Suit]int{Spades: 52, Hearts: 50, Clubs: 50, Diamonds: 50},
 		map[Suit]int{Spades: 66, Hearts: 64, Clubs: 64, Diamonds: 65},
@@ -219,7 +213,7 @@ func (t *testSuite) TestMeld() {
 		for _, trump := range Suits {
 			sort.Sort(hands[x])
 			meld, _ := hands[x].Meld(trump)
-			t.Equal(results[x][trump], meld)
+			t.Equal(results[x][trump], int(meld))
 		}
 	}
 }
