@@ -571,6 +571,9 @@ func ValidPlay(playedCard, winningCard Card, leadSuit Suit, hand *Hand, trump Su
 }
 
 func (h *SmallHand) Contains(card Card) bool {
+	if *h == 0 || *h == 1 {
+		return false // hand is empty
+	}
 	return *h%CardPrimes[card] == 0
 }
 
@@ -581,6 +584,17 @@ func (h *Hand) Contains(card Card) bool {
 		}
 	}
 	return false
+}
+
+func (h *SmallHand) Append(cards ...Card) {
+	if *h == 0 {
+		*h = 1
+	}
+	for x := range cards {
+		//Log("Appending %s[%d] to %d", cards[x], CardPrimes[cards[x]], *h)
+		*h *= CardPrimes[cards[x]]
+		//Log("Result is now %d", *h)
+	}
 }
 
 func (h *SmallHand) Remove(card Card) bool {

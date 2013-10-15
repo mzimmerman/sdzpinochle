@@ -73,6 +73,31 @@ func (t *testSuite) TestDeal() {
 	t.True(checkForDupes(h, t))
 }
 
+func (t *testSuite) TestSmallHand() {
+	hand := new(SmallHand)
+	t.False(hand.Contains(JD))
+	t.False(hand.Contains(AD))
+	t.False(hand.Contains(QH))
+	hand.Append(Hand{JD, QD, KD, AD, TD, JD, QS, QS, KS, AS, TS, JS}...)
+	t.True(hand.Contains(JD))
+	t.True(hand.Contains(AD))
+	t.True(hand.Contains(KD))
+	t.True(hand.Contains(TD))
+	t.True(hand.Contains(QS))
+	t.True(hand.Contains(KS))
+	t.True(hand.Contains(AS))
+	t.True(hand.Contains(TS))
+	t.True(hand.Contains(JS))
+	t.False(hand.Contains(QH))
+	t.False(hand.Remove(QH))
+	t.True(hand.Remove(JD))
+	t.True(hand.Contains(JD))
+	t.True(hand.Remove(JD))
+	t.False(hand.Contains(JD))
+	t.True(hand.Remove(AD))
+	t.False(hand.Contains(AD))
+}
+
 func (t *testSuite) TestRemove() {
 	hand := Hand{JD, QD, KD, AD, TD, JD, QS, QS, KS, AS, TS, JS}
 	sort.Sort(hand)
