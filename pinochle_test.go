@@ -74,7 +74,7 @@ func (t *testSuite) TestDeal() {
 }
 
 func (t *testSuite) TestSmallHand() {
-	hand := new(SmallHand)
+	hand := NewSmallHand()
 	t.False(hand.Contains(JD))
 	t.False(hand.Contains(AD))
 	t.False(hand.Contains(QH))
