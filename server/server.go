@@ -985,7 +985,7 @@ func playHandWithCard(ht *HandTracker, trump sdz.Suit) sdz.Card {
 					PlayCount: pw.PlayCount + 1,
 					Me:        pw.Trick.Next,
 				}
-				pw.Children[x].Hands[pw.Trick.Next] = pw.Hands[pw.Trick.Next].Copy()
+				pw.Children[x].Hands[pw.Trick.Next] = pw.Hands[pw.Trick.Next].CopySmallHand()
 				pw.Children[x].Hands[pw.Trick.Next].Remove(decisionMap[x])
 				count++
 				*pw.Children[x].Trick = *pw.Trick // copy the trick

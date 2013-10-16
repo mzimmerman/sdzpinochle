@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
+	"github.com/willf/bitset"
 	"math/rand"
 	"reflect"
 	"sort"
@@ -71,9 +71,6 @@ const (
 
 var Faces [6]Face
 var Suits [4]Suit
-var CardPrimes = [24]*big.Int{big.NewInt(2), big.NewInt(3), big.NewInt(5), big.NewInt(7), big.NewInt(11), big.NewInt(13), big.NewInt(17), big.NewInt(19), big.NewInt(23), big.NewInt(29), big.NewInt(31), big.NewInt(37), big.NewInt(41), big.NewInt(43), big.NewInt(47), big.NewInt(53), big.NewInt(59), big.NewInt(61), big.NewInt(67), big.NewInt(71), big.NewInt(73), big.NewInt(79), big.NewInt(83), big.NewInt(89)}
-var bigOne = big.NewInt(1)
-var bigZero = big.NewInt(0)
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
@@ -88,7 +85,7 @@ type Face int8
 type Deck [48]Card
 type Hand []Card
 type SmallHand struct {
-	val *big.Int
+	*bitset.BitSet
 }
 
 func CreateCard(suit Suit, face Face) Card {
@@ -220,7 +217,7 @@ func (d *Deck) Shuffle() {
 	}
 }
 
-func (h SmallHand) String() string {
+func (h *SmallHand) String() string {
 	var buffer bytes.Buffer
 	buffer.WriteString("SmallHand{")
 	for card := AS; card < AllCards; card++ {
@@ -575,13 +572,8 @@ func ValidPlay(playedCard, winningCard Card, leadSuit Suit, hand *Hand, trump Su
 	return true
 }
 
-func (h SmallHand) Contains(card Card) bool {
-	if h.val.Cmp(bigZero) == 0 || h.val.Cmp(bigOne) == 0 {
-		return false // hand is empty
-	}
-	mod := big.NewInt(0)
-	mod.Mod(h.val, CardPrimes[card])
-	return mod.Cmp(big.NewInt(0)) == 0
+func (h *SmallHand) Contains(card Card) bool {
+	return h.Test(uint(card) * 2)
 }
 
 func (h *Hand) Contains(card Card) bool {
@@ -593,31 +585,33 @@ func (h *Hand) Contains(card Card) bool {
 	return false
 }
 
-func NewSmallHand() (h *SmallHand) {
-	h = new(SmallHand)
-	h.val = big.NewInt(1)
-	return
+func (h *SmallHand) CopySmallHand() *SmallHand {
+	b := bitset.New(24)
+	h.Copy(b)
+	return &SmallHand{b}
 }
 
-func (h *SmallHand) Copy() (n *SmallHand) {
-	n = new(SmallHand)
-	n.val = big.NewInt(0)
-	n.val = n.val.Add(h.val, n.val)
-	return
+func NewSmallHand() *SmallHand {
+	return &SmallHand{bitset.New(24)}
 }
 
 func (h *SmallHand) Append(cards ...Card) {
 	for x := range cards {
-		//Log("Appending %s[%d] to %d", cards[x], CardPrimes[cards[x]], *h)
-		h.val.Mul(h.val, CardPrimes[cards[x]])
-		//Log("Appended %s[%d] for result of %d", cards[x], CardPrimes[cards[x]], h.val)
+		if h.Contains(cards[x]) {
+			h.SetTo(uint(cards[x]*2+1), true)
+		} else {
+			h.SetTo(uint(cards[x]*2), true)
+		}
 	}
 }
 
 func (h *SmallHand) Remove(card Card) bool {
-	//Log("Removing card %s", card)
+	if h.Test(uint(card*2 + 1)) {
+		h.SetTo(uint(card*2+1), false)
+		return true
+	}
 	if h.Contains(card) {
-		h.val.Div(h.val, CardPrimes[card])
+		h.SetTo(uint(card*2), false)
 		return true
 	}
 	return false

@@ -964,7 +964,7 @@ func (t *testSuite) TestPlayWalkerStringShort() {
 			}}
 			*pw.Children[0].Trick = *pw.Trick // copy the trick
 			pw = pw.Children[0]
-			pw.Hands[pw.Trick.Next] = pw.Hands[pw.Trick.Next].Copy()
+			pw.Hands[pw.Trick.Next] = pw.Hands[pw.Trick.Next].CopySmallHand()
 			pw.Hands[pw.Trick.Next].Remove(pw.Card)
 			pw.Trick.PlayCard(pw.Card, trump)
 			pw.PlayCount++
