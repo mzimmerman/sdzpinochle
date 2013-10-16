@@ -224,6 +224,10 @@ func (h *SmallHand) String() string {
 		if h.Contains(card) {
 			buffer.WriteString(card.String())
 			buffer.WriteString(", ")
+			if h.Test(uint(card*2 + 1)) {
+				buffer.WriteString(card.String())
+				buffer.WriteString(", ")
+			}
 		}
 	}
 	buffer.WriteString("}")
@@ -586,9 +590,7 @@ func (h *Hand) Contains(card Card) bool {
 }
 
 func (h *SmallHand) CopySmallHand() *SmallHand {
-	b := bitset.New(24)
-	h.Copy(b)
-	return &SmallHand{b}
+	return &SmallHand{h.Clone()}
 }
 
 func NewSmallHand() *SmallHand {
