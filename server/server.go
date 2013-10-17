@@ -696,39 +696,30 @@ func (t *Trick) reset() {
 	t.Plays = 0
 }
 
-func (trick *Trick) worth(playerid uint8, trump sdz.Suit) (worth int8) {
-	if trick.Plays != 4 {
-		panic("worth called on trick that's not finished!")
-		return
-	}
-	for x := range trick.Played {
-		if playerid%2 == uint8(x)%2 {
-			if trick.Played[x].Suit() == trump {
-				worth--
-			}
-			switch trick.Played[x].Face() {
-			case sdz.Ace:
-				worth -= 2
-			case sdz.Ten:
-				worth--
-			}
-		} else {
-			if trick.Played[x].Suit() == trump {
-				worth++
-			}
-			switch trick.Played[x].Face() {
-			case sdz.Ace:
-				worth += 2
-			case sdz.Ten:
-				worth++
-			}
-
+// Worth is called from the perspective of the pw.Parent and as such, pw.Me is backward so we switch it here
+func (pw *PlayWalker) Worth(trump sdz.Suit) (worth int8) {
+	worth = int8(pw.Counters[(pw.Me+1)%2])
+	for _, card := range pw.TeamCards[(pw.Me+1)%2].GetCards() {
+		if card.Suit() == trump {
+			worth--
+		}
+		switch card.Face() {
+		case sdz.Ace:
+			worth -= 2
+		case sdz.Ten:
+			worth--
 		}
 	}
-	if trick.WinningPlayer%2 == playerid%2 {
-		worth += int8(trick.counters()) * 4
-	} else {
-		worth -= int8(trick.counters()) * 4
+	for _, card := range pw.TeamCards[pw.Me%2].GetCards() {
+		if card.Suit() == trump {
+			worth++
+		}
+		switch card.Face() {
+		case sdz.Ace:
+			worth += 2
+		case sdz.Ten:
+			worth++
+		}
 	}
 	return
 }
@@ -983,11 +974,13 @@ tierLoop:
 					Trick:     new(Trick),
 					PlayCount: pw.PlayCount + 1,
 					Me:        pw.Trick.Next,
-					TeamCards: pw.TeamCards,
 					Counters:  pw.Counters,
 				}
-				pw.Children[x].TeamCards[pw.Children[x].Me%2] = pw.TeamCards[pw.Children[x].Me%2].CopySmallHand()
-				pw.Children[x].TeamCards[pw.Children[x].Me%2].Append(decisionMap[x])
+				if pw.PlayCount < 47 { // end of the hand, use only counters to make your "best" decision
+					pw.Children[x].TeamCards = pw.TeamCards
+					pw.Children[x].TeamCards[pw.Children[x].Me%2] = pw.TeamCards[pw.Children[x].Me%2].CopySmallHand()
+					pw.Children[x].TeamCards[pw.Children[x].Me%2].Append(decisionMap[x])
+				}
 				pw.Children[x].Hands[pw.Trick.Next] = pw.Hands[pw.Trick.Next].CopySmallHand()
 				pw.Children[x].Hands[pw.Trick.Next].Remove(decisionMap[x])
 				count++
@@ -1004,17 +997,15 @@ tierLoop:
 	// the whole hand is played, now we score it
 	for tier := len(tierSlice) - 1; tier >= 0; tier-- {
 		for _, pw = range tierSlice[tier] {
-			bestChild := 0
-			if len(pw.Children) != 0 {
-				for c := range pw.Children {
-					// TODO: Find the best child
-					if pw.Children[c].Counters[pw.Me%2] > pw.Children[bestChild].Counters[pw.Me%2] {
+			if len(pw.Children) > 0 {
+				bestChild := 0
+				bestWorth := pw.Children[0].Worth(trump)
+				for c := 1; c < len(pw.Children); c++ {
+					worth := pw.Children[c].Worth(trump)
+					if (pw.Me%2 == ht.Owner%2 && worth > bestWorth) || (pw.Me%2 != ht.Owner%2 && worth < bestWorth) {
+						bestWorth = worth
 						bestChild = c
 					}
-					//if pw.Children[bestChild].Result < pw.Children[c].Result && ht.Owner%2 == pw.Me%2 ||
-					//	pw.Children[bestChild].Result > pw.Children[c].Result && ht.Owner%2 != pw.Me%2 {
-					//	bestChild = c
-					//}
 				}
 				if pw.Children[bestChild].Best == nil {
 					pw.Best = pw.Children[bestChild]
@@ -1031,10 +1022,10 @@ tierLoop:
 				//	//Log(ht.Owner, "NOT Pulling up %s over top of %s", pw.Children[bestChild].Trick, pw.Trick)
 				//}
 				//Log(ht.Owner, "Found best child %s for player %d on tier %d - %s", pw.Children[bestChild].Card, pw.Me, tier, pw.PlayTrail())
-			}
-			if pw == root {
-				Log(ht.Owner, "Returning best play #%d %s for path %s", bestChild, pw.Children[bestChild].Card, pw.Best.PlayTrail())
-				return pw.Children[bestChild].Card
+				if pw == root {
+					Log(ht.Owner, "Returning best play #%d %s for path %s", bestChild, pw.Children[bestChild].Card, pw.Best.PlayTrail())
+					return pw.Children[bestChild].Card
+				}
 			}
 		}
 	}
@@ -1114,6 +1105,7 @@ tierLoop:
 func (ai *AI) findCardToPlay(action *sdz.Action) sdz.Card {
 	ai.HT.Trick.Next = action.Playerid
 	card := playHandWithCard(ai.HT, action.Trump)
+	runtime.GC() // since we created so much garbage, we need to have the GC mark it as unlinked/unused so next round it can be reused
 	//Log(ai.Playerid, "PlayHandWithCard returned %s for %d points.", card, points)
 	return card
 }

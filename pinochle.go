@@ -217,6 +217,22 @@ func (d *Deck) Shuffle() {
 	}
 }
 
+func (sh *SmallHand) GetCards() Hand {
+	if sh == nil {
+		return nil
+	}
+	h := make(Hand, 0, 24)
+	for card := AS; card < AllCards; card++ {
+		if sh.Contains(card) {
+			h = append(h, card)
+			if sh.Test(uint(card*2 + 1)) {
+				h = append(h, card)
+			}
+		}
+	}
+	return h
+}
+
 func (h *SmallHand) String() string {
 	var buffer bytes.Buffer
 	buffer.WriteString("SmallHand{")
