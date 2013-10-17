@@ -43,7 +43,6 @@ const (
 	Unknown = uint8(3)
 )
 
-var ErrOutOfMemory = errors.New("Out of Memory")
 var store = sessions.NewCookieStore([]byte("sdzpinochle"))
 
 //var sem = make(chan bool, runtime.NumCPU())
@@ -302,11 +301,6 @@ func (hts *HTStack) Pop() (ht *HandTracker, err error) {
 		//memstats := new(runtime.MemStats)
 		//runtime.ReadMemStats(memstats)
 		//Log(4, "MemStats = %#v", memstats)
-		defer func() {
-			if r := recover(); r != nil {
-				err = ErrOutOfMemory
-			}
-		}()
 		ht = new(HandTracker)
 		ht.Trick = new(Trick)
 		return
@@ -810,10 +804,12 @@ type PlayWalker struct {
 	Children  []*PlayWalker
 	Card      sdz.Card
 	Hands     [4]*sdz.SmallHand
-	Result    int8 // from the perspective of the current player
+	TeamCards [2]*sdz.SmallHand
+	Counters  [2]uint8
 	Trick     *Trick
 	PlayCount uint8
 	Me        uint8
+	Best      *PlayWalker
 }
 
 func (pw *PlayWalker) PlayTrail() string {
@@ -859,7 +855,7 @@ func (ht *HandTracker) Deal() (sh [4]*sdz.SmallHand) {
 		}
 	}
 	unknownCards.Shuffle()
-	Log(ht.Owner, "Have to add %d cards of %s to players' hands", len(unknownCards), unknownCards)
+	//Log(ht.Owner, "Have to add %d cards of %s to players' hands", len(unknownCards), unknownCards)
 	playerWalker := ht.Trick.Next
 	card := sdz.Card(sdz.NACard)
 	addHands := make([]sdz.Hand, 4)
@@ -871,7 +867,7 @@ func (ht *HandTracker) Deal() (sh [4]*sdz.SmallHand) {
 			addExtra = 0
 		}
 		numNeedsCards := baseNeedCards + addExtra - ht.calculateHand(playerWalker)
-		Log(ht.Owner, "Player %d needs %d cards added to his hand to make %d", playerWalker, numNeedsCards, baseNeedCards+addExtra)
+		//Log(ht.Owner, "Player %d needs %d cards added to his hand to make %d", playerWalker, numNeedsCards, baseNeedCards+addExtra)
 		needs[playerWalker] = numNeedsCards
 		playerWalker = (playerWalker + 1) % 4
 	}
@@ -883,19 +879,19 @@ largeLoop:
 			break // all cards identified homes
 		}
 		if needs[playerWalker] == uint8(len(addHands[playerWalker])) {
-			Log(ht.Owner, "Done adding cards to %d", playerWalker)
+			//Log(ht.Owner, "Done adding cards to %d", playerWalker)
 			playerWalker = (playerWalker + 1) % 4
 			continue
 		}
 		for _, card = range unknownCards {
 			if ht.Cards[playerWalker][card] == Unknown || ht.Cards[playerWalker][card] == 1 {
-				Log(ht.Owner, "Adding %s to player %d, value = %d", card, playerWalker, ht.Cards[playerWalker][card])
+				//Log(ht.Owner, "Adding %s to player %d, value = %d", card, playerWalker, ht.Cards[playerWalker][card])
 				addHands[playerWalker] = append(addHands[playerWalker], card)
 				//Log(ht.Owner, "Removing card %s from unknownHand", card)
 				unknownCards.Remove(card)
 				continue largeLoop
 			} else {
-				Log(ht.Owner, "Player %d can't take %s", playerWalker, card)
+				//Log(ht.Owner, "Player %d can't take %s", playerWalker, card)
 			}
 		}
 		// didn't find a location in the current player
@@ -907,7 +903,7 @@ largeLoop:
 				if ht.Cards[playerWalker][tmpCard] == Unknown || ht.Cards[playerWalker][tmpCard] == 1 {
 					addHands[playerWalker] = append(addHands[playerWalker], tmpCard)
 					addHands[x][y] = card
-					Log(ht.Owner, "Moving %s to player %d from player %d", tmpCard, playerWalker, x)
+					//Log(ht.Owner, "Moving %s to player %d from player %d", tmpCard, playerWalker, x)
 					//Log(ht.Owner, "Adding %s to player %d", card, x)
 					//Log(ht.Owner, "Removing card %s from unknownHand", card)
 					unknownCards.Remove(card)
@@ -947,33 +943,36 @@ func playHandWithCard(ht *HandTracker, trump sdz.Suit) sdz.Card {
 		Trick:     new(Trick),
 		PlayCount: ht.PlayCount,
 		Me:        ht.Owner,
+		TeamCards: [2]*sdz.SmallHand{sdz.NewSmallHand(), sdz.NewSmallHand()},
 	}
 	*root.Trick = *ht.Trick
 	end := false
-	time.AfterFunc(time.Second*3, func() {
+	time.AfterFunc(time.Millisecond*500, func() {
 		end = true
 		//	panic("Compute time exceeded for play")
 	})
 	tierSlice := make([][]*PlayWalker, 48-root.PlayCount+2)
 	tierSlice[0] = []*PlayWalker{root}
 	var pw *PlayWalker
+tierLoop:
 	for tier := 0; tier < len(tierSlice); tier++ {
 		//Log(ht.Owner, "Working on tier %d", tier)
+		if tierSlice[tier] == nil {
+			tierSlice[tier] = make([]*PlayWalker, 0)
+		}
 		for _, pw = range tierSlice[tier] {
 			runtime.Gosched() // yield this thread so on single core systems, the timer can run and end this loop
 			if end {
-				break // ran out of time generating tricks, calculate results
+				break tierLoop // ran out of time generating tricks, calculate results
 			}
 			//Log(ht.Owner, "Evaluating pw = %#v", pw)
-			if pw.PlayCount%4 == 0 {
-				pw.Trick.reset()
-			}
 			decisionMap := pw.potentialCards(pw.Trick, trump)
 			if len(decisionMap) == 0 {
 				if pw.PlayCount != 48 {
 					panic("hand is at the end but 48 plays haven't been made!")
 				}
 				//Log(ht.Owner, "************** Hand is at the end! - %s", pw.PlayTrail())
+				continue // no need to make children and append them if they don't exist!
 			}
 			pw.Children = make([]*PlayWalker, len(decisionMap))
 			for x := range decisionMap {
@@ -984,16 +983,20 @@ func playHandWithCard(ht *HandTracker, trump sdz.Suit) sdz.Card {
 					Trick:     new(Trick),
 					PlayCount: pw.PlayCount + 1,
 					Me:        pw.Trick.Next,
+					TeamCards: pw.TeamCards,
+					Counters:  pw.Counters,
 				}
+				pw.Children[x].TeamCards[pw.Children[x].Me%2] = pw.TeamCards[pw.Children[x].Me%2].CopySmallHand()
+				pw.Children[x].TeamCards[pw.Children[x].Me%2].Append(decisionMap[x])
 				pw.Children[x].Hands[pw.Trick.Next] = pw.Hands[pw.Trick.Next].CopySmallHand()
 				pw.Children[x].Hands[pw.Trick.Next].Remove(decisionMap[x])
 				count++
 				*pw.Children[x].Trick = *pw.Trick // copy the trick
 				pw.Children[x].Trick.PlayCard(pw.Children[x].Card, trump)
+				if pw.Children[x].Trick.Plays == 4 {
+					pw.Children[x].Counters[pw.Children[x].Trick.WinningPlayer%2] += pw.Children[x].Trick.counters()
+				}
 				//Log(ht.Owner, "Created trick %s", pw.Children[x].Trick)
-			}
-			if tierSlice[tier+1] == nil {
-				tierSlice[tier+1] = make([]*PlayWalker, 0, len(pw.Children))
 			}
 			tierSlice[tier+1] = append(tierSlice[tier+1], pw.Children...)
 		}
@@ -1004,22 +1007,33 @@ func playHandWithCard(ht *HandTracker, trump sdz.Suit) sdz.Card {
 			bestChild := 0
 			if len(pw.Children) != 0 {
 				for c := range pw.Children {
-					if pw.Children[bestChild].Result > pw.Children[c].Result {
+					// TODO: Find the best child
+					if pw.Children[c].Counters[pw.Me%2] > pw.Children[bestChild].Counters[pw.Me%2] {
 						bestChild = c
 					}
+					//if pw.Children[bestChild].Result < pw.Children[c].Result && ht.Owner%2 == pw.Me%2 ||
+					//	pw.Children[bestChild].Result > pw.Children[c].Result && ht.Owner%2 != pw.Me%2 {
+					//	bestChild = c
+					//}
 				}
-				pw.Result = pw.Children[bestChild].Result
-				if pw.Trick.Plays != 4 { // pull up the "best" trick and score it from my perspective
-					pw.Trick = pw.Children[bestChild].Trick
+				if pw.Children[bestChild].Best == nil {
+					pw.Best = pw.Children[bestChild]
+				} else {
+					pw.Best = pw.Children[bestChild].Best
 				}
-			}
-			if pw.Trick.Plays == 4 {
-				pw.Result += pw.Trick.worth(pw.Me, trump)
-			} else {
-				// TODO: Score some arbitrary score, the trick isn't finished'
+				pw.Counters = pw.Children[bestChild].Counters
+				pw.TeamCards = pw.Children[bestChild].TeamCards
+				//if pw.Children[bestChild].Trick.Plays > pw.Trick.Plays {
+				//	//if pw.Trick.Plays != 4 && pw.Children[bestChild].Trick.Plays != 0 { // pull up the "best" trick and score it from my perspective
+				//	Log(ht.Owner, "Pulling up %s over top of %s", pw.Children[bestChild].Trick, pw.Trick)
+				//	pw.Trick = pw.Children[bestChild].Trick
+				//} else {
+				//	//Log(ht.Owner, "NOT Pulling up %s over top of %s", pw.Children[bestChild].Trick, pw.Trick)
+				//}
+				//Log(ht.Owner, "Found best child %s for player %d on tier %d - %s", pw.Children[bestChild].Card, pw.Me, tier, pw.PlayTrail())
 			}
 			if pw == root {
-				Log(ht.Owner, "Returning best play of %s with result %d", pw.Children[bestChild].Card, pw.Children[bestChild].Result)
+				Log(ht.Owner, "Returning best play #%d %s for path %s", bestChild, pw.Children[bestChild].Card, pw.Best.PlayTrail())
 				return pw.Children[bestChild].Card
 			}
 		}
@@ -1109,8 +1123,12 @@ func (pw *PlayWalker) potentialCards(trick *Trick, trump sdz.Suit) sdz.Hand {
 	//Log(ht.Owner, "PotentialCards Player%d - %s", playerid, ht.Cards[playerid])
 	validHand := getHand()
 	handStatus := Nothing
-	winning := trick.winningCard()
-	lead := trick.leadSuit()
+	winning := sdz.NACard
+	lead := sdz.NASuit
+	if trick.Plays != 4 {
+		winning = trick.winningCard()
+		lead = trick.leadSuit()
+	}
 allCardLoop:
 	for x := 0; x < sdz.AllCards; x++ {
 		card := sdz.Card(x)
@@ -1135,7 +1153,7 @@ allCardLoop:
 				validHand[0] = card
 			} else if cardStatus == handStatus {
 				if (cardStatus == FollowLose || cardStatus == TrumpLose) ||
-					((cardStatus == FollowWin || cardStatus == TrumpWin) && pw.PlayCount%4 == 3) {
+					((cardStatus == FollowWin || cardStatus == TrumpWin) && trick.Plays == 3) {
 					// there should be a maximum of two cards in validHand, counter and non-counter
 					//Log(ht.Owner, "ValidHand=%s", validHand)
 					for y, vhc := range validHand {
