@@ -52,6 +52,32 @@ type testSuite struct {
 	pt.Suite
 }
 
+func (t *testSuite) TestWorthShort() {
+	pw := &PlayWalker{}
+	pw.Counters = [2]uint8{5, 7}
+	pw.TeamCards = [2]*sdz.SmallHand{sdz.NewSmallHand(), sdz.NewSmallHand()}
+	pw.TeamCards[0].Append(sdz.Hand{JD, QD, KD, AD, TD, JD, QS, QS, KS, AS, TS, JS}...)
+	pw.TeamCards[1].Append(sdz.Hand{AH, TS, ND}...)
+
+	pw.Me = 0
+	t.Equal(int8(15-11+3), pw.Worth(sdz.Diamonds))
+	t.Equal(int8(15-6+4), pw.Worth(sdz.Hearts))
+
+	pw.Me = 1
+	t.Equal(int8(21+11-3), pw.Worth(sdz.Diamonds))
+	t.Equal(int8(21+6-4), pw.Worth(sdz.Hearts))
+
+	pw.Counters = [2]uint8{0, 0}
+	pw.Me = 0
+	t.Equal(int8(0-11+3), pw.Worth(sdz.Diamonds))
+	t.Equal(int8(0-6+4), pw.Worth(sdz.Hearts))
+
+	pw.Me = 1
+	t.Equal(int8(0+11-3), pw.Worth(sdz.Diamonds))
+	t.Equal(int8(0+6-4), pw.Worth(sdz.Hearts))
+
+}
+
 func (t *testSuite) TestRemoveShort() {
 	hand := sdz.Hand{JD, QD, KD, AD, TD, JD, QS, QS, KS, AS, TS, JS}
 	sort.Sort(hand)
@@ -657,6 +683,64 @@ func (t *testSuite) TestHandTrackerDeal() {
 	t.True(result[1].Contains(NH))
 	t.True(result[2].Contains(KD))
 	t.True(result[2].Contains(QD))
+}
+
+func (t *testSuite) TestFindCardToPlayPartnerAces() {
+	ai := createAI()
+	ai.SetHand(nil, nil, nil, sdz.Hand{AD, KD, QD, ND, ND, QC, JC, QH, JH, NH, NH, QS}, 0, 0)
+	//for card := range ai.HT.PlayedCards {
+	//	ai.HT.PlayedCards[card] = 2
+	//}
+	//ai.HT.PlayCount = 48 - 12 // 8 cards have not been played according to below
+	trump := sdz.Diamonds
+	ai.HT.Cards[2][AD] = 1
+	ai.HT.Cards[2][AS] = 1
+	ai.HT.Cards[2][AH] = 1
+	ai.HT.Cards[2][AC] = 1
+	for x := 0; x < sdz.AllCards; x++ {
+		ai.HT.calculateCard(sdz.Card(x))
+	}
+	ai.HT.Trick.Next = ai.PlayerID()
+	action := sdz.CreatePlayRequest(sdz.NACard, sdz.NASuit, trump, ai.PlayerID(), ai.Hand())
+	card := ai.findCardToPlay(action)
+	t.True(card == KD, fmt.Sprintf("Looking for the KD but got %s", card))
+}
+
+func (t *testSuite) TestFindCardToPlayDrainTrump() {
+	ai := createAI()
+	ai.SetHand(nil, nil, nil, sdz.Hand{QS, QS, AH}, 0, 0)
+	for card := range ai.HT.PlayedCards {
+		ai.HT.PlayedCards[card] = 2
+	}
+	ai.HT.PlayCount = 48 - 12 // 12 cards have not been played according to below
+	trump := sdz.Hearts
+	ai.HT.Cards[1][NH] = 1 // opponent has the 9H
+
+	ai.HT.Cards[1][JD] = 1
+	ai.HT.Cards[1][QD] = 1
+	ai.HT.Cards[2][KD] = 1
+	ai.HT.Cards[2][KD] = 1
+	ai.HT.Cards[2][TD] = 1
+	ai.HT.Cards[3][AD] = 1
+	ai.HT.Cards[3][ND] = 2
+
+	ai.HT.PlayedCards[AH] = 1
+	ai.HT.PlayedCards[NH] = 1
+	ai.HT.PlayedCards[JD] = 1
+	ai.HT.PlayedCards[QD] = 1
+	ai.HT.PlayedCards[KD] = None
+	ai.HT.PlayedCards[TD] = 1
+	ai.HT.PlayedCards[AD] = 1
+	ai.HT.PlayedCards[ND] = None
+	ai.HT.PlayedCards[QS] = None
+
+	for x := 0; x < sdz.AllCards; x++ {
+		ai.HT.calculateCard(sdz.Card(x))
+	}
+	ai.HT.Trick.Next = ai.PlayerID()
+	action := sdz.CreatePlayRequest(sdz.NACard, sdz.NASuit, trump, ai.PlayerID(), ai.Hand())
+	card := ai.findCardToPlay(action)
+	t.True(card == AH, fmt.Sprintf("Looking for AH but got %s", card))
 }
 
 func (t *testSuite) TestFindCardToPlayShort() {
