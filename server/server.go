@@ -943,7 +943,7 @@ func playHandWithCard(ht *HandTracker, trump sdz.Suit) sdz.Card {
 		*tierSlice[0][x].Trick = *ht.Trick
 	}
 	end := false
-	time.AfterFunc(time.Millisecond*3000, func() {
+	time.AfterFunc(time.Millisecond*1500, func() {
 		end = true
 		//	panic("Compute time exceeded for play")
 	})
