@@ -8,6 +8,7 @@ import (
 	pt "github.com/remogatto/prettytest"
 	"sort"
 	//"strconv"
+	"fmt"
 	"testing"
 )
 
@@ -680,7 +681,7 @@ func (t *testSuite) TestFindCardToPlayShort() {
 	ai.HT.Trick.Next = 3
 	action := sdz.CreatePlayRequest(sdz.NACard, sdz.NASuit, trump, 3, ai.Hand())
 	card := ai.findCardToPlay(action)
-	t.True(card == AD || card == QS)
+	t.True(card == AD || card == QS, fmt.Sprintf("Looking for AD or QS but got %s", card))
 }
 
 func (t *testSuite) TestFindCardToPlayLong() {

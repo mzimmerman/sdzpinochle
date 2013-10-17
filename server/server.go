@@ -928,22 +928,24 @@ largeLoop:
 
 func playHandWithCard(ht *HandTracker, trump sdz.Suit) sdz.Card {
 	count := uint(0)
-	root := &PlayWalker{
-		Hands:     ht.Deal(),
-		Card:      sdz.NACard,
-		Trick:     new(Trick),
-		PlayCount: ht.PlayCount,
-		Me:        ht.Owner,
-		TeamCards: [2]*sdz.SmallHand{sdz.NewSmallHand(), sdz.NewSmallHand()},
+	tierSlice := make([][]*PlayWalker, 48-ht.PlayCount+2)
+	tierSlice[0] = make([]*PlayWalker, 3)
+	for x := 0; x < 3; x++ {
+		tierSlice[0][x] = &PlayWalker{
+			Hands:     ht.Deal(),
+			Card:      sdz.NACard,
+			Trick:     new(Trick),
+			PlayCount: ht.PlayCount,
+			Me:        ht.Owner,
+			TeamCards: [2]*sdz.SmallHand{sdz.NewSmallHand(), sdz.NewSmallHand()},
+		}
+		*tierSlice[0][x].Trick = *ht.Trick
 	}
-	*root.Trick = *ht.Trick
 	end := false
 	time.AfterFunc(time.Millisecond*500, func() {
 		end = true
 		//	panic("Compute time exceeded for play")
 	})
-	tierSlice := make([][]*PlayWalker, 48-root.PlayCount+2)
-	tierSlice[0] = []*PlayWalker{root}
 	var pw *PlayWalker
 tierLoop:
 	for tier := 0; tier < len(tierSlice); tier++ {
@@ -964,6 +966,11 @@ tierLoop:
 				}
 				//Log(ht.Owner, "************** Hand is at the end! - %s", pw.PlayTrail())
 				continue // no need to make children and append them if they don't exist!
+			}
+			if tier == 0 && len(decisionMap) == 1 {
+				// no need to continue any further, this was the only legal play
+				Log(ht.Owner, "Returning the only legal play of %s", decisionMap[0])
+				return decisionMap[0]
 			}
 			pw.Children = make([]*PlayWalker, len(decisionMap))
 			for x := range decisionMap {
@@ -995,13 +1002,22 @@ tierLoop:
 		}
 	} // if end==false, we generated all the possibilities
 	// the whole hand is played, now we score it
+	aggregateScore := make(map[uint8]int8)
 	for tier := len(tierSlice) - 1; tier >= 0; tier-- {
 		for _, pw = range tierSlice[tier] {
 			if len(pw.Children) > 0 {
-				bestChild := 0
+				bestChild := uint8(0)
 				bestWorth := pw.Children[0].Worth(trump)
-				for c := 1; c < len(pw.Children); c++ {
+				if tier == 0 { // since each "root" will have the same potentialCards, find out which one did the best when accounting for all scenarios played
+					aggregateScore[0] += bestWorth
+					//Log(ht.Owner, "Child is %d %s", 0, pw.Children[0].Card)
+				}
+				for c := uint8(1); c < uint8(len(pw.Children)); c++ {
 					worth := pw.Children[c].Worth(trump)
+					if tier == 0 { // since each "root" will have the same potentialCards, find out which one did the best when accounting for all scenarios played
+						aggregateScore[c] += worth
+						//Log(ht.Owner, "Child is %d %s", c, pw.Children[c].Card)
+					}
 					if (pw.Me%2 == ht.Owner%2 && worth > bestWorth) || (pw.Me%2 != ht.Owner%2 && worth < bestWorth) {
 						bestWorth = worth
 						bestChild = c
@@ -1014,22 +1030,26 @@ tierLoop:
 				}
 				pw.Counters = pw.Children[bestChild].Counters
 				pw.TeamCards = pw.Children[bestChild].TeamCards
-				//if pw.Children[bestChild].Trick.Plays > pw.Trick.Plays {
-				//	//if pw.Trick.Plays != 4 && pw.Children[bestChild].Trick.Plays != 0 { // pull up the "best" trick and score it from my perspective
-				//	Log(ht.Owner, "Pulling up %s over top of %s", pw.Children[bestChild].Trick, pw.Trick)
-				//	pw.Trick = pw.Children[bestChild].Trick
-				//} else {
-				//	//Log(ht.Owner, "NOT Pulling up %s over top of %s", pw.Children[bestChild].Trick, pw.Trick)
-				//}
-				//Log(ht.Owner, "Found best child %s for player %d on tier %d - %s", pw.Children[bestChild].Card, pw.Me, tier, pw.PlayTrail())
-				if pw == root {
-					Log(ht.Owner, "Returning best play #%d %s for path %s", bestChild, pw.Children[bestChild].Card, pw.Best.PlayTrail())
-					return pw.Children[bestChild].Card
+				//Log(ht.Owner, "Found best child %s for player %d on tier %d - %s", pw.Children[bestChild].Card, pw.Me, tier, pw.Best.PlayTrail())
+				if pw.Parent == nil { // || tier == 0
+					pw.Card = pw.Children[bestChild].Card
 				}
 			}
 		}
 	}
-	panic("no card found!")
+	bestChild := uint8(0)
+	for c := uint8(0); c < uint8(len(aggregateScore)); c++ {
+		if aggregateScore[c] > aggregateScore[bestChild] {
+			bestChild = c
+		}
+	}
+	//Log(ht.Owner, "bestChild = %d", bestChild)
+	//Log(ht.Owner, "len(tierSlice[0]) = %d", len(tierSlice[0]))
+	Log(ht.Owner, "Returning best play #%d %s with worth %d for the following path(s):", bestChild, tierSlice[0][0].Children[bestChild].Card, aggregateScore[bestChild])
+	for _, pw := range tierSlice[0] {
+		Log(ht.Owner, pw.Best.PlayTrail())
+	}
+	return tierSlice[0][0].Children[bestChild].Card
 }
 
 //func inline(ht *HandTracker, trump sdz.Suit, myCard sdz.Card, results chan Result) {
