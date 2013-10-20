@@ -2,7 +2,7 @@
 package sdzpinochleserver
 
 import (
-	"github.com/icub3d/appenginetesting"
+	"appengine/aetest"
 	"github.com/mzimmerman/goon"
 	sdz "github.com/mzimmerman/sdzpinochle"
 	pt "github.com/remogatto/prettytest"
@@ -265,9 +265,10 @@ func BenchmarkKnownCards(b *testing.B) {
 }
 
 func BenchmarkFullGame(b *testing.B) {
-	c, err := appenginetesting.NewContext(&appenginetesting.Options{Debug: "critical"})
+	c, err := aetest.NewContext(nil)
 	if err != nil {
-		b.Fatalf("Could not start up appenginetesting")
+		b.Fatalf("Could not start appenginetesting")
+		return
 	}
 	defer c.Close()
 	b.ResetTimer()
@@ -794,16 +795,12 @@ func (t *testSuite) TestFindCardToPlayLong() {
 }
 
 func (t *testSuite) TestGame() {
-	c, err := appenginetesting.NewContext(&appenginetesting.Options{Debug: "debug"})
+	c, err := aetest.NewContext(nil)
 	if err != nil {
 		t.Error("Could not start appenginetesting")
 		return
 	}
 	defer c.Close()
-	if c == nil {
-		t.Error("Could not start testing framework")
-		return
-	}
 	g := goon.FromContext(c)
 	game := NewGame(4)
 	game.Dealer = 0
