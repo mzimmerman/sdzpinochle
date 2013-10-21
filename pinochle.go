@@ -9,21 +9,26 @@ import (
 	"math/rand"
 	"reflect"
 	"sort"
-	"time"
+	"strconv"
+	//"time"
 )
 
-func Log(m string, v ...interface{}) {
-	fmt.Printf(m+"\n", v...)
+func Log(playerid uint8, m string, v ...interface{}) {
+	if playerid == 4 {
+		fmt.Printf("NP - "+m+"\n", v...)
+	} else {
+		fmt.Printf("P"+strconv.Itoa(int(playerid))+" - "+m+"\n", v...)
+	}
 }
 
 const (
+	NAFace      Face  = iota
 	Ace         Face  = iota
 	Ten         Face  = iota
 	King        Face  = iota
 	Queen       Face  = iota
 	Jack        Face  = iota
 	Nine        Face  = iota
-	NAFace      Face  = -1
 	acearound   uint8 = 10
 	kingaround  uint8 = 8
 	queenaround uint8 = 6
@@ -33,14 +38,15 @@ const (
 )
 
 const (
+	NASuit   Suit = iota
 	Spades   Suit = iota
 	Hearts   Suit = iota
 	Clubs    Suit = iota
 	Diamonds Suit = iota
-	NASuit   Suit = iota
 )
 
 const (
+	NACard Card = iota
 	AS     Card = iota
 	TS     Card = iota
 	KS     Card = iota
@@ -65,14 +71,14 @@ const (
 	QD     Card = iota
 	JD     Card = iota
 	ND     Card = iota
-	NACard Card = iota
 )
 
 var Faces [6]Face
 var Suits [4]Suit
 
 func init() {
-	rand.Seed(time.Now().UnixNano())
+	//rand.Seed(time.Now().UnixNano())
+	rand.Seed(0)
 	Faces = [6]Face{Ace, Ten, King, Queen, Jack, Nine}
 	Suits = [4]Suit{Spades, Hearts, Clubs, Diamonds}
 }
@@ -86,13 +92,13 @@ type Hand []Card
 type SmallHand [6]byte
 
 func (c Card) GetBitInfo() (bitnum uint, sliceIndex int8) {
-	bitnum = uint(c%4) * 2
-	sliceIndex = int8(c / 4)
+	bitnum = uint((c-1)%4) * 2
+	sliceIndex = int8((c - 1) / 4)
 	return
 }
 
 func CreateCard(suit Suit, face Face) Card {
-	return Card(int(suit)*6 + int(face))
+	return Card((int(suit-1) * 6) + int(face))
 }
 
 func (c Card) MarshalJSON() ([]byte, error) {
@@ -164,7 +170,7 @@ func (c *Card) UnmarshalJSON(data []byte) error {
 	default:
 		return errors.New(fmt.Sprintf("Data %s not a card", data))
 	}
-	*c = Card(int(suit)*6 + int(face))
+	*c = Card(int(suit-1)*6 + int(face))
 	return nil
 }
 
@@ -197,14 +203,14 @@ func (c Card) Suit() Suit {
 	if c == NACard {
 		return NASuit
 	}
-	return Suit(int(c) / 6)
+	return Suit((c-1)/6 + 1)
 }
 
 func (c Card) Face() Face {
 	if c == NACard {
 		return NAFace
 	}
-	return Face(int(c) % 6)
+	return Face((c-1)%6 + 1)
 }
 
 func (d *Deck) Swap(i, j uint8) {
@@ -333,8 +339,12 @@ func (d Deck) Deal() (hands []Hand) {
 }
 
 func CreateDeck() (deck Deck) {
-	for x := int8(0); x < int8(len(deck)); x++ {
-		deck[x] = Card(x % AllCards)
+	index := 0
+	for x := AS; int8(x) <= AllCards; x++ {
+		deck[index] = x
+		index++
+		deck[index] = x
+		index++
 	}
 	return
 }
@@ -421,7 +431,7 @@ func (action *Action) MarshalJSON() ([]byte, error) {
 			} else {
 				data["Playerid"] = action.Playerid
 			}
-		case typ.Field(x).Name == "WinningPlayer" && action.Type == "Play":
+		case typ.Field(x).Name == "WinningPlayer" && action.Type == "PlayRequest":
 			data["WinningPlayer"] = action.WinningPlayer
 		case typ.Field(x).Name == "Amount" && action.Type == "Bid":
 			data["Amount"] = action.Amount
@@ -458,7 +468,7 @@ func CreateBid(bid, playerid uint8) *Action {
 }
 
 func CreatePlayRequest(winning Card, lead, trump Suit, playerid uint8, hand *Hand) *Action {
-	return &Action{Type: "Play", WinningCard: winning, Lead: lead, Trump: trump, Playerid: playerid, Hand: *hand}
+	return &Action{Type: "PlayRequest", WinningCard: winning, Lead: lead, Trump: trump, Playerid: playerid, Hand: *hand}
 }
 
 func CreatePlay(card Card, playerid uint8) *Action {
@@ -769,7 +779,7 @@ func (h Hand) Meld(trump Suit) (meld uint8, result Hand) {
 			show[CreateCard(suit, King)] = max(show[CreateCard(suit, King)], 1)
 			show[CreateCard(suit, Queen)] = max(show[CreateCard(suit, Queen)], 1)
 			if debugLog {
-				fmt.Println("SingleMarriage")
+				fmt.Printf("SingleMarriage in %s, show = %v\n", suit, show)
 			}
 			meld += 2
 		}

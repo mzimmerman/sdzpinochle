@@ -401,19 +401,18 @@
 					break;
 				case "Play":
 					playCount++;
-					if (action.Playerid != playerid) {
-						if (playCount < 4) {
-							addToQueue(function () {
-								setTurn((action.Playerid + 1) % 4);
-								showHand(getPlayer(action.Playerid).children(".play"),[action.PlayedCard]);								
-							});
-						} else {
-							addToQueue(function(){
-								showHand(getPlayer(action.Playerid).children(".play"),[action.PlayedCard]);
-							});
-						}
-						return;
+					if (playCount < 4) {
+						addToQueue(function () {
+							setTurn((action.Playerid + 1) % 4);
+							showHand(getPlayer(action.Playerid).children(".play"),[action.PlayedCard]);								
+						});
+					} else {
+						addToQueue(function(){
+							showHand(getPlayer(action.Playerid).children(".play"),[action.PlayedCard]);
+						});
 					}
+					break;
+				case "PlayRequest":
 					// the server is asking us to play
 					addToQueue(function () {
 						setTurn(getPlayer(playerid));

@@ -3,8 +3,10 @@ package sdzpinochle
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	pt "github.com/remogatto/prettytest"
 	"sort"
+	"strconv"
 	"testing"
 )
 
@@ -168,6 +170,49 @@ func (t *testSuite) TestMarshal() {
 	suit := card.Suit()
 	result, _ = suit.MarshalJSON()
 	t.Equal(0, bytes.Compare(result, []byte("\"H\"")))
+}
+
+func (t *testSuite) TestCardStrings() {
+	cards := []struct {
+		c   Card
+		val string
+		s   Suit
+		f   Face
+	}{
+		{AS, "AS", Spades, Ace},
+		{TS, "TS", Spades, Ten},
+		{KS, "KS", Spades, King},
+		{QS, "QS", Spades, Queen},
+		{JS, "JS", Spades, Jack},
+		{NS, "9S", Spades, Nine},
+		{AD, "AD", Diamonds, Ace},
+		{TD, "TD", Diamonds, Ten},
+		{KD, "KD", Diamonds, King},
+		{QD, "QD", Diamonds, Queen},
+		{JD, "JD", Diamonds, Jack},
+		{ND, "9D", Diamonds, Nine},
+		{AC, "AC", Clubs, Ace},
+		{TC, "TC", Clubs, Ten},
+		{KC, "KC", Clubs, King},
+		{QC, "QC", Clubs, Queen},
+		{JC, "JC", Clubs, Jack},
+		{NC, "9C", Clubs, Nine},
+		{AH, "AH", Hearts, Ace},
+		{TH, "TH", Hearts, Ten},
+		{KH, "KH", Hearts, King},
+		{QH, "QH", Hearts, Queen},
+		{JH, "JH", Hearts, Jack},
+		{NH, "9H", Hearts, Nine},
+	}
+	card := new(Card)
+	for x := range cards {
+		t.Equal(cards[x].c.String(), cards[x].val, fmt.Sprintf("Card #%d doesn't match, %s != %s", x, cards[x].c, cards[x].val))
+		err := card.UnmarshalJSON([]byte(strconv.Quote(cards[x].val)))
+		t.Nil(err)
+		t.Equal(*card, cards[x].c, fmt.Sprintf("Card #%d doesn't unmarshal properly, %d != %s", x, *card, cards[x].val))
+		t.Equal(cards[x].c.Suit(), cards[x].s)
+		t.Equal(cards[x].c.Face(), cards[x].f)
+	}
 }
 
 func (t *testSuite) TestUnmarshal() {
