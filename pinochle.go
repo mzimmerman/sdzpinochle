@@ -17,19 +17,19 @@ func Log(m string, v ...interface{}) {
 }
 
 const (
-	Ace         Face = iota
-	Ten         Face = iota
-	King        Face = iota
-	Queen       Face = iota
-	Jack        Face = iota
-	Nine        Face = iota
-	NAFace      Face = -1
-	acearound        = 10
-	kingaround       = 8
-	queenaround      = 6
-	jackaround       = 4
-	debugLog         = false
-	AllCards         = 24
+	Ace         Face  = iota
+	Ten         Face  = iota
+	King        Face  = iota
+	Queen       Face  = iota
+	Jack        Face  = iota
+	Nine        Face  = iota
+	NAFace      Face  = -1
+	acearound   uint8 = 10
+	kingaround  uint8 = 8
+	queenaround uint8 = 6
+	jackaround  uint8 = 4
+	debugLog          = false
+	AllCards    int8  = 24
 )
 
 const (
@@ -84,6 +84,12 @@ type Face int8
 type Deck [48]Card
 type Hand []Card
 type SmallHand [6]byte
+
+func (c Card) GetBitInfo() (bitnum uint, sliceIndex int8) {
+	bitnum = uint(c%4) * 2
+	sliceIndex = int8(c / 4)
+	return
+}
 
 func CreateCard(suit Suit, face Face) Card {
 	return Card(int(suit)*6 + int(face))
@@ -217,7 +223,7 @@ func (d *Deck) Shuffle() {
 func (h *SmallHand) String() string {
 	var buffer bytes.Buffer
 	buffer.WriteString("SmallHand{")
-	for card := AS; card < AllCards; card++ {
+	for card := AS; int8(card) < AllCards; card++ {
 		count := h.Count(card)
 		for {
 			if count == 0 {
@@ -327,7 +333,7 @@ func (d Deck) Deal() (hands []Hand) {
 }
 
 func CreateDeck() (deck Deck) {
-	for x := 0; x < len(deck); x++ {
+	for x := int8(0); x < int8(len(deck)); x++ {
 		deck[x] = Card(x % AllCards)
 	}
 	return
@@ -578,8 +584,7 @@ func (h *SmallHand) Contains(card Card) bool {
 	if h == nil {
 		return false
 	}
-	bitnum := uint(card%4) * 2
-	sliceIndex := card / 4
+	bitnum, sliceIndex := card.GetBitInfo()
 	resp := ((*h)[sliceIndex]>>bitnum)&1 == 1
 	return resp
 }
@@ -588,8 +593,7 @@ func (h *SmallHand) Count(card Card) int8 {
 	if h == nil {
 		return 0
 	}
-	bitnum := uint(card%4) * 2
-	sliceIndex := card / 4
+	bitnum, sliceIndex := card.GetBitInfo()
 	if ((*h)[sliceIndex]>>(bitnum+1))&1 == 1 {
 		return 2
 	} else if ((*h)[sliceIndex]>>bitnum)&1 == 1 {
@@ -619,8 +623,7 @@ func NewSmallHand() *SmallHand {
 
 func (sh *SmallHand) Append(cards ...Card) {
 	for x := range cards {
-		bitnum := uint(cards[x]%4) * 2
-		sliceIndex := cards[x] / 4
+		bitnum, sliceIndex := cards[x].GetBitInfo()
 		if sh.Contains(cards[x]) {
 			(*sh)[sliceIndex] = (*sh)[sliceIndex] | (1 << (bitnum + 1))
 		} else {
@@ -630,8 +633,7 @@ func (sh *SmallHand) Append(cards ...Card) {
 }
 
 func (sh *SmallHand) Remove(card Card) bool {
-	bitnum := uint(card%4) * 2
-	sliceIndex := card / 4
+	bitnum, sliceIndex := card.GetBitInfo()
 	count := sh.Count(card)
 	if count == 2 {
 		//x &^ (1 << i)

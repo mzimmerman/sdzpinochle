@@ -75,7 +75,7 @@ func (t *testSuite) TestDeal() {
 
 func (t *testSuite) TestSmallHand() {
 	hand := NewSmallHand()
-	for card := AS; card < AllCards; card++ {
+	for card := AS; int8(card) < AllCards; card++ {
 		t.False(hand.Contains(card))
 	}
 	t.False(hand.Contains(JD))
