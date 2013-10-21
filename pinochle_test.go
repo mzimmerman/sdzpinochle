@@ -73,8 +73,36 @@ func (t *testSuite) TestDeal() {
 	t.True(checkForDupes(h, t))
 }
 
+func (t *testSuite) TestSmallHandGetCards() {
+	sh := NewSmallHand()
+	t.Equal(0, len(sh.GetCards()))
+	sh.Append(AS)
+	t.Equal(1, len(sh.GetCards()))
+	sh.Append(AS)
+	t.Equal(2, len(sh.GetCards()))
+	t.True(sh.Remove(AS))
+	t.Equal(1, len(sh.GetCards()))
+	t.True(sh.Remove(AS))
+	t.Equal(0, len(sh.GetCards()))
+	t.False(sh.Remove(AS))
+	t.Equal(0, len(sh.GetCards()))
+	sh.Append(ND)
+	t.Equal(1, len(sh.GetCards()))
+	sh.Append(ND)
+	t.Equal(2, len(sh.GetCards()))
+	t.True(sh.Remove(ND))
+	t.Equal(1, len(sh.GetCards()))
+	t.True(sh.Remove(ND))
+	t.Equal(0, len(sh.GetCards()))
+	t.False(sh.Remove(ND))
+	t.Equal(0, len(sh.GetCards()))
+}
+
 func (t *testSuite) TestSmallHand() {
 	hand := NewSmallHand()
+	for card := AS; card < AllCards; card++ {
+		t.False(hand.Contains(card))
+	}
 	t.False(hand.Contains(JD))
 	t.False(hand.Contains(AD))
 	t.False(hand.Contains(QH))
@@ -116,7 +144,7 @@ func (t *testSuite) TestSmallHand() {
 	t.True(handCopy.Remove(AD))
 	t.False(handCopy.Contains(AD))
 
-	hand.ClearAll()
+	hand = new(SmallHand)
 
 	t.False(hand.Contains(JD))
 	hand.Append(JD)

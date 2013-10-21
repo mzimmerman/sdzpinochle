@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/willf/bitset"
 	"math/rand"
 	"reflect"
 	"sort"
@@ -84,9 +83,7 @@ type Face int8
 
 type Deck [48]Card
 type Hand []Card
-type SmallHand struct {
-	*bitset.BitSet
-}
+type SmallHand [6]byte
 
 func CreateCard(suit Suit, face Face) Card {
 	return Card(int(suit)*6 + int(face))
@@ -224,8 +221,11 @@ func (sh *SmallHand) GetCards() Hand {
 	h := make(Hand, 0, 24)
 	for card := AS; card < AllCards; card++ {
 		if sh.Contains(card) {
-			h = append(h, card)
-			if sh.Test(uint(card*2 + 1)) {
+			if sh.Contains2(card) {
+				//Log("Adding two %s for GetCards()", card)
+				h = append(h, card, card)
+			} else {
+				//Log("Adding one %s for GetCards()", card)
 				h = append(h, card)
 			}
 		}
@@ -240,7 +240,7 @@ func (h *SmallHand) String() string {
 		if h.Contains(card) {
 			buffer.WriteString(card.String())
 			buffer.WriteString(", ")
-			if h.Test(uint(card*2 + 1)) {
+			if h.Contains2(card) {
 				buffer.WriteString(card.String())
 				buffer.WriteString(", ")
 			}
@@ -593,7 +593,21 @@ func ValidPlay(playedCard, winningCard Card, leadSuit Suit, hand *Hand, trump Su
 }
 
 func (h *SmallHand) Contains(card Card) bool {
-	return h.Test(uint(card) * 2)
+	bitnum := uint(card%4) * 2
+	sliceIndex := card / 4
+	resp := ((*h)[sliceIndex]>>bitnum)&1 == 1
+	//Log("CardNum=%d, Contains looking for bit #%d of slice #%d and found %t", card, bitnum, sliceIndex, resp)
+	return resp
+}
+
+func (h *SmallHand) Contains2(card Card) bool {
+	//Log("Contains2 %s?\n", card)
+	if h.Contains(card) {
+		bitnum := uint(card%4) * 2
+		sliceIndex := card / 4
+		return ((*h)[sliceIndex]>>(bitnum+1))&1 == 1
+	}
+	return false
 }
 
 func (h *Hand) Contains(card Card) bool {
@@ -606,30 +620,42 @@ func (h *Hand) Contains(card Card) bool {
 }
 
 func (h *SmallHand) CopySmallHand() *SmallHand {
-	return &SmallHand{h.Clone()}
+	sh := new(SmallHand)
+	*sh = *h
+	return sh
 }
 
 func NewSmallHand() *SmallHand {
-	return &SmallHand{bitset.New(24)}
+	return new(SmallHand)
 }
 
-func (h *SmallHand) Append(cards ...Card) {
+func (sh *SmallHand) Append(cards ...Card) {
 	for x := range cards {
-		if h.Contains(cards[x]) {
-			h.SetTo(uint(cards[x]*2+1), true)
+		//Log("Before append of %s - %s", cards[x], sh.GetCards())
+		//Log("CardNum = %d", cards[x])
+		bitnum := uint(cards[x]%4) * 2
+		sliceIndex := cards[x] / 4
+		if sh.Contains(cards[x]) {
+			//Log("Setting 2bit #%d of slice %d", bitnum+1, sliceIndex)
+			(*sh)[sliceIndex] = (*sh)[sliceIndex] | (1 << (bitnum + 1))
 		} else {
-			h.SetTo(uint(cards[x]*2), true)
+			//Log("Setting 1bit #%d of slice %d", bitnum, sliceIndex)
+			(*sh)[sliceIndex] = (*sh)[sliceIndex] | (1 << bitnum)
 		}
+		//Log("After append of %s - %s", cards[x], sh.GetCards())
 	}
 }
 
-func (h *SmallHand) Remove(card Card) bool {
-	if h.Test(uint(card*2 + 1)) {
-		h.SetTo(uint(card*2+1), false)
+func (sh *SmallHand) Remove(card Card) bool {
+	bitnum := uint(card%4) * 2
+	sliceIndex := card / 4
+	if sh.Contains2(card) {
+		//x &^ (1 << i)
+		(*sh)[sliceIndex] = (*sh)[sliceIndex] & ^(1 << (bitnum + 1))
 		return true
 	}
-	if h.Contains(card) {
-		h.SetTo(uint(card*2), false)
+	if sh.Contains(card) {
+		(*sh)[sliceIndex] = (*sh)[sliceIndex] & ^(1 << bitnum)
 		return true
 	}
 	return false
