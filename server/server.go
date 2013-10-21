@@ -698,29 +698,33 @@ func (t *Trick) reset() {
 	t.Plays = 0
 }
 
-// Worth is called from the perspective of the pw.Parent and as such, pw.Me is backward so we switch it here
 func (pw *PlayWalker) Worth(trump sdz.Suit) (worth int8) {
 	worth = int8(pw.Counters[pw.Me%2]) * 3
-	for _, card := range pw.TeamCards[pw.Me%2].GetCards() {
-		if card.Suit() == trump {
-			worth--
+	count := int8(0)
+	face := sdz.NAFace
+	suit := sdz.NASuit
+	for card := sdz.AS; card < sdz.AllCards; card++ {
+		// teamate
+		suit = card.Suit()
+		face = card.Face()
+		count = pw.TeamCards[pw.Me%2].Count(card)
+		if suit == trump {
+			worth -= count
 		}
-		switch card.Face() {
-		case sdz.Ace:
-			worth -= 2
-		case sdz.Ten:
-			worth--
+		if face == sdz.Ace {
+			worth -= count * 2
+		} else if face == sdz.Ten {
+			worth -= count
 		}
-	}
-	for _, card := range pw.TeamCards[(pw.Me+1)%2].GetCards() {
-		if card.Suit() == trump {
-			worth++
+		// opponent
+		count = pw.TeamCards[(pw.Me+1)%2].Count(card)
+		if suit == trump {
+			worth += count
 		}
-		switch card.Face() {
-		case sdz.Ace:
-			worth += 2
-		case sdz.Ten:
-			worth++
+		if face == sdz.Ace {
+			worth += count * 2
+		} else if face == sdz.Ten {
+			worth += count
 		}
 	}
 	return
@@ -944,11 +948,7 @@ func playHandWithCard(ht *HandTracker, trump sdz.Suit) sdz.Card {
 		}
 		*tierSlice[0][x].Trick = *ht.Trick
 	}
-	end := false
-	time.AfterFunc(time.Millisecond*500, func() {
-		end = true
-		//	panic("Compute time exceeded for play")
-	})
+	end := time.Now().Add(time.Millisecond * 1500)
 	var pw *PlayWalker
 tierLoop:
 	for tier := 0; tier < len(tierSlice); tier++ {
@@ -957,8 +957,7 @@ tierLoop:
 			tierSlice[tier] = make([]*PlayWalker, 0)
 		}
 		for _, pw = range tierSlice[tier] {
-			runtime.Gosched() // yield this thread so on single core systems, the timer can run and end this loop
-			if end {
+			if time.Now().After(end) {
 				break tierLoop // ran out of time generating tricks, calculate results
 			}
 			//Log(ht.Owner, "Evaluating pw = %#v", pw)

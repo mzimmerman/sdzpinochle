@@ -214,36 +214,18 @@ func (d *Deck) Shuffle() {
 	}
 }
 
-func (sh *SmallHand) GetCards() Hand {
-	if sh == nil {
-		return nil
-	}
-	h := make(Hand, 0, 24)
-	for card := AS; card < AllCards; card++ {
-		if sh.Contains(card) {
-			if sh.Contains2(card) {
-				//Log("Adding two %s for GetCards()", card)
-				h = append(h, card, card)
-			} else {
-				//Log("Adding one %s for GetCards()", card)
-				h = append(h, card)
-			}
-		}
-	}
-	return h
-}
-
 func (h *SmallHand) String() string {
 	var buffer bytes.Buffer
 	buffer.WriteString("SmallHand{")
 	for card := AS; card < AllCards; card++ {
-		if h.Contains(card) {
+		count := h.Count(card)
+		for {
+			if count == 0 {
+				break
+			}
+			count--
 			buffer.WriteString(card.String())
 			buffer.WriteString(", ")
-			if h.Contains2(card) {
-				buffer.WriteString(card.String())
-				buffer.WriteString(", ")
-			}
 		}
 	}
 	buffer.WriteString("}")
@@ -593,21 +575,27 @@ func ValidPlay(playedCard, winningCard Card, leadSuit Suit, hand *Hand, trump Su
 }
 
 func (h *SmallHand) Contains(card Card) bool {
+	if h == nil {
+		return false
+	}
 	bitnum := uint(card%4) * 2
 	sliceIndex := card / 4
 	resp := ((*h)[sliceIndex]>>bitnum)&1 == 1
-	//Log("CardNum=%d, Contains looking for bit #%d of slice #%d and found %t", card, bitnum, sliceIndex, resp)
 	return resp
 }
 
-func (h *SmallHand) Contains2(card Card) bool {
-	//Log("Contains2 %s?\n", card)
-	if h.Contains(card) {
-		bitnum := uint(card%4) * 2
-		sliceIndex := card / 4
-		return ((*h)[sliceIndex]>>(bitnum+1))&1 == 1
+func (h *SmallHand) Count(card Card) int8 {
+	if h == nil {
+		return 0
 	}
-	return false
+	bitnum := uint(card%4) * 2
+	sliceIndex := card / 4
+	if ((*h)[sliceIndex]>>(bitnum+1))&1 == 1 {
+		return 2
+	} else if ((*h)[sliceIndex]>>bitnum)&1 == 1 {
+		return 1
+	}
+	return 0
 }
 
 func (h *Hand) Contains(card Card) bool {
@@ -631,30 +619,26 @@ func NewSmallHand() *SmallHand {
 
 func (sh *SmallHand) Append(cards ...Card) {
 	for x := range cards {
-		//Log("Before append of %s - %s", cards[x], sh.GetCards())
-		//Log("CardNum = %d", cards[x])
 		bitnum := uint(cards[x]%4) * 2
 		sliceIndex := cards[x] / 4
 		if sh.Contains(cards[x]) {
-			//Log("Setting 2bit #%d of slice %d", bitnum+1, sliceIndex)
 			(*sh)[sliceIndex] = (*sh)[sliceIndex] | (1 << (bitnum + 1))
 		} else {
-			//Log("Setting 1bit #%d of slice %d", bitnum, sliceIndex)
 			(*sh)[sliceIndex] = (*sh)[sliceIndex] | (1 << bitnum)
 		}
-		//Log("After append of %s - %s", cards[x], sh.GetCards())
 	}
 }
 
 func (sh *SmallHand) Remove(card Card) bool {
 	bitnum := uint(card%4) * 2
 	sliceIndex := card / 4
-	if sh.Contains2(card) {
+	count := sh.Count(card)
+	if count == 2 {
 		//x &^ (1 << i)
 		(*sh)[sliceIndex] = (*sh)[sliceIndex] & ^(1 << (bitnum + 1))
 		return true
 	}
-	if sh.Contains(card) {
+	if count == 1 {
 		(*sh)[sliceIndex] = (*sh)[sliceIndex] & ^(1 << bitnum)
 		return true
 	}

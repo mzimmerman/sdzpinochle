@@ -73,31 +73,6 @@ func (t *testSuite) TestDeal() {
 	t.True(checkForDupes(h, t))
 }
 
-func (t *testSuite) TestSmallHandGetCards() {
-	sh := NewSmallHand()
-	t.Equal(0, len(sh.GetCards()))
-	sh.Append(AS)
-	t.Equal(1, len(sh.GetCards()))
-	sh.Append(AS)
-	t.Equal(2, len(sh.GetCards()))
-	t.True(sh.Remove(AS))
-	t.Equal(1, len(sh.GetCards()))
-	t.True(sh.Remove(AS))
-	t.Equal(0, len(sh.GetCards()))
-	t.False(sh.Remove(AS))
-	t.Equal(0, len(sh.GetCards()))
-	sh.Append(ND)
-	t.Equal(1, len(sh.GetCards()))
-	sh.Append(ND)
-	t.Equal(2, len(sh.GetCards()))
-	t.True(sh.Remove(ND))
-	t.Equal(1, len(sh.GetCards()))
-	t.True(sh.Remove(ND))
-	t.Equal(0, len(sh.GetCards()))
-	t.False(sh.Remove(ND))
-	t.Equal(0, len(sh.GetCards()))
-}
-
 func (t *testSuite) TestSmallHand() {
 	hand := NewSmallHand()
 	for card := AS; card < AllCards; card++ {
@@ -237,6 +212,20 @@ func (t *testSuite) TestCount() {
 	t.Equal(count[TS], uint8(1))
 	t.Equal(count[JS], uint8(2))
 	t.Equal(count[JH], uint8(0))
+
+	sh := new(SmallHand)
+	sh.Append(hand...)
+	t.Equal(sh.Count(JS), int8(2))
+	t.Equal(sh.Count(KD), int8(1))
+	t.Equal(sh.Count(AD), int8(1))
+	t.Equal(sh.Count(TD), int8(1))
+	t.Equal(sh.Count(QS), int8(0))
+	t.Equal(sh.Count(KS), int8(1))
+	t.Equal(sh.Count(AS), int8(1))
+	t.Equal(sh.Count(TS), int8(1))
+	t.Equal(sh.Count(JS), int8(2))
+	t.Equal(sh.Count(JH), int8(0))
+
 }
 
 func (t *testSuite) TestMeld2() {
