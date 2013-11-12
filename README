@@ -1,12 +1,34 @@
 A single deck pinochle engine
 
-It works by listening for Human connections and then presenting a menu to the human to determine what game mode they want to play.
+It works by presenting a web interface with available "tables" to sit at.  Once a table is chosen, the player has the ability to "Start" the game and the server will substitute the best known pinochle AI to play against/with.
 
 -- AI --
-The AI makes a *decent* attempt at bidding but I have yet to implement a better playing algorithm.  For now, the AI picks the first valid move it finds.
+A Pinochle AI is actually quite difficult due to the unknown and known amount of card(s), the alogrithm for this is roughly:
+O(4*(n!)^c) where:
+n = (number of cards left to play in the hand
+c = (number of cards with an unknown state (we don't know which player has them))
+
+The AI plays the lowest card that puts it in a given position.
+AS -> KS -> 9S -> ?
+My partner (KS) is losing
+I have a spade
+We are going to lose the trick
+I will play my lowest spade
+KS -> AS -> 9S -> ?
+My partner is winning
+I have the KS, TS, and 9S
+The AI will evaluate playing it's KS and 9S, but not the TS as that can't possibly do better than the TS
+KS -> ?
+Spades is trump
+I'm out of spades
+My partner has the AS
+The other AS is unknown
+Here (if possible) the lowest counter and non-counter from each other suit would be tried since each possibility could lead to the "best" position.
 
 -- Protocol Explanation --
-The network protocol is TCP/JSON where the following responses are used for the Type field:
+The protocol is JSON where the client sends POSTs messages to /receive and fetches messages through the Javascript AppEngine Channel API.
+ An alternative to the Javascript client for the AppEngine Channel API can be found at: http://schibum.blogspot.com/2011/06/using-google-appengine-channel-api-with.html
+The following responses are used for the Type field:
 * Message - A way to send a string of output to the client
 	* Message = A string representation of what should can be shown to the client
 * Hello - A way to say Hello to the client
@@ -43,17 +65,18 @@ Since your playerid was assigned through the Deal message as 0, the client needs
 <-- {"Playerid":0,"Type":"Bid", "Bid":0}
 
 -- Network protocol Example --
---> {"Message":"Do you want to join a game, create a new game, or quit? (join, create, quit)","Type":"Message"}
---> {"Type":"Hello"}
-<-- {"Message":"create","Type":"Hello"}
---> {"Message":"Option 1 - Play against three AI players and start immediately","Type":"Message"}
---> {"Message":"Option 2 - Play with a human partner against two AI players","Type":"Message"}
---> {"Message":"Option 3 - Play with a human partner against one AI players and 1 Human","Type":"Message"}
---> {"Message":"Option 4 - Play with a human partner against two humans","Type":"Message"}
---> {"Message":"Option 5 - Play against a human with AI partners","Type":"Message"}
---> {"Message":"Option 6 - Go back","Type":"Message"}
---> {"Type":"Game"}
-<-- {"Option":1,"Type":"Game"}
+TODO: Update the start_of_game protocol to reference the new Table system~~
+~~--> {"Message":"Do you want to join a game, create a new game, or quit? (join, create, quit)","Type":"Message"}~~
+~~--> {"Type":"Hello"}~~
+~~<-- {"Message":"create","Type":"Hello"}~~
+~~--> {"Message":"Option 1 - Play against three AI players and start immediately","Type":"Message"}~~
+~~--> {"Message":"Option 2 - Play with a human partner against two AI players","Type":"Message"}~~
+~~--> {"Message":"Option 3 - Play with a human partner against one AI players and 1 Human","Type":"Message"}~~
+~~--> {"Message":"Option 4 - Play with a human partner against two humans","Type":"Message"}~~
+~~--> {"Message":"Option 5 - Play against a human with AI partners","Type":"Message"}~~
+~~--> {"Message":"Option 6 - Go back","Type":"Message"}~~
+~~--> {"Type":"Game"}~~
+~~<-- {"Option":1,"Type":"Game"}~~
 --> {"Hand":["AD","KD","KD","JD","9D","JC","TH","KH","TS","TS","JS","9S"],"Playerid":0,"Type":"Deal"}
 --> {"Playerid":1,"Type":"Bid"}
 --> {"Bid":25,"Playerid":2,"Type":"Bid"}
@@ -137,11 +160,12 @@ Since your playerid was assigned through the Deal message as 0, the client needs
 <-- {"PlayedCard":"KH","Playerid":0,"Type":"Play"}
 --> {"PlayedCard":"JS","Playerid":1,"Type":"Play"}
 --> {"PlayedCard":"QS","Playerid":2,"Type":"Play"}
---> {"Message":"Player 3 wins trick #12 with 9D for 2 points","Type":"Message"}
---> {"Message":"Scores are now Team0 = 24 to Team1 = -55, played 3 hands","Type":"Message"}
---> {"Message":"Team0 wins with a score of 24!","Type":"Message"}
---> {"GameOver":true,"Score":[24,-55],"Type":"Score","Win":true}
---> {"Message":"Do you want to join a game, create a new game, or quit? (join, create, quit)","Type":"Message"}
---> {"Type":"Hello"}
-<-- {"Message":"quit","Type":"Hello"}
---> {"Message":"Ok, bye bye!","Type":"Message"}
+TODO: Further update the end_of_game network protocol
+~~--> {"Message":"Player 3 wins trick #12 with 9D for 2 points","Type":"Message"}~~
+~~--> {"Message":"Scores are now Team0 = 24 to Team1 = -55, played 3 hands","Type":"Message"}~~
+~~--> {"Message":"Team0 wins with a score of 24!","Type":"Message"}~~
+~~--> {"GameOver":true,"Score":[24,-55],"Type":"Score","Win":true}~~
+~~--> {"Message":"Do you want to join a game, create a new game, or quit? (join, create, quit)","Type":"Message"}~~
+~~--> {"Type":"Hello"}~~
+~~<-- {"Message":"quit","Type":"Hello"}~~
+~~--> {"Message":"Ok, bye bye!","Type":"Message"}~~
