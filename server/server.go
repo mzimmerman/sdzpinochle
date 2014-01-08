@@ -60,6 +60,7 @@ func init() {
 	http.HandleFunc("/_ah/channel/connected/", connected)
 	http.HandleFunc("/receive", receive)
 	http.HandleFunc("/processAction", processActionHandler)
+	http.HandleFunc("/tell", tell)
 	http.HandleFunc("/remind", remind)
 	store.Options = &sessions.Options{
 		Path:   "/",
@@ -252,6 +253,18 @@ func receive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Fprintf(w, "Success")
+}
+
+func tell(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	err := channel.Send(c, r.FormValue("Client"), r.FormValue("Action"))
+	if logError(c, err) {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Error - %v", err)
+	} else {
+		fmt.Fprintf(w, "Success")
+	}
+	return
 }
 
 func processActionHandler(w http.ResponseWriter, r *http.Request) {
@@ -1749,28 +1762,36 @@ func (client *Client) Tell(g *goon.Goon, c appengine.Context, game *Game, action
 		// client is not connected, can't tell them
 		return nil
 	}
-	err := channel.SendJSON(c, client.getId(), action)
-	if err != nil {
-		Log(4, "Error in Send - %v", err)
-		client.Connected = false
-		_, err = g.Put(client)
-		logError(c, err)
-		if game != nil {
-			me := uint8(0)
-			for x, player := range game.Players {
-				if human, ok := player.(*Human); ok {
-					if human.Client.Id == client.Id {
-						me = uint8(x)
-						human.Client.Connected = false // update the client in the game as well
-						break
-					}
-				}
-			}
-			game.Broadcast(g, c, CreateDisconnect(me), me)
-		}
+	actionJson, err := action.MarshalJSON()
+	if logError(c, err) {
 		return nil
 	}
-	c.Debugf("Sent %s", action)
+
+	task := taskqueue.NewPOSTTask("/tell", url.Values{"Client": []string{fmt.Sprintf("%d", client.Id)}, "Action": []string{string(actionJson)}})
+	_, err = taskqueue.Add(c, task, "frontend")
+	logError(c, err)
+	//err := channel.SendJSON(c, client.getId(), action)
+	//if err != nil {
+	//	Log(4, "Error in Send - %v", err)
+	//	client.Connected = false
+	//	_, err = g.Put(client)
+	//	logError(c, err)
+	//	if game != nil {
+	//		me := uint8(0)
+	//		for x, player := range game.Players {
+	//			if human, ok := player.(*Human); ok {
+	//				if human.Client.Id == client.Id {
+	//					me = uint8(x)
+	//					human.Client.Connected = false // update the client in the game as well
+	//					break
+	//				}
+	//			}
+	//		}
+	//		game.Broadcast(g, c, CreateDisconnect(me), me)
+	//	}
+	//	return nil
+	//}
+	//c.Debugf("Sent %s", action)
 	return nil
 }
 
