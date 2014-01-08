@@ -1,25 +1,27 @@
 package sdzpinochleserver
 
 import (
+	"bytes"
+	"encoding/gob"
+	"log"
+	"github.com/gorilla/sessions"
 	"appengine"
 	"appengine/channel"
 	"appengine/datastore"
-	"bytes"
-	"encoding/gob"
-	"github.com/gorilla/sessions"
-	"log"
+	"appengine/taskqueue"
 	//"runtime"
 	//"runtime"
 	//"appengine/datastore"
-	"appengine/mail"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"github.com/mzimmerman/goon"
 	. "github.com/mzimmerman/sdzpinochle"
-	"math/rand"
+	"appengine/mail"
 	//"net"
 	"net/http"
+	"net/url"
 	"runtime"
 	"runtime/debug"
 	"sort"
@@ -57,6 +59,7 @@ func init() {
 	http.HandleFunc("/connect", connect)
 	http.HandleFunc("/_ah/channel/connected/", connected)
 	http.HandleFunc("/receive", receive)
+	http.HandleFunc("/processAction", processActionHandler)
 	http.HandleFunc("/remind", remind)
 	store.Options = &sessions.Options{
 		Path:   "/",
@@ -235,13 +238,63 @@ func receive(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	game, err = game.processAction(g, c, client, action)
+	actionJson, err := action.MarshalJSON()
 	if logError(c, err) {
 		w.WriteHeader(500)
 		fmt.Fprintf(w, "Error - %v", err)
 		return
 	}
+	task := taskqueue.NewPOSTTask("/processAction", url.Values{"Client": []string{fmt.Sprintf("%d", client.Id)}, "Action": []string{string(actionJson)}})
+	_, err = taskqueue.Add(c, task, "AI")
+	if logError(c, err) {
+		w.WriteHeader(500)
+		fmt.Fprintf(w, "Error adding task- %v", err)
+		return
+	}
 	fmt.Fprintf(w, "Success")
+}
+
+func processActionHandler(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	g := goon.FromContext(c)
+	client := new(Client)
+	var err error
+	client.Id, err = strconv.ParseInt(r.FormValue("Client"), 10, 64)
+	if logError(c, err) {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Error - %v", err)
+		return
+	}
+	err = g.Get(client)
+	if logError(c, err) {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Error - %v", err)
+		return
+	}
+	action := new(Action)
+	if logError(c, action.UnmarshalJSON([]byte(r.FormValue("Action")))) {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	c.Debugf("Received in backend %s", action)
+	var game *Game
+	if client.TableId != 0 {
+		game = &Game{Id: client.TableId}
+		err = g.Get(game)
+		if err == datastore.ErrNoSuchEntity {
+			game = nil
+		} else if logError(c, err) {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "Error - %v", err)
+			return
+		}
+	}
+	game, err = game.processAction(g, c, client, action)
+	if logError(c, err) {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, "Error - %v", err)
+	}
+	return
 }
 
 type CardMap [25]uint8
@@ -943,7 +996,7 @@ func playHandWithCard(ht *HandTracker, trump Suit) Card {
 		}
 		*tierSlice[0][x].Trick = *ht.Trick
 	}
-	end := time.Now().Add(time.Millisecond * 1500)
+	end := time.Now().Add(time.Millisecond * 2500)
 	var pw *PlayWalker
 tierLoop:
 	for tier := 0; tier < len(tierSlice); tier++ {

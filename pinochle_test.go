@@ -1,3 +1,4 @@
+// +build !appengine
 package sdzpinochle
 
 import (

@@ -1,0 +1,10 @@
+total_storage_limit: 499M
+queue:
+- name: AI
+  max_concurrent_requests: 1
+  mode: push
+  rate: 10/s
+  retry_parameters:
+    task_retry_limit: 7
+    max_backoff_seconds: 2
+  target: ai

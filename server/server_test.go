@@ -1,12 +1,12 @@
-// server_test.go
+// +build !appengine
 package sdzpinochleserver
 
 import (
-	"appengine/aetest"
+	"sort"
 	"github.com/mzimmerman/goon"
 	. "github.com/mzimmerman/sdzpinochle"
 	pt "github.com/remogatto/prettytest"
-	"sort"
+	"appengine/aetest"
 	//"strconv"
 	"fmt"
 	"testing"
@@ -766,11 +766,13 @@ func (t *testSuite) TestFindCardToPlayLong() {
 
 func (t *testSuite) TestGame() {
 	c, err := aetest.NewContext(nil)
+	if c != nil {
+		defer c.Close()
+	}
 	if err != nil {
-		t.Error("Could not start appenginetesting")
+		t.Error("Could not start aetest - %v", err)
 		return
 	}
-	defer c.Close()
 	g := goon.FromContext(c)
 	game := NewGame(4)
 	game.Dealer = 0

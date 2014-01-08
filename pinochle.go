@@ -10,7 +10,6 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
-	//"time"
 )
 
 func Log(playerid uint8, m string, v ...interface{}) {
