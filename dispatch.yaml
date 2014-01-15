@@ -1,0 +1,9 @@
+application: sdzpinochle
+
+dispatch:
+ - url: "*/*"
+   module: default
+
+ - url: "*/processAction*"
+   module: ai
+

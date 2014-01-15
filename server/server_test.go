@@ -1,5 +1,5 @@
 // +build !appengine
-package sdzpinochleserver
+package server
 
 import (
 	"sort"

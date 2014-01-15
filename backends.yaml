@@ -1,4 +1,0 @@
-backends:
-- name: ai
-  class: B8
-  options: dynamic

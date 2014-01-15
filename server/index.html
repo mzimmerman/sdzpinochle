@@ -151,14 +151,14 @@
 		function addToQueue(f) {
 			$('body').queue(f);
 		}
-				
+
 		function showError(msg){
 			$('#error').html(msg).show();
 			setTimeout(function(){
 				$('#error').fadeOut('slow');
 			},3000);
 		}
-		
+
 		function showHand(location, hand){
 			location.empty().show();
 			for(var i=0;i<hand.length;i++){
@@ -169,7 +169,7 @@
 		function createCard(c) {
 			return "<img title='" + c + "' class='playingCard' src='cards/" + c + ".png'>";
 		}
-		
+
 		function playCard() {
 			var c = $(this).attr("title");
 			send({Type:"Play",PlayedCard:c});
@@ -180,11 +180,11 @@
 				setTurn((playerid + 1) % 4);
 			});
 		}
-		
+
 		function processQueue() {
 			$('body').dequeue();
 		}
-				
+
 		$(document).ready(function(){
 			//console.log("Doing /connect");
 			$.get("/connect").done(function (data) {
@@ -196,7 +196,7 @@
 //				socket.onclose = onClose;
 			});
 			timer = setInterval(processQueue,500);
-						
+
 			$("#continueMeld button").click(function () {
 				$(this).parent().parent().hide();
 				timer = setInterval(processQueue,500);
@@ -212,7 +212,7 @@
 				$("#bid-value").html(highBid);
 				$(this).parent().parent().hide();
 			});
-			
+
 			$("#chooseTrump button").click(function () {
 				var trump = $("#chooseTrump input:checked").val();
 				send({Type:"Trump",Trump:trump});
@@ -220,7 +220,7 @@
 				setTurn(playerid);
 				$(this).parent().parent().hide();
 			});
-			
+
 			$("#updateTables").click(function() {
 				send({Type:"Tables"});
 			});
@@ -229,18 +229,18 @@
 				send({Type:"Start"});
 			});
 		}); // end of $(document).ready()
-		
+
 		function getPlayer(id) {
 			if (id == left) return $("#left");
 			if (id == partner) return $("#partner");
 			if (id == right) return $("#right");
 			return $('#bottom');
 		}
-		
+
 		function appendMessage(msg) {
 			//$("#messages").append("<p>" + msg + "</p>");
 		}
-		
+
 		function send(action) {
 			action.Playerid = playerid
 			var text = JSON.stringify(action);
@@ -249,16 +249,16 @@
 			});
 			console.log("Sent - " + text);
 		}
-		
+
 		function setTurn(id) {
 			$(".player").removeClass('turn');
 			getPlayer(id).addClass('turn');
 		}
-		
+
 		function createTable(table) {
 			return "<div class='cardTable' TableId='" + table.Id + "'>" + table.Players[0] + " & " + table.Players[2] + " vs " + table.Players[1] + " & " + table.Players[3] + "</div>";
 		}
-		
+
 		function onMessage(evt) {
 			console.log("Received - " + evt.data);
 			var action = $.parseJSON(evt.data);
@@ -377,7 +377,7 @@
 						addToQueue(function(){
 							var setTo = "Pass";
 							if (action.hasOwnProperty("Bid") && action.Bid > highBid) {
-								highBid = action.Bid;	
+								highBid = action.Bid;
 								setTo = action.Bid;
 							}
 							setTurn((action.Playerid + 1) % 4);
@@ -404,7 +404,7 @@
 					if (playCount < 4) {
 						addToQueue(function () {
 							setTurn((action.Playerid + 1) % 4);
-							showHand(getPlayer(action.Playerid).children(".play"),[action.PlayedCard]);								
+							showHand(getPlayer(action.Playerid).children(".play"),[action.PlayedCard]);
 						});
 					} else {
 						addToQueue(function(){
@@ -420,7 +420,7 @@
 						showHand($("#hand"),action.Hand);
 						$("#hand").find('.playingCard').click(playCard);
 					});
-					break;
+					break;x
 				case "Meld":
 					meldActions++;
 					addToQueue(function() {

@@ -1,4 +1,4 @@
-package sdzpinochleserver
+package server
 
 import (
 	"bytes"
@@ -8,18 +8,12 @@ import (
 	"appengine"
 	"appengine/channel"
 	"appengine/datastore"
-	"appengine/taskqueue"
-	//"runtime"
-	//"runtime"
-	//"appengine/datastore"
+	"appengine/urlfetch"
+
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
-	"github.com/mzimmerman/goon"
-	. "github.com/mzimmerman/sdzpinochle"
-	"appengine/mail"
-	//"net"
 	"net/http"
 	"net/url"
 	"runtime"
@@ -27,9 +21,10 @@ import (
 	"sort"
 	"strconv"
 	"time"
+	"github.com/mzimmerman/goon"
+	. "github.com/mzimmerman/sdzpinochle"
+	"appengine/mail"
 )
-
-//443-926-0119
 
 const (
 	StateNew   = "new"
@@ -173,20 +168,25 @@ func connect(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	client.Connected = false // the client is only connecting now, need to setup the channel first
-	c.Debugf("Putting client %d", client.Id)
-	_, err = g.Put(client)
-	c.Debugf("Put client %d", client.Id)
-	if logError(c, err) {
-		return
+	if client.Id == 0 {
+		c.Debugf("Putting client %d", client.Id)
+		_, err = g.Put(client)
+		c.Debugf("Put client %d", client.Id)
+		if logError(c, err) {
+			return
+		}
 	}
 	cookie.Values["ClientId"] = client.Id
 	cookie.Save(r, w)
-	token, err := channel.Create(c, client.getId())
+	client.Token, err = channel.Create(c, client.getId())
 	if logError(c, err) {
 		return
 	}
+	c.Debugf("Putting client %d with token %s", client.Id, client.Token)
+	_, err = g.Put(client)
+	c.Debugf("Put client %d with token %s", client.Id, client.Token)
 	w.Header().Set("Content-type", " application/json")
-	rj, err := json.Marshal(token)
+	rj, err := json.Marshal(client.Token)
 	if logError(c, err) {
 		return
 	}
@@ -245,8 +245,11 @@ func receive(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Error - %v", err)
 		return
 	}
-	task := taskqueue.NewPOSTTask("/processAction", url.Values{"Client": []string{fmt.Sprintf("%d", client.Id)}, "Action": []string{string(actionJson)}})
-	_, err = taskqueue.Add(c, task, "AI")
+	hostname, err := appengine.ModuleHostname(c, "ai", "", "")
+	logError(c, err)
+	_, err = urlfetch.Client(c).PostForm("http://"+hostname+"/processAction", url.Values{"Client": []string{fmt.Sprintf("%d", client.Id)}, "Action": []string{string(actionJson)}})
+	//task := taskqueue.NewPOSTTask("/processAction", url.Values{"Client": []string{fmt.Sprintf("%d", client.Id)}, "Action": []string{string(actionJson)}})
+	//_, err = taskqueue.Add(c, task, "AI")
 	if logError(c, err) {
 		w.WriteHeader(500)
 		fmt.Fprintf(w, "Error adding task- %v", err)
@@ -257,7 +260,9 @@ func receive(w http.ResponseWriter, r *http.Request) {
 
 func tell(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
-	err := channel.Send(c, r.FormValue("Client"), r.FormValue("Action"))
+	client, jsonString := r.FormValue("Client"), r.FormValue("JSON")
+	err := channel.Send(c, client, jsonString)
+	c.Debugf("message sent on channel, tell handler fired for client id %s and action %s", client, jsonString)
 	if logError(c, err) {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "Error - %v", err)
@@ -1709,6 +1714,7 @@ type Client struct {
 	Connected bool
 	Name      string
 	TableId   int64
+	Token     string
 }
 
 func (c Client) getId() string {
@@ -1724,6 +1730,8 @@ func (client *Client) SendTables(g *goon.Goon, c appengine.Context, game *Game) 
 	if client.Name == "" {
 		client.Tell(g, c, game, CreateName())
 	}
+	hostname, err := appengine.ModuleHostname(c, "default", "", "")
+	logError(c, err)
 	if game == nil && client.TableId == 0 {
 		var tables []*Game
 		query := datastore.NewQuery("Game").Filter("State = ", "new").Limit(30)
@@ -1733,7 +1741,11 @@ func (client *Client) SendTables(g *goon.Goon, c appengine.Context, game *Game) 
 		}
 		tables = append(tables, NewGame(4))
 		c.Debugf("Sending first table to %d - %s %#v", client.Id, client.Name, tables[0])
-		logError(c, channel.SendJSON(c, client.getId(), struct{ Type, Tables interface{} }{Type: "Tables", Tables: tables}))
+		myTableString, err := json.Marshal(struct{ Type, Tables interface{} }{Type: "Tables", Tables: tables})
+		logError(c, err)
+		//_, err = taskqueue.Add(c, taskqueue.NewPOSTTask("/tell", url.Values{"Client": []string{fmt.Sprintf("%d", client.Id)}, "JSON": []string{string(myTableString)}}), "frontend")
+		_, err = urlfetch.Client(c).PostForm("http://"+hostname+"/tell", url.Values{"Client": []string{fmt.Sprintf("%d", client.Id)}, "JSON": []string{string(myTableString)}})
+		logError(c, err)
 	} else {
 		if game == nil {
 			game = &Game{Id: client.TableId}
@@ -1751,13 +1763,22 @@ func (client *Client) SendTables(g *goon.Goon, c appengine.Context, game *Game) 
 				}
 			}
 		}
+		myTableString, err := json.Marshal(struct{ Type, MyTable, Playerid interface{} }{Type: "MyTable", MyTable: game, Playerid: me})
+		if logError(c, err) {
+			return
+		}
 		c.Debugf("Sending MyTable to %d-%s %#v", client.Id, client.Name, game)
-		logError(c, channel.SendJSON(c, client.getId(), struct{ Type, MyTable, Playerid interface{} }{Type: "MyTable", MyTable: game, Playerid: me}))
+		//_, err = taskqueue.Add(c, taskqueue.NewPOSTTask("/tell", url.Values{"Client": []string{fmt.Sprintf("%d", client.Id)}, "JSON": []string{string(myTableString)}}), "frontend")
+		_, err = urlfetch.Client(c).PostForm("http://"+hostname+"/tell", url.Values{"Client": []string{fmt.Sprintf("%d", client.Id)}, "JSON": []string{string(myTableString)}})
+		//logError(c, err)
+		//c.Debugf("Tell urlfetch task added to %d of action %s", client.Id, myTableString)
+		logError(c, err)
 		game.retell(g, c)
 	}
 }
 
 func (client *Client) Tell(g *goon.Goon, c appengine.Context, game *Game, action *Action) *Action {
+	g.C().Debugf("Inside client Tell for action - %s", action)
 	if !client.Connected {
 		// client is not connected, can't tell them
 		return nil
@@ -1766,11 +1787,14 @@ func (client *Client) Tell(g *goon.Goon, c appengine.Context, game *Game, action
 	if logError(c, err) {
 		return nil
 	}
-
-	task := taskqueue.NewPOSTTask("/tell", url.Values{"Client": []string{fmt.Sprintf("%d", client.Id)}, "Action": []string{string(actionJson)}})
-	_, err = taskqueue.Add(c, task, "frontend")
+	hostname, err := appengine.ModuleHostname(c, "default", "", "")
 	logError(c, err)
-	//err := channel.SendJSON(c, client.getId(), action)
+
+	//_, err = taskqueue.Add(c, taskqueue.NewPOSTTask("/tell", url.Values{"Client": []string{fmt.Sprintf("%d", client.Id)}, "JSON": []string{string(actionJson)}}), "frontend")
+	_, err = urlfetch.Client(c).PostForm("http://"+hostname+"/tell", url.Values{"Client": []string{fmt.Sprintf("%d", client.Id)}, "JSON": []string{string(actionJson)}})
+	logError(c, err)
+	return nil
+	//err := channel.SendJSON(c, fmt.Sprintf("%d", client.Id), action)
 	//if err != nil {
 	//	Log(4, "Error in Send - %v", err)
 	//	client.Connected = false
@@ -1792,7 +1816,7 @@ func (client *Client) Tell(g *goon.Goon, c appengine.Context, game *Game, action
 	//	return nil
 	//}
 	//c.Debugf("Sent %s", action)
-	return nil
+	//return nil
 }
 
 type Player interface {

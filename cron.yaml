@@ -1,0 +1,4 @@
+cron:
+# - description: every minute check on failed games
+#  url: /remind
+#  schedule: every 1 minutes
