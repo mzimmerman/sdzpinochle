@@ -997,7 +997,7 @@ largeLoop:
 	return
 }
 
-func playHandWithCard(ht *HandTracker, trump Suit) Card {
+func playHandWithCard(ht *HandTracker, trump Suit) (Card, uint) {
 	count := uint(0)
 	tierSlice := make([][]*PlayWalker, 48-ht.PlayCount+2)
 	length := int(ht.calculateHand(ht.Owner))
@@ -1038,7 +1038,7 @@ tierLoop:
 			if tier == 0 && len(decisionMap) == 1 {
 				// no need to continue any further, this was the only legal play
 				Log(ht.Owner, "Returning the only legal play of %s", decisionMap[0])
-				return decisionMap[0]
+				return decisionMap[0], 0
 			}
 			pw.Children = make([]*PlayWalker, len(decisionMap))
 			for x := range decisionMap {
@@ -1126,15 +1126,15 @@ tierLoop:
 	//for _, pw := range tierSlice[0] {
 	//Log(ht.Owner, pw.Best.PlayTrail())
 	//}
-	return tierSlice[0][0].Children[bestChild].Card
+	return tierSlice[0][0].Children[bestChild].Card, count
 }
 
-func (ai *AI) findCardToPlay(action *Action) Card {
+func (ai *AI) findCardToPlay(action *Action) (Card, uint) {
 	ai.HT.Trick.Next = action.Playerid
-	card := playHandWithCard(ai.HT, action.Trump)
+	card, amount := playHandWithCard(ai.HT, action.Trump)
 	runtime.GC() // since we created so much garbage, we need to have the GC mark it as unlinked/unused so next round it can be reused
 	//Log(ai.Playerid, "PlayHandWithCard returned %s for %d points.", card, points)
-	return card
+	return card, amount
 }
 
 func (pw *PlayWalker) potentialCards(trick *Trick, trump Suit) Hand {
@@ -1237,7 +1237,12 @@ func (ai *AI) Tell(g *goon.Goon, c appengine.Context, game *Game, action *Action
 		//Log(ai.Playerid, "Trick = %s", ai.Trick)
 		var response *Action
 		if action.Playerid == ai.Playerid {
-			response = CreatePlay(ai.findCardToPlay(action), ai.Playerid)
+			var start = time.Now()
+			card, amount := ai.findCardToPlay(action)
+			response = CreatePlay(card, ai.Playerid)
+			if c != nil {
+				c.Debugf("Logged %d unique paths in %s", amount, time.Now().Sub(start))
+			}
 			action.PlayedCard = response.PlayedCard
 		}
 		ai.HT.Trick.Next = action.Playerid

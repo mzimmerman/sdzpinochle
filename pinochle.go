@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"time"
 )
 
 func Log(playerid uint8, m string, v ...interface{}) {
@@ -76,8 +77,7 @@ var Faces [6]Face
 var Suits [4]Suit
 
 func init() {
-	//rand.Seed(time.Now().UnixNano())
-	rand.Seed(0)
+	rand.Seed(time.Now().UnixNano())
 	Faces = [6]Face{Ace, Ten, King, Queen, Jack, Nine}
 	Suits = [4]Suit{Spades, Hearts, Clubs, Diamonds}
 }

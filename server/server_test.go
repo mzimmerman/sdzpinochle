@@ -673,7 +673,7 @@ func (t *testSuite) TestFindCardToPlayPartnerAces() {
 	}
 	ai.HT.Trick.Next = ai.PlayerID()
 	action := CreatePlayRequest(NACard, NASuit, trump, ai.PlayerID(), ai.Hand())
-	card := ai.findCardToPlay(action)
+	card, _ := ai.findCardToPlay(action)
 	t.True(card == KD, fmt.Sprintf("Looking for the KD but got %s", card))
 }
 
@@ -710,7 +710,7 @@ func (t *testSuite) TestFindCardToPlayDrainTrump() {
 	}
 	ai.HT.Trick.Next = ai.PlayerID()
 	action := CreatePlayRequest(NACard, NASuit, trump, ai.PlayerID(), ai.Hand())
-	card := ai.findCardToPlay(action)
+	card, _ := ai.findCardToPlay(action)
 	t.True(card == AH, fmt.Sprintf("Looking for AH but got %s", card))
 }
 
@@ -735,7 +735,7 @@ func (t *testSuite) TestFindCardToPlayShort() {
 	}
 	ai.HT.Trick.Next = 3
 	action := CreatePlayRequest(NACard, NASuit, trump, 3, ai.Hand())
-	card := ai.findCardToPlay(action)
+	card, _ := ai.findCardToPlay(action)
 	t.True(card == AD || card == QS, fmt.Sprintf("Looking for AD or QS but got %s", card))
 }
 
@@ -753,7 +753,8 @@ func (t *testSuite) TestFindCardToPlayLong() {
 		ai.HT.calculateCard(card)
 	}
 	action := CreatePlayRequest(NACard, NASuit, ai.Trump, 3, ai.Hand())
-	switch ai.findCardToPlay(action) {
+	card, _ := ai.findCardToPlay(action)
+	switch card {
 	case AD:
 		fallthrough
 	case JD:
@@ -852,7 +853,8 @@ func (t *testSuite) TestFindCardToPlayFull() {
 	p0.HT.Trick.Next = 2
 	p0.HT.PlayCard(AD, trump)
 	p0.HT.PlayCard(JC, trump)
-	t.True(playHandWithCard(p0.HT, trump) == TD)
+	card, _ := playHandWithCard(p0.HT, trump)
+	t.True(card == TD)
 	p0.HT.PlayCard(TD, trump)
 
 }
