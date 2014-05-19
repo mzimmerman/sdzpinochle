@@ -9,11 +9,11 @@ inbound_services:
 
 handlers:
 - url: /cards
-  static_dir: server/cards
+  static_dir: cards
 - url: /js
-  static_dir: server/js
+  static_dir: js
 - url: /
-  static_files: server/index.html
-  upload: server/index\.html
+  static_files: index.html
+  upload: index\.html
 - url: /.*
   script: _go_app

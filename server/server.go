@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/gob"
 	"log"
+
 	"github.com/gorilla/sessions"
+
 	"appengine"
 	"appengine/channel"
 	"appengine/datastore"
@@ -21,8 +23,10 @@ import (
 	"sort"
 	"strconv"
 	"time"
+
 	"github.com/mzimmerman/goon"
 	. "github.com/mzimmerman/sdzpinochle"
+
 	"appengine/mail"
 )
 
@@ -246,7 +250,9 @@ func receive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hostname, err := appengine.ModuleHostname(c, "ai", "", "")
-	logError(c, err)
+	if logError(c, err) {
+		hostname = "localhost:8080"
+	}
 	_, err = urlfetch.Client(c).PostForm("http://"+hostname+"/processAction", url.Values{"Client": []string{fmt.Sprintf("%d", client.Id)}, "Action": []string{string(actionJson)}})
 	//task := taskqueue.NewPOSTTask("/processAction", url.Values{"Client": []string{fmt.Sprintf("%d", client.Id)}, "Action": []string{string(actionJson)}})
 	//_, err = taskqueue.Add(c, task, "AI")

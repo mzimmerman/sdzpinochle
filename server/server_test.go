@@ -3,11 +3,14 @@ package server
 
 import (
 	"sort"
+
 	"github.com/mzimmerman/goon"
 	. "github.com/mzimmerman/sdzpinochle"
 	pt "github.com/remogatto/prettytest"
+
 	"appengine/aetest"
 	//"strconv"
+	"encoding/json"
 	"fmt"
 	"testing"
 )
@@ -22,6 +25,16 @@ func TestFoo(t *testing.T) {
 
 type testSuite struct {
 	pt.Suite
+}
+
+func (t *testSuite) TestGameMarshaller() {
+	game := NewGame(4)
+	data, err := json.Marshal(*game)
+	if err != nil {
+		t.T.Fatalf("Error %v marhsalling Game", err)
+	}
+	expected := `{"HighBid":0,"HighPlayer":0,"Id":0,"Meld":"AAA=","Next":0,"Players":["","","",""],"Score":[0,0],"State":"new","Trump":"~"}`
+	t.Equal(string(data), expected)
 }
 
 func (t *testSuite) TestWorthShort() {
