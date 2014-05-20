@@ -4,7 +4,7 @@ package server
 import (
 	"sort"
 
-	"github.com/mzimmerman/goon"
+	"github.com/mjibson/goon"
 	. "github.com/mzimmerman/sdzpinochle"
 	pt "github.com/remogatto/prettytest"
 

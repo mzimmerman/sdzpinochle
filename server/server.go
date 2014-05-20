@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/mzimmerman/goon"
+	"github.com/mjibson/goon"
 	. "github.com/mzimmerman/sdzpinochle"
 
 	"appengine/mail"
@@ -53,6 +53,8 @@ var store = sessions.NewCookieStore([]byte("sdzpinochle"))
 var Hands = make(chan Hand, 1000)
 
 var htstack *HTStack
+
+var logBuffer bytes.Buffer
 
 func init() {
 	http.HandleFunc("/connect", connect)
@@ -313,11 +315,14 @@ func processActionHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	game, err = game.processAction(g, c, client, action)
+	c.Debugf("Game before processAction is - %#v", game)
+	_, err = game.processAction(g, c, client, action)
 	if logError(c, err) {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "Error - %v", err)
 	}
+	c.Debugf("buffer = %s", logBuffer.String())
+	logBuffer.Reset()
 	return
 }
 
@@ -1365,7 +1370,6 @@ func logError(c appengine.Context, err error) bool {
 type Game struct {
 	Id          int64    `datastore:"-" goon:"id"`
 	Trick       Trick    `datastore:"-" json:"-"`
-	PlayerGob   []byte   `datastore:"-" json:"-"`
 	Players     []Player `datastore:"-"`
 	Dealer      uint8    `datastore:"-" json:"-"`
 	Score       []int16  `datastore:"-"`
@@ -1382,17 +1386,21 @@ type Game struct {
 	Updated     time.Time `json:"-"`
 }
 
-func (x *Game) Load(c <-chan datastore.Property) error {
+func (x *Game) Load(c <-chan datastore.Property) (err error) {
+	gobbed := false
 	for {
 		prop := <-c
 		if prop.Name == "" {
-			return nil
+			if !gobbed {
+				panic("Loaded Game without a GameGob!")
+			}
+			fmt.Fprintf(&logBuffer, "Loaded Game - %#v", x)
+			return
 		}
 		switch prop.Name {
 		case "GameGob":
-			if err := gob.NewDecoder(bytes.NewReader(prop.Value.([]byte))).Decode(&x); err != nil {
-				return err
-			}
+			err = gob.NewDecoder(bytes.NewReader(prop.Value.([]byte))).Decode(&x)
+			gobbed = true
 		default:
 			// skip, it'll get loaded in the Gob, I just want to query on it :)
 		}
@@ -1422,6 +1430,9 @@ func (x *Game) Save(c chan<- datastore.Property) error {
 func NewGame(players int) *Game {
 	game := new(Game)
 	game.Players = make([]Player, players)
+	for x := range game.Players {
+		game.Players[x] = createAI()
+	}
 	game.Score = make([]int16, players/2)
 	game.Meld = make([]uint8, players/2)
 	game.State = StateNew
@@ -1563,7 +1574,7 @@ func (game *Game) processAction(g *goon.Goon, c appengine.Context, client *Clien
 					openSlot = x
 					break
 				}
-				if player == nil {
+				if _, ok := player.(*AI); ok {
 					openSlot = x
 				}
 			}
@@ -1789,7 +1800,6 @@ func (client *Client) SendTables(g *goon.Goon, c appengine.Context, game *Game) 
 }
 
 func (client *Client) Tell(g *goon.Goon, c appengine.Context, game *Game, action *Action) *Action {
-	g.C().Debugf("Inside client Tell for action - %s", action)
 	if !client.Connected {
 		// client is not connected, can't tell them
 		return nil

@@ -1,6 +1,6 @@
 application: sdzpinochle
 module: ai
-version: 1
+version: 2
 runtime: go
 api_version: go1
 instance_class: B8
