@@ -1,3 +1,3 @@
 #!/bin/sh
 
-/home/zubov/google_appengine/dev_appserver.py --clear_datastore=yes --log_level=debug ./
+/home/zubov/google_appengine/dev_appserver.py --clear_datastore=yes --log_level=debug app.yaml ai.yaml
