@@ -22,19 +22,19 @@ func Log(playerid uint8, m string, v ...interface{}) {
 }
 
 const (
-	NAFace      Face  = iota
-	Ace         Face  = iota
-	Ten         Face  = iota
-	King        Face  = iota
-	Queen       Face  = iota
-	Jack        Face  = iota
-	Nine        Face  = iota
-	acearound   uint8 = 10
-	kingaround  uint8 = 8
-	queenaround uint8 = 6
-	jackaround  uint8 = 4
-	debugLog          = false
-	AllCards    int8  = 24
+	NAFace      Face = iota
+	Ace         Face = iota
+	Ten         Face = iota
+	King        Face = iota
+	Queen       Face = iota
+	Jack        Face = iota
+	Nine        Face = iota
+	acearound   int  = 10
+	kingaround  int  = 8
+	queenaround int  = 6
+	jackaround  int  = 4
+	debugLog         = false
+	AllCards    int8 = 24
 )
 
 const (
@@ -76,7 +76,7 @@ const (
 var Faces [6]Face
 var Suits [4]Suit
 
-func init() {
+func Init() {
 	rand.Seed(time.Now().UnixNano())
 	Faces = [6]Face{Ace, Ten, King, Queen, Jack, Nine}
 	Suits = [4]Suit{Spades, Hearts, Clubs, Diamonds}
@@ -196,6 +196,16 @@ func (a Card) Beats(b Card, trump Suit) bool {
 
 func (c Card) Counter() bool {
 	return c.Face() == Ace || c.Face() == Ten || c.Face() == King
+}
+
+func (h Hand) Counters() int {
+	var count int
+	for _, card := range h {
+		if card.Counter() {
+			count++
+		}
+	}
+	return count
 }
 
 func (c Card) Suit() Suit {
@@ -677,8 +687,8 @@ func (h Hand) CountSuit(suit Suit) (count int) {
 	return
 }
 
-func (h Hand) Count() (cards map[Card]uint8) {
-	cards = make(map[Card]uint8)
+func (h Hand) Count() (cards map[Card]int) {
+	cards = make(map[Card]int)
 	for _, face := range Faces {
 		for _, suit := range Suits {
 			cards[CreateCard(suit, face)] = 0
@@ -690,28 +700,28 @@ func (h Hand) Count() (cards map[Card]uint8) {
 	return
 }
 
-func max(a, b uint8) uint8 {
+func max(a, b int) int {
 	if a > b {
 		return a
 	}
 	return b
 }
 
-func min(a, b uint8) uint8 {
+func min(a, b int) int {
 	if a < b {
 		return a
 	}
 	return b
 }
 
-func (h Hand) Meld(trump Suit) (meld uint8, result Hand) {
+func (h Hand) Meld(trump Suit) (meld int, result Hand) {
 	// hand does not have to be sorted
 	count := h.Count()
 	if debugLog {
 		fmt.Printf("Count is %v\n", count)
 	}
-	show := make(map[Card]uint8)
-	around := make(map[Face]uint8)
+	show := make(map[Card]int)
+	around := make(map[Face]int)
 	for _, value := range Faces {
 		around[value] = 2
 	}
@@ -789,7 +799,7 @@ func (h Hand) Meld(trump Suit) (meld uint8, result Hand) {
 	}
 	for _, face := range []Face{Ace, King, Queen, Jack} {
 		if around[face] > 0 {
-			var worth uint8
+			var worth int
 			switch face {
 			case Ace:
 				worth = acearound
