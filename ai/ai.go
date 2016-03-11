@@ -47,8 +47,8 @@ func (m *Match) SetMeld(trump sdz.Suit) {
 	p1, _ := m.Hands[1].Meld(trump)
 	p2, _ := m.Hands[2].Meld(trump)
 	p3, _ := m.Hands[3].Meld(trump)
-	m.Partnerships[0].DealScore = p0 + p2
-	m.Partnerships[1].DealScore = p1 + p3
+	m.Partnerships[0].DealScore = int(p0 + p2)
+	m.Partnerships[1].DealScore = int(p1 + p3)
 }
 
 func (m *Match) String() string {
@@ -63,7 +63,7 @@ func NeverBid(hand *sdz.Hand, bids []int) (int, sdz.Suit) {
 }
 
 func ChooseSuitWithMostMeld(hand *sdz.Hand, bids []int) (int, sdz.Suit) {
-	highestMeld := 0
+	var highestMeld uint8 = 0
 	var trump sdz.Suit
 	for _, suit := range sdz.Suits {
 		meld, _ := hand.Meld(suit)
@@ -72,7 +72,7 @@ func ChooseSuitWithMostMeld(hand *sdz.Hand, bids []int) (int, sdz.Suit) {
 			trump = suit
 		}
 	}
-	return highestMeld + 5, trump
+	return int(highestMeld + 5), trump
 }
 
 func PlayHighest(hand *sdz.Hand, winningCard sdz.Card, leadSuit sdz.Suit, trump sdz.Suit) sdz.Card {

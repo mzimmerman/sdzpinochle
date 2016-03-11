@@ -24,7 +24,6 @@ type NamedPlay struct {
 }
 
 func main() {
-	sdz.Init()
 	bidding_strategies := []NamedBid{
 		NamedBid{"NeverBid", ai.NeverBid},
 		NamedBid{"MostMeld", ai.ChooseSuitWithMostMeld},
@@ -45,7 +44,7 @@ func main() {
 		win0 := 0
 		win1 := 0
 		fmt.Printf("%v vs %v\n", player1.Name, player2.Name)
-		for x := 0; x < 10000; x++ {
+		for x := 0; x < 1000; x++ {
 			winningPartnership, match := playMatch(player1, player2)
 			if winningPartnership == 0 {
 				win0++
