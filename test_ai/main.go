@@ -5,12 +5,15 @@ import (
 	sdz "github.com/mzimmerman/sdzpinochle"
 	ai "github.com/mzimmerman/sdzpinochle/ai"
 	"sort"
+	"time"
 )
 
 const (
-	winningScore   int  = 120
-	numberOfTricks int  = 12
-	debugLog       bool = false
+	winningScore      int  = 120
+	giveUpScore       int  = -500
+	numberOfTricks    int  = 12
+	debugLog          bool = false
+	matchesToSimulate int  = 1000
 )
 
 type NamedBid struct {
@@ -24,9 +27,17 @@ type NamedPlay struct {
 }
 
 func main() {
+	startTime := time.Now()
+	matchesSimulated := 0
 	bidding_strategies := []NamedBid{
 		NamedBid{"NeverBid", ai.NeverBid},
 		NamedBid{"MostMeld", ai.ChooseSuitWithMostMeld},
+	}
+	for x := 16; x <= 18; x++ {
+		bidding_strategies = append(
+			bidding_strategies,
+			NamedBid{fmt.Sprintf("MostMeldPlus%v", x), ai.MostMeldPlusX(x)},
+		)
 	}
 	playing_strategies := []NamedPlay{
 		NamedPlay{"PlayHighest", ai.PlayHighest},
@@ -41,15 +52,19 @@ func main() {
 	}
 	player1 := players[0]
 	for _, player2 := range players[1:] {
+		matchesSimulated += matchesToSimulate
 		win0 := 0
 		win1 := 0
 		fmt.Printf("%v vs %v\n", player1.Name, player2.Name)
-		for x := 0; x < 1000; x++ {
+		for x := 0; x < matchesToSimulate; x++ {
 			winningPartnership, match := playMatch(player1, player2)
 			if winningPartnership == 0 {
 				win0++
 			} else {
 				win1++
+			}
+			if debugLog && x%10 == 0 {
+				fmt.Printf("Current standings: %v - %v\n", win0, win1)
 			}
 			if debugLog {
 				fmt.Printf("Partnership %v won! %v\n", winningPartnership, match)
@@ -61,8 +76,14 @@ func main() {
 			player1 = player2
 		}
 	}
+	elapsedSeconds := time.Since(startTime).Seconds()
 	fmt.Printf("%v is the champ!\n", player1.Name)
-
+	fmt.Printf(
+		"%v matches simulated in %.f2 seconds\n",
+		matchesSimulated,
+		elapsedSeconds,
+	)
+	fmt.Printf("%.2f matches simulated per second.\n", float64(matchesSimulated)/elapsedSeconds)
 }
 
 func playMatch(player1, player2 ai.Player) (int, *ai.Match) {
@@ -83,11 +104,11 @@ func playMatch(player1, player2 ai.Player) (int, *ai.Match) {
 		bidder := playDeal(&match, x%4)
 		pOne := match.Partnerships[0]
 		pTwo := match.Partnerships[1]
-		if pOne.MatchScore > winningScore && pTwo.MatchScore > winningScore {
+		if pOne.MatchScore >= winningScore && pTwo.MatchScore >= winningScore {
 			winner = bidder % 2
-		} else if pOne.MatchScore > winningScore {
+		} else if pOne.MatchScore >= winningScore || pTwo.MatchScore <= giveUpScore {
 			winner = 0
-		} else if pTwo.MatchScore > winningScore {
+		} else if pTwo.MatchScore >= winningScore || pTwo.MatchScore <= giveUpScore {
 			winner = 1
 		}
 	}
@@ -138,9 +159,6 @@ func playDeal(match *ai.Match, dealer int) int {
 		if debugLog {
 			fmt.Println("deal scores after:", match.Partnerships[0].DealScore, match.Partnerships[1].DealScore)
 		}
-	}
-	if debugLog {
-		fmt.Println("Match before:", match)
 	}
 	match.Partnerships[0].SetDealScore()
 	match.Partnerships[1].SetDealScore()

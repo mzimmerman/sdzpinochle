@@ -72,7 +72,14 @@ func ChooseSuitWithMostMeld(hand *sdz.Hand, bids []int) (int, sdz.Suit) {
 			trump = suit
 		}
 	}
-	return int(highestMeld + 5), trump
+	return int(highestMeld), trump
+}
+
+func MostMeldPlusX(x int) BiddingStrategy {
+	return func(h *sdz.Hand, b []int) (int, sdz.Suit) {
+		meld, suit := ChooseSuitWithMostMeld(h, b)
+		return meld + x, suit
+	}
 }
 
 func PlayHighest(hand *sdz.Hand, winningCard sdz.Card, leadSuit sdz.Suit, trump sdz.Suit) sdz.Card {
