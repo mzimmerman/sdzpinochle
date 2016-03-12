@@ -4,6 +4,7 @@ import (
 	"fmt"
 	sdz "github.com/mzimmerman/sdzpinochle"
 	ai "github.com/mzimmerman/sdzpinochle/ai"
+	"runtime"
 	"sort"
 	"time"
 )
@@ -16,6 +17,15 @@ const (
 	matchesToSimulate int  = 1000
 )
 
+var oponents = make(chan Oponents)
+var results = make(chan Result)
+var numberOfMatchRunners = runtime.NumCPU()
+
+type Oponents struct {
+	player1 ai.Player
+	player2 ai.Player
+}
+
 type NamedBid struct {
 	Name string
 	Bid  ai.BiddingStrategy
@@ -26,9 +36,49 @@ type NamedPlay struct {
 	Play ai.PlayingStrategy
 }
 
+type Result struct {
+	playerOneWins int
+	playerTwoWins int
+}
+
 func main() {
 	startTime := time.Now()
+	createMatchRunners()
 	matchesSimulated := 0
+	players := createPlayers()
+
+	player1 := players[0]
+	for _, player2 := range players[1:] {
+		matchesSimulated += matchesToSimulate
+		fmt.Printf("%v vs %v\n", player1.Name, player2.Name)
+
+		var win1, win2 int
+		for x := 0; x < numberOfMatchRunners; x++ {
+			oponents <- Oponents{player1, player2}
+		}
+		for x := 0; x < numberOfMatchRunners; x++ {
+			result := <-results
+			win1 += result.playerOneWins
+			win2 += result.playerTwoWins
+		}
+
+		fmt.Printf("%v %v wins - %v %v wins\n", player1.Name, win1, player2.Name, win2)
+		if win2 > win1 {
+			// Winner stays
+			player1 = player2
+		}
+	}
+	elapsedSeconds := time.Since(startTime).Seconds()
+	fmt.Printf("%v is the champ!\n", player1.Name)
+	fmt.Printf(
+		"%v matches simulated in %.f2 seconds\n",
+		matchesSimulated,
+		elapsedSeconds,
+	)
+	fmt.Printf("%.2f matches simulated per second.\n", float64(matchesSimulated)/elapsedSeconds)
+}
+
+func createPlayers() []ai.Player {
 	bidding_strategies := []NamedBid{
 		NamedBid{"NeverBid", ai.NeverBid},
 		NamedBid{"MostMeld", ai.ChooseSuitWithMostMeld},
@@ -50,40 +100,36 @@ func main() {
 			players = append(players, ai.Player{fmt.Sprintf("%v:%v", b.Name, p.Name), b.Bid, p.Play})
 		}
 	}
-	player1 := players[0]
-	for _, player2 := range players[1:] {
-		matchesSimulated += matchesToSimulate
-		win0 := 0
+	return players
+}
+
+func createMatchRunners() {
+	for x := 0; x < numberOfMatchRunners; x++ {
+		go simulateMatches(matchesToSimulate / numberOfMatchRunners)
+	}
+}
+
+func simulateMatches(matchesToSimulate int) (int, int) {
+	for {
+		oponents := <-oponents
 		win1 := 0
-		fmt.Printf("%v vs %v\n", player1.Name, player2.Name)
+		win2 := 0
 		for x := 0; x < matchesToSimulate; x++ {
-			winningPartnership, match := playMatch(player1, player2)
+			winningPartnership, match := playMatch(oponents.player1, oponents.player2)
 			if winningPartnership == 0 {
-				win0++
-			} else {
 				win1++
+			} else {
+				win2++
 			}
 			if debugLog && x%10 == 0 {
-				fmt.Printf("Current standings: %v - %v\n", win0, win1)
+				fmt.Printf("Current standings: %v - %v\n", win1, win2)
 			}
 			if debugLog {
 				fmt.Printf("Partnership %v won! %v\n", winningPartnership, match)
 			}
 		}
-		fmt.Printf("%v %v wins - %v %v wins\n", player1.Name, win0, player2.Name, win1)
-		if win1 > win0 {
-			// Winner stays
-			player1 = player2
-		}
+		results <- Result{win1, win2}
 	}
-	elapsedSeconds := time.Since(startTime).Seconds()
-	fmt.Printf("%v is the champ!\n", player1.Name)
-	fmt.Printf(
-		"%v matches simulated in %.f2 seconds\n",
-		matchesSimulated,
-		elapsedSeconds,
-	)
-	fmt.Printf("%.2f matches simulated per second.\n", float64(matchesSimulated)/elapsedSeconds)
 }
 
 func playMatch(player1, player2 ai.Player) (int, *ai.Match) {
