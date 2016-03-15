@@ -2,6 +2,7 @@
 package server
 
 import (
+	"log"
 	"sort"
 
 	"github.com/mjibson/goon"
@@ -30,9 +31,7 @@ type testSuite struct {
 func (t *testSuite) TestGameMarshaller() {
 	game := NewGame(4)
 	data, err := json.Marshal(*game)
-	if err != nil {
-		t.T.Fatalf("Error %v marhsalling Game", err)
-	}
+	log.Fatalf("Error marshalling - %v", err)
 	expected := `{"HighBid":0,"HighPlayer":0,"Id":0,"Meld":"AAA=","Next":0,"Players":["","","",""],"Score":[0,0],"State":"new","Trump":"~"}`
 	t.Equal(string(data), expected)
 }
