@@ -4,8 +4,6 @@ package server
 import (
 	"testing"
 
-	. "github.com/mzimmerman/sdzpinochle"
-
 	//"strconv"
 )
 
@@ -771,31 +769,13 @@ import (
 //	}
 //}
 
-func TestGameWithBen(t *testing.T) {
+func TestGame(t *testing.T) {
 	game := NewGame(4)
-	game.Dealer = 0
-	game.Players[1] = createAI()
-
-	game.Players[1].SetHand(game, Hand{KD, QD, JD, JD, ND, TC, KC, QC, KH, NH, QS, NS}, 0, 1)
-	game.Players[2] = createAI()
-	game.Players[2].SetHand(game, Hand{AD, AD, KD, ND, NC, NC, TH, JH, AS, JS, JS, NS}, 0, 2)
-	game.Players[3] = createAI()
-	game.Players[3].SetHand(game, Hand{AC, AC, KC, JC, JC, TH, QH, QH, JH, AS, TS, KS}, 0, 3)
-	game.Players[0] = createAI()
-	game.Players[0].SetHand(game, Hand{TD, TD, QD, TC, QC, AH, AH, KH, NH, TS, KS, QS}, 0, 0)
-	game.Meld = make([]uint8, len(game.Players)/2)
-	game.CountMeld = make([]bool, len(game.Players)/2)
-	game.Counters = make([]uint8, len(game.Players)/2)
-	game.HighBid = 20
-	game.HighPlayer = game.Dealer
-	game.State = StateBid
-	game.Next = game.Dealer
-	//oright = game.Players[0].(*AI).HT
-	//Log(oright.Owner, "Start of game hands")
-	//oright.Debug()
-	game.inc() // so dealer's not the first to bid
-
-	game.processAction(game.Players[game.Next].Tell(game, CreateBid(0, game.Next)))
+	var err error
+	game, err = game.NextHand()
+	if err != nil {
+		t.Errorf("Unexpected error doing next hand - %v", err)
+	}
 }
 
 //func (t *testSuite) TestGame() {

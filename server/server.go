@@ -1361,6 +1361,7 @@ func (game *Game) processAction(action *Action) (*Game, error) {
 						game.Score[(game.HighPlayer+1)%2] += int16(game.Meld[(game.HighPlayer+1)%2] + game.Counters[(game.HighPlayer+1)%2])
 					}
 					// check the score for a winner
+					log.Printf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)
 					game.BroadcastAll(CreateMessage(fmt.Sprintf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)))
 					//Log(4, "Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)
 					win := make([]bool, 2)
@@ -1375,6 +1376,7 @@ func (game *Game) processAction(action *Action) (*Game, error) {
 					for x := 0; x < len(game.Players); x++ {
 						game.Players[x].Tell(game, CreateScore(game.Score, gameOver, win[x%2]))
 					}
+					log.Printf("Score = %v, GameOver=%t, win=%v", game.Score, gameOver, win)
 					if gameOver {
 						for _, player := range game.Players {
 							if _, ok := player.(*Human); ok {
