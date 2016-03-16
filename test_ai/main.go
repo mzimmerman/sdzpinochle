@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	sdz "github.com/mzimmerman/sdzpinochle"
-	ai "github.com/mzimmerman/sdzpinochle/ai"
 	"runtime"
 	"sort"
 	"time"
+
+	sdz "github.com/mzimmerman/sdzpinochle"
+	ai "github.com/mzimmerman/sdzpinochle/ai"
 )
 
 const (
@@ -17,11 +18,11 @@ const (
 	matchesToSimulate int  = 1000
 )
 
-var oponents = make(chan Oponents)
+var opponents = make(chan Opponents)
 var results = make(chan Result)
 var numberOfMatchRunners = runtime.NumCPU()
 
-type Oponents struct {
+type Opponents struct {
 	player1 ai.Player
 	player2 ai.Player
 }
@@ -54,7 +55,7 @@ func main() {
 
 		var win1, win2 int
 		for x := 0; x < numberOfMatchRunners; x++ {
-			oponents <- Oponents{player1, player2}
+			opponents <- Opponents{player1, player2}
 		}
 		for x := 0; x < numberOfMatchRunners; x++ {
 			result := <-results
@@ -111,7 +112,7 @@ func createMatchRunners() {
 
 func simulateMatches(matchesToSimulate int) (int, int) {
 	for {
-		oponents := <-oponents
+		oponents := <-opponents
 		win1 := 0
 		win2 := 0
 		for x := 0; x < matchesToSimulate; x++ {
