@@ -1,5 +1,5 @@
 // +build !appengine
-package server
+package main
 
 import (
 	"testing"
