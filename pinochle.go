@@ -372,6 +372,7 @@ type Action struct {
 	Score                   []int16
 	Dealer                  uint8
 	WinningPlayer           uint8
+	Option                  int
 }
 
 func (action *Action) String() string {
@@ -385,6 +386,7 @@ func (action *Action) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
+	action.Option = victim.Option
 	action.Amount = victim.Amount
 	action.Bid = victim.Bid
 	action.Message = victim.Message
@@ -425,6 +427,7 @@ type JSONAction struct {
 	Amount     uint8
 	Message    string
 	TableId    int64
+	Option     int
 }
 
 func (action *Action) MarshalJSON() ([]byte, error) {
@@ -458,6 +461,14 @@ func (action *Action) MarshalJSON() ([]byte, error) {
 		}
 	}
 	return json.Marshal(data)
+}
+
+func CreateGame(option int) *Action {
+	return &Action{Type: "Game", Option: option}
+}
+
+func CreateHello(m string) *Action {
+	return &Action{Type: "Hello", Message: m}
 }
 
 func CreateName() *Action {

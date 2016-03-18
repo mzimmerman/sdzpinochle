@@ -1115,6 +1115,7 @@ func NewGame(players int) *Game {
 
 // PRE : Players are already created and set
 func (game *Game) NextHand() (*Game, error) {
+	log.Printf("Game players = %v", game.Players)
 	game.Meld = make([]uint8, len(game.Players)/2)
 	game.Trick = Trick{}
 	game.CountMeld = make([]bool, len(game.Players)/2)
@@ -1123,7 +1124,7 @@ func (game *Game) NextHand() (*Game, error) {
 	game.HighPlayer = game.Dealer
 	game.State = StateBid
 	game.Next = game.Dealer
-	//Log(4, "Dealer is %d", game.Dealer)
+	Log(4, "Dealer is %d", game.Dealer)
 	deck := CreateDeck()
 	deck.Shuffle()
 	hands := deck.Deal()
@@ -1139,6 +1140,8 @@ func (game *Game) NextHand() (*Game, error) {
 }
 
 func (game *Game) inc() uint8 {
+	log.Printf("game.Next == %d", game.Next)
+	log.Printf("game.Players = %d", len(game.Players))
 	return (game.Next + 1) % uint8(len(game.Players))
 }
 
@@ -1431,42 +1434,43 @@ func (h *Human) Listen() (action *Action, open bool) {
 		Log(h.Playerid, "Error receiving action from human - %v", err)
 		return nil, false
 	}
+	Log(h.Playerid, "Received action %s", action)
 	return action, true
 
 }
 
 func (h *Human) createGame(option int, cp *ConnectionPool) {
 	game := new(Game)
-	players := make([]Player, 4)
+	game.Players = make([]Player, 4)
 	// connect players
-	players[0] = h
+	game.Players[0] = h
 	switch option {
 	case 1:
 		// Option 1 - Play against three AI players and start immediately
 		for x := 1; x < 4; x++ {
-			players[x] = createAI()
+			game.Players[x] = createAI()
 		}
 	case 2:
 		// Option 2 - Play with a human partner against two AI players
-		players[1] = createAI()
-		players[2] = cp.Pop()
-		players[3] = createAI()
+		game.Players[1] = createAI()
+		game.Players[2] = cp.Pop()
+		game.Players[3] = createAI()
 	case 3:
 		// Option 3 - Play with a human partner against one AI players and 1 Human
-		players[1] = createAI()
-		players[2] = cp.Pop()
-		players[3] = cp.Pop()
+		game.Players[1] = createAI()
+		game.Players[2] = cp.Pop()
+		game.Players[3] = cp.Pop()
 
 	case 4:
 		// Option 4 - Play with a human partner against two humans
 		for x := 1; x < 4; x++ {
-			players[x] = cp.Pop()
+			game.Players[x] = cp.Pop()
 		}
 	case 5:
 		// Option 5 - Play against a human with AI partners
-		players[1] = cp.Pop()
-		players[2] = createAI()
-		players[3] = createAI()
+		game.Players[1] = cp.Pop()
+		game.Players[2] = createAI()
+		game.Players[3] = createAI()
 	}
 	var err error
 	game, err = game.NextHand()
@@ -1492,9 +1496,13 @@ func setupGame(net *net.Conn, cp *ConnectionPool) {
 	for {
 		for {
 			human.Tell(CreateMessage("Do you want to join a game, create a new game, or quit? (join, create, quit)"))
-			action := CreateMessage("Hello")
+			action := CreateHello("Hello")
 			human.Tell(action)
-			action, _ = human.Listen()
+			action, ok := human.Listen()
+			if !ok {
+				Log(4, "Error receiving message from human")
+				return
+			}
 			if action.Message == "create" {
 				break
 			} else if action.Message == "join" {
@@ -1515,25 +1523,20 @@ func setupGame(net *net.Conn, cp *ConnectionPool) {
 			human.Tell(CreateMessage("Option 4 - Play with a human partner against two humans"))
 			human.Tell(CreateMessage("Option 5 - Play against a human with AI partners"))
 			human.Tell(CreateMessage("Option 6 - Go back"))
-			human.Tell(CreateMessage("prompt"))
-			human.Listen()
-			//			switch action.Option {
-			//			case 1:
-			//				fallthrough
-			//			case 2:
-			//				fallthrough
-			//			case 3:
-			//				fallthrough
-			//			case 4:
-			//				fallthrough
-			//			case 5:
-			human.createGame(1, cp)
-			//			case 6:
-			//				break
-			//			default:
-			//				human.Tell(CreateMessage("Not a valid option"))
-			//			}
-			break // after their game is over, let's set them up again'
+			human.Tell(CreateGame(0))
+			if action, ok := human.Listen(); ok {
+				switch action.Option {
+				case 1, 2, 3, 4, 5:
+					human.createGame(1, cp)
+				case 6:
+					break
+				default:
+					human.Tell(CreateMessage("Not a valid option"))
+				}
+				break // after their game is over, let's set them up again
+			} else {
+				return
+			}
 		}
 	}
 }

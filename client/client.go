@@ -14,6 +14,7 @@ import (
 )
 
 func send(conn net.Conn, action *sdz.Action) {
+	sdz.Log(4, "Sending action")
 	jsonData, err := json.Marshal(action)
 	if err != nil {
 		sdz.Log(4, "Error encoding action - %v", err)
@@ -22,6 +23,7 @@ func send(conn net.Conn, action *sdz.Action) {
 	if err != nil {
 		sdz.Log(4, "Error sending action - %v", err)
 	}
+	sdz.Log(4, "Sent action - %s", jsonData)
 }
 
 func main() {
@@ -119,15 +121,15 @@ func main() {
 			sdz.Log(playerid, "Player %d is melding %s for %d points", action.Playerid, action.Hand, action.Amount)
 		case "Score": // this client does not have to implement this type as it's already told through Message actions
 		case "Message":
-			sdz.Log(playerid, action.Message)
+			sdz.Log(playerid, "message! - "+action.Message)
 		case "Hello":
 			var response string
 			fmt.Scan(&response)
-			send(conn, sdz.CreateMessage(response))
+			send(conn, sdz.CreateHello(response))
 		case "Game":
 			var option int
 			fmt.Scan(&option)
-			send(conn, sdz.CreateMessage("option"))
+			send(conn, sdz.CreateGame(option))
 		default:
 			sdz.Log(playerid, "Received an action I didn't understand - %v", action)
 		}
