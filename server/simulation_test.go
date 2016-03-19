@@ -7,32 +7,29 @@ import (
 	"time"
 
 	sdz "github.com/mzimmerman/sdzpinochle"
-	ai "github.com/mzimmerman/sdzpinochle/ai"
-	server "github.com/mzimmerman/sdzpinochle/server"
 )
 
 const (
 	winningScore       int  = 120
 	giveUpScore        int  = -500
 	numberOfTricks     int  = 12
-	debugLog           bool = false
 	simulateWithServer bool = false
 )
 
 type Opponents struct {
-	player1 ai.Player
-	player2 ai.Player
+	player1 Player
+	player2 Player
 }
 
 type NamedBid struct {
 	Name string
-	Bid  server.BiddingStrategy
+	Bid  BiddingStrategy
 }
 
 type NamedPlay struct {
 	Name   string
-	Play   ai.PlayingStrategy
-	HTPlay server.HTPlayingStrategy
+	Play   PlayingStrategy
+	HTPlay HTPlayingStrategy
 }
 
 type Result struct {
@@ -40,7 +37,7 @@ type Result struct {
 	playerTwoWins int
 }
 
-type matchPlayer func(player1, player2 ai.Player) uint8
+type matchPlayer func(player1, player2 Player) uint8
 
 func main() {
 	var numberOfMatchRunners int
@@ -103,36 +100,36 @@ func PlayNone(hand *sdz.Hand, winningCard sdz.Card, leadSuit sdz.Suit, trump sdz
 	return sdz.AD
 }
 
-func createPlayers() []ai.Player {
+func createPlayers() []Player {
 	biddingStrategies := []NamedBid{
-		NamedBid{"NeverBid", ai.NeverBid},
-		NamedBid{"MostMeld", ai.ChooseSuitWithMostMeld},
-		NamedBid{fmt.Sprintf("MostMeldPlus%v", 18), ai.MostMeldPlusX(18)},
-		NamedBid{"MattBid", server.MattBid},
+		NamedBid{"NeverBid", NeverBid},
+		NamedBid{"MostMeld", ChooseSuitWithMostMeld},
+		NamedBid{fmt.Sprintf("MostMeldPlus%v", 18), MostMeldPlusX(18)},
+		NamedBid{"MattBid", MattBid},
 	}
 	for x := 16; x <= 18; x++ {
 		/*
 			biddingStrategies = append(
 				biddingStrategies,
-				NamedBid{fmt.Sprintf("MostMeldPlus%v", x), ai.MostMeldPlusX(uint8(x))},
+				NamedBid{fmt.Sprintf("MostMeldPlus%v", x), MostMeldPlusX(uint8(x))},
 			)
 		*/
 	}
 	playingStrategies := []NamedPlay{
-		NamedPlay{"PlayHighest", ai.PlayHighest, createHTPlayingStrategy(ai.PlayHighest)},
-		NamedPlay{"PlayRandom", ai.PlayRandom, createHTPlayingStrategy(ai.PlayRandom)},
-		NamedPlay{"PlayLowest", ai.PlayLowest, createHTPlayingStrategy(ai.PlayLowest)},
+		NamedPlay{"PlayHighest", PlayHighest, createHTPlayingStrategy(PlayHighest)},
+		NamedPlay{"PlayRandom", PlayRandom, createHTPlayingStrategy(PlayRandom)},
+		NamedPlay{"PlayLowest", PlayLowest, createHTPlayingStrategy(PlayLowest)},
 	}
 	if simulateWithServer {
 		playingStrategies = append(
 			playingStrategies,
-			NamedPlay{"MattPlay", PlayNone, server.PlayHandWithCard},
+			NamedPlay{"MattPlay", PlayNone, PlayHandWithCard},
 		)
 	}
-	players := make([]ai.Player, 0)
+	players := make([]Player, 0)
 	for _, b := range biddingStrategies {
 		for _, p := range playingStrategies {
-			players = append(players, ai.Player{
+			players = append(players, Player{
 				fmt.Sprintf("%v:%v", b.Name, p.Name), b.Bid, p.Play, p.HTPlay,
 			})
 		}
@@ -172,7 +169,7 @@ func simulateMatches(
 	}
 }
 
-func handFromHT(ht *server.HandTracker) *sdz.Hand {
+func handFromHT(ht *HandTracker) *sdz.Hand {
 	hand := make(sdz.Hand, 0)
 	for x := 1; x < 25; x++ {
 		if ht.Cards[ht.Trick.Next][x] > 0 {
@@ -182,27 +179,27 @@ func handFromHT(ht *server.HandTracker) *sdz.Hand {
 	return &hand
 }
 
-func createHTPlayingStrategy(ps ai.PlayingStrategy) server.HTPlayingStrategy {
-	return func(ht *server.HandTracker, t sdz.Suit) sdz.Card {
+func createHTPlayingStrategy(ps PlayingStrategy) HTPlayingStrategy {
+	return func(ht *HandTracker, t sdz.Suit) sdz.Card {
 		return ps(handFromHT(ht), ht.Trick.WinningCard(), ht.Trick.LeadSuit(), t)
 	}
 }
 
-func playServerMatch(player1, player2 ai.Player) uint8 {
-	game := server.NewGame(4)
+func playServerMatch(player1, player2 Player) uint8 {
+	game := NewGame(4)
 	game.Dealer = 0
 
 	deck := sdz.CreateDeck()
 	deck.Shuffle()
 	hands := deck.Deal()
 	for x := uint8(0); x < 4; x++ {
-		ai := server.CreateAI()
+		ai := CreateAI()
 		if x%2 == 0 {
-			ai.BiddingStrategy = player1.Bid
-			ai.PlayingStrategy = player1.HTPlay
+			BiddingStrategy = player1.Bid
+			PlayingStrategy = player1.HTPlay
 		} else {
-			ai.BiddingStrategy = player2.Bid
-			ai.PlayingStrategy = player2.HTPlay
+			BiddingStrategy = player2.Bid
+			PlayingStrategy = player2.HTPlay
 		}
 		game.Players[x] = ai
 		game.Players[x].SetHand(game, hands[x], 0, x)
@@ -212,7 +209,7 @@ func playServerMatch(player1, player2 ai.Player) uint8 {
 	game.Counters = make([]uint8, len(game.Players)/2)
 	game.HighBid = 20
 	game.HighPlayer = game.Dealer
-	game.State = server.StateBid
+	game.State = StateBid
 	game.Next = game.Dealer
 	//oright = game.Players[0].(*AI).HT
 	//Log(oright.Owner, "Start of game hands")
@@ -223,8 +220,8 @@ func playServerMatch(player1, player2 ai.Player) uint8 {
 	return game.WinningPartnership
 }
 
-func playMatch(player1, player2 ai.Player) uint8 {
-	var players [4]ai.Player
+func playMatch(player1, player2 Player) uint8 {
+	var players [4]Player
 	for x := 0; x < 4; x++ {
 		if x%2 == 0 {
 			players[x] = player1
@@ -232,8 +229,8 @@ func playMatch(player1, player2 ai.Player) uint8 {
 			players[x] = player2
 		}
 	}
-	match := ai.Match{
-		Partnerships: new([2]ai.Partnership),
+	match := Match{
+		Partnerships: new([2]Partnership),
 		Players:      players,
 	}
 	winner := -1
@@ -255,7 +252,7 @@ func playMatch(player1, player2 ai.Player) uint8 {
 	return uint8(winner)
 }
 
-func playDeal(match *ai.Match, dealer int) int {
+func playDeal(match *Match, dealer int) int {
 	deck := sdz.CreateDeck()
 	deck.Shuffle()
 	hands := deck.Deal()
@@ -309,7 +306,7 @@ func playDeal(match *ai.Match, dealer int) int {
 	return playerWithBid
 }
 
-func playHand(match *ai.Match, playerWithLead int, trump sdz.Suit) (int, sdz.Hand) {
+func playHand(match *Match, playerWithLead int, trump sdz.Suit) (int, sdz.Hand) {
 	winningCard := sdz.NACard
 	winningPlayer := playerWithLead
 	leadSuit := sdz.NASuit
@@ -339,7 +336,7 @@ func playHand(match *ai.Match, playerWithLead int, trump sdz.Suit) (int, sdz.Han
 	return winningPlayer, trick
 }
 
-func bid(match *ai.Match, dealer int) (uint8, int, sdz.Suit) {
+func bid(match *Match, dealer int) (uint8, int, sdz.Suit) {
 	var highBid uint8 = 20
 	var highBidder int = dealer
 	var trump sdz.Suit
