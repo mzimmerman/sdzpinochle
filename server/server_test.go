@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	. "github.com/mzimmerman/sdzpinochle"
-
 	//"strconv"
 )
 
@@ -774,14 +773,14 @@ import (
 func TestGameWithBen(t *testing.T) {
 	game := NewGame(4)
 	game.Dealer = 0
-	game.Players[1] = createAI()
+	game.Players[1] = CreateAI()
 
 	game.Players[1].SetHand(game, Hand{KD, QD, JD, JD, ND, TC, KC, QC, KH, NH, QS, NS}, 0, 1)
-	game.Players[2] = createAI()
+	game.Players[2] = CreateAI()
 	game.Players[2].SetHand(game, Hand{AD, AD, KD, ND, NC, NC, TH, JH, AS, JS, JS, NS}, 0, 2)
-	game.Players[3] = createAI()
+	game.Players[3] = CreateAI()
 	game.Players[3].SetHand(game, Hand{AC, AC, KC, JC, JC, TH, QH, QH, JH, AS, TS, KS}, 0, 3)
-	game.Players[0] = createAI()
+	game.Players[0] = CreateAI()
 	game.Players[0].SetHand(game, Hand{TD, TD, QD, TC, QC, AH, AH, KH, NH, TS, KS, QS}, 0, 0)
 	game.Meld = make([]uint8, len(game.Players)/2)
 	game.CountMeld = make([]bool, len(game.Players)/2)
