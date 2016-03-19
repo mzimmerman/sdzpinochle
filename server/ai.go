@@ -11,13 +11,6 @@ type PlayingStrategy func(h *sdz.Hand, c sdz.Card, l sdz.Suit, t sdz.Suit) sdz.C
 type BiddingStrategy func(h *sdz.Hand, bids []uint8) (uint8, sdz.Suit, sdz.Hand)
 type HTPlayingStrategy func(ht *HandTracker, t sdz.Suit) sdz.Card
 
-type AIPlayer struct {
-	Name   string
-	Bid    BiddingStrategy
-	Play   PlayingStrategy
-	HTPlay HTPlayingStrategy
-}
-
 type Partnership struct {
 	MatchScore    int
 	DealScore     int
@@ -35,14 +28,6 @@ func (p *Partnership) GetDealScore() int {
 
 func (p *Partnership) SetDealScore() {
 	p.MatchScore += p.GetDealScore()
-}
-
-type Match struct {
-	Partnerships *[2]Partnership
-	// Players 0 and 2 belong to partnership 0 and Players 1 and 3 belong to partnership 1
-	Players [4]Player
-	// Players have the hand in the same position: Player 0 has hand 0
-	Hands [4]sdz.Hand
 }
 
 func (m *Match) SetMeld(trump sdz.Suit) {

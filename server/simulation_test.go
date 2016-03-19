@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"runtime"
 	"sort"
+	"testing"
 	"time"
 
 	sdz "github.com/mzimmerman/sdzpinochle"
@@ -17,8 +18,8 @@ const (
 )
 
 type Opponents struct {
-	player1 Player
-	player2 Player
+	player1 AIPlayer
+	player2 AIPlayer
 }
 
 type NamedBid struct {
@@ -37,9 +38,17 @@ type Result struct {
 	playerTwoWins int
 }
 
-type matchPlayer func(player1, player2 Player) uint8
+type matchPlayer func(player1, player2 AIPlayer) uint8
 
-func main() {
+type Match struct {
+	Partnerships *[2]Partnership
+	// Players 0 and 2 belong to partnership 0 and Players 1 and 3 belong to partnership 1
+	Players [4]AIPlayer
+	// Players have the hand in the same position: Player 0 has hand 0
+	Hands [4]sdz.Hand
+}
+
+func BenchmarkSimulation(b *testing.B) {
 	var numberOfMatchRunners int
 	var matchesToSimulate int
 	var matchPlayer matchPlayer
@@ -100,7 +109,7 @@ func PlayNone(hand *sdz.Hand, winningCard sdz.Card, leadSuit sdz.Suit, trump sdz
 	return sdz.AD
 }
 
-func createPlayers() []Player {
+func createPlayers() []AIPlayer {
 	biddingStrategies := []NamedBid{
 		NamedBid{"NeverBid", NeverBid},
 		NamedBid{"MostMeld", ChooseSuitWithMostMeld},
@@ -126,15 +135,22 @@ func createPlayers() []Player {
 			NamedPlay{"MattPlay", PlayNone, PlayHandWithCard},
 		)
 	}
-	players := make([]Player, 0)
+	players := make([]AIPlayer, 0)
 	for _, b := range biddingStrategies {
 		for _, p := range playingStrategies {
-			players = append(players, Player{
+			players = append(players, AIPlayer{
 				fmt.Sprintf("%v:%v", b.Name, p.Name), b.Bid, p.Play, p.HTPlay,
 			})
 		}
 	}
 	return players
+}
+
+type AIPlayer struct {
+	Name   string
+	Bid    BiddingStrategy
+	Play   PlayingStrategy
+	HTPlay HTPlayingStrategy
 }
 
 func createMatchRunners(
@@ -185,7 +201,7 @@ func createHTPlayingStrategy(ps PlayingStrategy) HTPlayingStrategy {
 	}
 }
 
-func playServerMatch(player1, player2 Player) uint8 {
+func playServerMatch(player1, player2 AIPlayer) uint8 {
 	game := NewGame(4)
 	game.Dealer = 0
 
@@ -195,14 +211,14 @@ func playServerMatch(player1, player2 Player) uint8 {
 	for x := uint8(0); x < 4; x++ {
 		ai := CreateAI()
 		if x%2 == 0 {
-			BiddingStrategy = player1.Bid
-			PlayingStrategy = player1.HTPlay
+			ai.BiddingStrategy = player1.Bid
+			ai.PlayingStrategy = player1.HTPlay
 		} else {
-			BiddingStrategy = player2.Bid
-			PlayingStrategy = player2.HTPlay
+			ai.BiddingStrategy = player2.Bid
+			ai.PlayingStrategy = player2.HTPlay
 		}
 		game.Players[x] = ai
-		game.Players[x].SetHand(game, hands[x], 0, x)
+		game.Players[x].SetHand(hands[x], 0, x)
 	}
 	game.Meld = make([]uint8, len(game.Players)/2)
 	game.CountMeld = make([]bool, len(game.Players)/2)
@@ -216,12 +232,12 @@ func playServerMatch(player1, player2 Player) uint8 {
 	//oright.Debug()
 	game.Inc() // so dealer's not the first to bid
 
-	game.ProcessAction(game.Players[game.Next].Tell(game, sdz.CreateBid(0, game.Next)))
+	game.ProcessAction(game.Players[game.Next].Tell(sdz.CreateBid(0, game.Next)))
 	return game.WinningPartnership
 }
 
-func playMatch(player1, player2 Player) uint8 {
-	var players [4]Player
+func playMatch(player1, player2 AIPlayer) uint8 {
+	var players [4]AIPlayer
 	for x := 0; x < 4; x++ {
 		if x%2 == 0 {
 			players[x] = player1
