@@ -64,11 +64,11 @@ func BenchmarkSimulation(b *testing.B) {
 		matchPlayer = playMatch
 	}
 
-	opponents := make(chan Opponents, numberOfMatchRunners)
+	opponentsChan := make(chan Opponents, numberOfMatchRunners)
 	results := make(chan Result, numberOfMatchRunners)
 	createMatchRunners(
 		numberOfMatchRunners, matchesToSimulate,
-		matchPlayer, opponents, results,
+		matchPlayer, opponentsChan, results,
 	)
 	matchesSimulated := 0
 	players := createPlayers()
@@ -80,7 +80,7 @@ func BenchmarkSimulation(b *testing.B) {
 
 		var win1, win2 int
 		for x := 0; x < numberOfMatchRunners; x++ {
-			opponents <- Opponents{player1, player2}
+			opponentsChan <- Opponents{player1, player2}
 		}
 		for x := 0; x < numberOfMatchRunners; x++ {
 			result := <-results
@@ -198,19 +198,19 @@ type AIPlayer struct {
 
 func createMatchRunners(
 	numberOfMatchRunners, matchesToSimulate int,
-	matchPlayer matchPlayer, opponents chan Opponents, results chan Result) {
+	matchPlayer matchPlayer, opponentsChan chan Opponents, results chan Result) {
 	for x := 0; x < numberOfMatchRunners; x++ {
 		go simulateMatches(
 			matchesToSimulate/numberOfMatchRunners, matchPlayer,
-			opponents, results)
+			opponentsChan, results)
 	}
 }
 
 func simulateMatches(
 	matchesToSimulate int, matchPlayer matchPlayer,
-	opponents chan Opponents, results chan Result) (int, int) {
+	opponentsChan chan Opponents, results chan Result) (int, int) {
 	for {
-		opponents := <-opponents
+		opponents := <-opponentsChan
 		win1 := 0
 		win2 := 0
 		for x := 0; x < matchesToSimulate; x++ {
