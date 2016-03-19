@@ -768,6 +768,9 @@ import (
 //}
 
 func TestGame(t *testing.T) {
+	if testing.Short() {
+		return
+	}
 	game := NewGame(4)
 	var err error
 	game, err = game.NextHand()

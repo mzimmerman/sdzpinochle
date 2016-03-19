@@ -14,7 +14,7 @@ const (
 	winningScore       int  = 120
 	giveUpScore        int  = -500
 	numberOfTricks     int  = 12
-	simulateWithServer bool = false
+	simulateWithServer bool = true
 )
 
 type Opponents struct {
@@ -109,6 +109,49 @@ func PlayNone(hand *sdz.Hand, winningCard sdz.Card, leadSuit sdz.Suit, trump sdz
 	return sdz.AD
 }
 
+func playHandWithCardCheap(ht *HandTracker, trump sdz.Suit) sdz.Card {
+	tierSlice := make([][]*PlayWalker, 48-ht.PlayCount+2)
+	length := int(ht.calculateHand(ht.Owner))
+	// TODO: update length to be the count of "unknown" cards in the HandTracker
+	tierSlice[0] = make([]*PlayWalker, length)
+	for x := 0; x < length; x++ {
+		tierSlice[0][x] = &PlayWalker{
+			Hands:     ht.Deal(),
+			Card:      sdz.NACard,
+			Trick:     new(Trick),
+			PlayCount: ht.PlayCount,
+			Me:        ht.Owner,
+			TeamCards: [2]*sdz.SmallHand{sdz.NewSmallHand(), sdz.NewSmallHand()},
+		}
+		*tierSlice[0][x].Trick = *ht.Trick
+	}
+	end := time.Now().Add(time.Millisecond * 500)
+	var pw *PlayWalker
+tierLoop:
+	for tier := 0; tier < len(tierSlice); tier++ {
+		//Log(ht.Owner, "Working on tier %d", tier)
+		if tierSlice[tier] == nil {
+			tierSlice[tier] = make([]*PlayWalker, 0)
+		}
+		for _, pw = range tierSlice[tier] {
+			if time.Now().After(end) {
+				break tierLoop // ran out of time generating tricks, calculate results
+			}
+			//Log(ht.Owner, "Evaluating pw = %#v", pw)
+			decisionMap := pw.potentialCards(pw.Trick, trump)
+			if len(decisionMap) == 0 {
+				if pw.PlayCount != 48 {
+					panic("hand is at the end but 48 plays haven't been made!")
+				}
+				//Log(ht.Owner, "************** Hand is at the end! - %s", pw.PlayTrail())
+				continue // no need to make children and append them if they don't exist!
+			}
+			return decisionMap[0]
+		}
+	} // if end==false, we generated all the possibilities
+	panic("test failed")
+}
+
 func createPlayers() []AIPlayer {
 	biddingStrategies := []NamedBid{
 		NamedBid{"NeverBid", NeverBid},
@@ -132,7 +175,7 @@ func createPlayers() []AIPlayer {
 	if simulateWithServer {
 		playingStrategies = append(
 			playingStrategies,
-			NamedPlay{"MattPlay", PlayNone, PlayHandWithCard},
+			NamedPlay{"MattPlay", PlayNone, playHandWithCardCheap},
 		)
 	}
 	players := make([]AIPlayer, 0)

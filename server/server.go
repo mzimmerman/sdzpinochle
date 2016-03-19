@@ -931,7 +931,6 @@ func NewGame(players int) *Game {
 
 // PRE : Players are already created and set
 func (game *Game) NextHand() (*Game, error) {
-	log.Printf("Game players = %v", game.Players)
 	game.Meld = make([]uint8, len(game.Players)/2)
 	game.Trick = Trick{}
 	game.CountMeld = make([]bool, len(game.Players)/2)
