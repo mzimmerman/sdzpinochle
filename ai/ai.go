@@ -3,30 +3,31 @@ package ai
 import (
 	"fmt"
 	sdz "github.com/mzimmerman/sdzpinochle"
+	server "github.com/mzimmerman/sdzpinochle/server"
 	"math/rand"
 )
 
-type BiddingStrategy func(h *sdz.Hand, bids []int) (int, sdz.Suit)
 type PlayingStrategy func(h *sdz.Hand, c sdz.Card, l sdz.Suit, t sdz.Suit) sdz.Card
 
 type Player struct {
-	Name string
-	Bid  BiddingStrategy
-	Play PlayingStrategy
+	Name   string
+	Bid    server.BiddingStrategy
+	Play   PlayingStrategy
+	HTPlay server.HTPlayingStrategy
 }
 
 type Partnership struct {
 	MatchScore    int
 	DealScore     int
 	HasTakenTrick bool
-	Bid           int
+	Bid           uint8
 }
 
 func (p *Partnership) GetDealScore() int {
-	if p.HasTakenTrick && p.DealScore >= p.Bid {
+	if p.HasTakenTrick && p.DealScore >= int(p.Bid) {
 		return p.DealScore
 	} else {
-		return -1 * p.Bid
+		return -1 * int(p.Bid)
 	}
 }
 
@@ -55,30 +56,32 @@ func (m *Match) String() string {
 	return fmt.Sprintf("Score: %v - %v", m.Partnerships[0].MatchScore, m.Partnerships[1].MatchScore)
 }
 
-var BiddingStrategys = []BiddingStrategy{NeverBid}
-var PlayingStrategys = []PlayingStrategy{PlayRandom}
-
-func NeverBid(hand *sdz.Hand, bids []int) (int, sdz.Suit) {
-	return 0, sdz.Hearts
+func NeverBid(hand *sdz.Hand, bids []uint8) (uint8, sdz.Suit, sdz.Hand) {
+	return 20, sdz.Hearts, *hand
 }
 
-func ChooseSuitWithMostMeld(hand *sdz.Hand, bids []int) (int, sdz.Suit) {
+func ChooseSuitWithMostMeld(hand *sdz.Hand, bids []uint8) (uint8, sdz.Suit, sdz.Hand) {
 	var highestMeld uint8 = 0
 	var trump sdz.Suit
+	var showMeld sdz.Hand
 	for _, suit := range sdz.Suits {
-		meld, _ := hand.Meld(suit)
+		meld, show := hand.Meld(suit)
 		if meld > highestMeld {
 			highestMeld = meld
 			trump = suit
+			showMeld = show
 		}
 	}
-	return int(highestMeld), trump
+	if highestMeld < 20 {
+		highestMeld = 20
+	}
+	return highestMeld, trump, showMeld
 }
 
-func MostMeldPlusX(x int) BiddingStrategy {
-	return func(h *sdz.Hand, b []int) (int, sdz.Suit) {
-		meld, suit := ChooseSuitWithMostMeld(h, b)
-		return meld + x, suit
+func MostMeldPlusX(x uint8) server.BiddingStrategy {
+	return func(h *sdz.Hand, b []uint8) (uint8, sdz.Suit, sdz.Hand) {
+		meld, suit, show := ChooseSuitWithMostMeld(h, b)
+		return meld + x, suit, show
 	}
 }
 

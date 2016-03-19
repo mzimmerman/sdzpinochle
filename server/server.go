@@ -21,6 +21,7 @@ const (
 	StateMeld  = "meld"
 	StatePlay  = "play"
 	cookieName = "sdzpinochle"
+	debugLog   = false
 	Nothing    = iota
 	TrumpLose
 	TrumpWin
@@ -43,6 +44,9 @@ func init() {
 	htstack = &hts
 	rand.Seed(0)
 }
+
+type BiddingStrategy func(h *Hand, bids []uint8) (uint8, Suit, Hand)
+type HTPlayingStrategy func(ht *HandTracker, t Suit) Card
 
 func getHand() Hand {
 	var h Hand
@@ -172,8 +176,9 @@ func (ht *HandTracker) PlayCard(card Card, trump Suit) {
 	//Log(ht.Owner, "In ht.PlayCard for %d-%s on player %d", playerid, card, ht.Owner)
 	val := ht.Cards[playerid][card]
 	if val == None {
-		ht.Debug()
+		fmt.Println("\n\n\nCard", card)
 		Log(ht.Owner, "Player %d does not have card %s, panicking", playerid, card)
+		ht.Debug()
 		panic("panic")
 	}
 	ht.PlayedCards.inc(card)
@@ -206,24 +211,24 @@ func (ht *HandTracker) PlayCard(card Card, trump Suit) {
 	//}
 	ht.Trick.PlayCard(card, trump)
 	switch {
-	case ht.Trick.leadSuit() == NASuit || trump == NASuit:
+	case ht.Trick.LeadSuit() == NASuit || trump == NASuit:
 		// do nothing, start of the trick, everything is legal
-	case card.Suit() != ht.Trick.leadSuit() && card.Suit() != trump: // couldn't follow suit, couldn't lay trump
+	case card.Suit() != ht.Trick.LeadSuit() && card.Suit() != trump: // couldn't follow suit, couldn't lay trump
 		ht.noSuit(playerid, trump)
 		//if oright == ht && playerid == 1 {
 		//	Log(ht.Owner, "Setting all %s to None for playerid=%d", trump, playerid)
 		//}
 		fallthrough
-	case card.Suit() != ht.Trick.leadSuit(): // couldn't follow suit
-		ht.noSuit(playerid, ht.Trick.leadSuit())
+	case card.Suit() != ht.Trick.LeadSuit(): // couldn't follow suit
+		ht.noSuit(playerid, ht.Trick.LeadSuit())
 		//if oright == ht && playerid == 1 {
-		//	Log(ht.Owner, "Setting all %s to None for playerid=%d", trick.leadSuit(), playerid)
+		//	Log(ht.Owner, "Setting all %s to None for playerid=%d", trick.LeadSuit(), playerid)
 		//}
 	}
 	if playerid != ht.Trick.WinningPlayer { // did not win
 		for _, f := range Faces {
 			tempCard := CreateCard(card.Suit(), f)
-			if tempCard.Beats(ht.Trick.winningCard(), trump) {
+			if tempCard.Beats(ht.Trick.WinningCard(), trump) {
 				//if oright == ht && playerid == 1 {
 				//Log(ht.Owner, "Setting %s to None for playerid=%d because it could have won", tempCard, playerid)
 				//}
@@ -374,12 +379,15 @@ func (ht *HandTracker) calculateCard(cardIndex Card) {
 }
 
 type AI struct {
-	RealHand   *Hand
-	Trump      Suit
-	BidAmount  uint8
-	HighBid    uint8
-	HighBidder uint8
-	NumBidders uint8
+	RealHand        *Hand
+	Trump           Suit
+	BiddingStrategy BiddingStrategy
+	PlayingStrategy HTPlayingStrategy
+	BidAmount       uint8
+	HighBid         uint8
+	HighBidder      uint8
+	NumBidders      uint8
+	Bids            []uint8
 	PlayerImpl
 	HT *HandTracker
 }
@@ -403,16 +411,18 @@ func (a *AI) reset() {
 	a.HT.reset(a.Playerid)
 }
 
-func createAI() (a *AI) {
+func CreateAI() (a *AI) {
 	a = new(AI)
 	a.reset()
+	a.BiddingStrategy = MattBid
+	a.PlayingStrategy = PlayHandWithCard
 	return a
 }
 
-func (ai AI) powerBid(suit Suit) (count uint8) {
+func powerBid(realHand *Hand, suit Suit) (count uint8) {
 	count = 5 // your partner's good for at least this right?!?
 	suitMap := make(map[Suit]int)
-	for _, card := range *ai.RealHand {
+	for _, card := range *realHand {
 		suitMap[card.Suit()]++
 		if card.Suit() == suit {
 			switch card.Face() {
@@ -447,10 +457,14 @@ func (ai AI) powerBid(suit Suit) (count uint8) {
 }
 
 func (ai AI) calculateBid() (amount uint8, trump Suit, show Hand) {
+	return ai.BiddingStrategy(ai.RealHand, ai.Bids)
+}
+
+func MattBid(realHand *Hand, prevBids []uint8) (amount uint8, trump Suit, show Hand) {
 	bids := make(map[Suit]uint8)
 	for _, suit := range Suits {
-		bids[suit], show = ai.RealHand.Meld(suit)
-		bids[suit] = bids[suit] + ai.powerBid(suit)
+		bids[suit], show = realHand.Meld(suit)
+		bids[suit] = bids[suit] + powerBid(realHand, suit)
 		//		Log("Could bid %d in %s", bids[suit], suit)
 		if bids[trump] < bids[suit] {
 			trump = suit
@@ -575,14 +589,14 @@ func (t *Trick) String() string {
 	return str.String()
 }
 
-func (trick *Trick) leadSuit() Suit {
+func (trick *Trick) LeadSuit() Suit {
 	if trick.Plays == 0 {
 		return NASuit
 	}
 	return trick.Played[trick.Lead].Suit()
 }
 
-func (trick *Trick) winningCard() Card {
+func (trick *Trick) WinningCard() Card {
 	if trick.Plays == 0 {
 		return NACard
 	}
@@ -602,7 +616,7 @@ func (trick *Trick) counters() (counters uint8) {
 }
 
 func CardBeatsTrick(card Card, trick *Trick, trump Suit) bool {
-	return card.Beats(trick.winningCard(), trump)
+	return card.Beats(trick.WinningCard(), trump)
 }
 
 type PlayWalker struct {
@@ -745,7 +759,8 @@ largeLoop:
 	return
 }
 
-func playHandWithCard(ht *HandTracker, trump Suit) (Card, uint) {
+func PlayHandWithCard(ht *HandTracker, trump Suit) Card {
+	var start = time.Now()
 	count := uint(0)
 	tierSlice := make([][]*PlayWalker, 48-ht.PlayCount+2)
 	length := int(ht.calculateHand(ht.Owner))
@@ -786,7 +801,8 @@ tierLoop:
 			if tier == 0 && len(decisionMap) == 1 {
 				// no need to continue any further, this was the only legal play
 				Log(ht.Owner, "Returning the only legal play of %s", decisionMap[0])
-				return decisionMap[0], 0
+				log.Printf("Logged %d unique paths in %s", 0, time.Now().Sub(start))
+				return decisionMap[0]
 			}
 			pw.Children = make([]*PlayWalker, len(decisionMap))
 			for x := range decisionMap {
@@ -874,15 +890,16 @@ tierLoop:
 	//for _, pw := range tierSlice[0] {
 	//Log(ht.Owner, pw.Best.PlayTrail())
 	//}
-	return tierSlice[0][0].Children[bestChild].Card, count
+	log.Printf("Logged %d unique paths in %s", count, time.Now().Sub(start))
+	return tierSlice[0][0].Children[bestChild].Card
 }
 
-func (ai *AI) findCardToPlay(action *Action) (Card, uint) {
+func (ai *AI) findCardToPlay(action *Action) Card {
 	ai.HT.Trick.Next = action.Playerid
-	card, amount := playHandWithCard(ai.HT, action.Trump)
+	card := ai.PlayingStrategy(ai.HT, action.Trump)
 	runtime.GC() // since we created so much garbage, we need to have the GC mark it as unlinked/unused so next round it can be reused
 	//Log(ai.Playerid, "PlayHandWithCard returned %s for %d points.", card, points)
-	return card, amount
+	return card
 }
 
 func (pw *PlayWalker) potentialCards(trick *Trick, trump Suit) Hand {
@@ -893,8 +910,8 @@ func (pw *PlayWalker) potentialCards(trick *Trick, trump Suit) Hand {
 	winning := NACard
 	lead := NASuit
 	if trick.Plays != 4 {
-		winning = trick.winningCard()
-		lead = trick.leadSuit()
+		winning = trick.WinningCard()
+		lead = trick.LeadSuit()
 	}
 allCardLoop:
 	for card := AS; int8(card) <= AllCards; card++ {
@@ -977,6 +994,7 @@ func (ai *AI) Tell(action *Action) *Action {
 				ai.HighBid = action.Bid
 				ai.HighBidder = action.Playerid
 			}
+			ai.Bids = append(ai.Bids, ai.BidAmount)
 			ai.NumBidders++
 		}
 	case "Play":
@@ -985,10 +1003,8 @@ func (ai *AI) Tell(action *Action) *Action {
 		//Log(ai.Playerid, "Trick = %s", ai.Trick)
 		var response *Action
 		if action.Playerid == ai.Playerid {
-			var start = time.Now()
-			card, amount := ai.findCardToPlay(action)
+			card := ai.findCardToPlay(action)
 			response = CreatePlay(card, ai.Playerid)
-			log.Printf("Logged %d unique paths in %s", amount, time.Now().Sub(start))
 			action.PlayedCard = response.PlayedCard
 		}
 		ai.HT.Trick.Next = action.Playerid
@@ -1021,6 +1037,7 @@ func (ai *AI) Tell(action *Action) *Action {
 		ai.HighBid = 20
 		ai.HighBidder = action.Dealer
 		ai.NumBidders = 0
+		ai.Bids = make([]uint8, 0)
 	case "Meld":
 		//Log(ai.Playerid, "Received meld action - %#v", action)
 		if action.Playerid == ai.Playerid {
@@ -1083,29 +1100,30 @@ func (a *Human) SetHand(h Hand, dealer, playerid uint8) {
 }
 
 type Game struct {
-	Id          int64    `datastore:"-" goon:"id"`
-	Trick       Trick    `datastore:"-" json:"-"`
-	Players     []Player `datastore:"-"`
-	Dealer      uint8    `datastore:"-" json:"-"`
-	Score       []int16  `datastore:"-"`
-	Meld        []uint8  `datastore:"-"`
-	CountMeld   []bool   `datastore:"-" json:"-"`
-	Counters    []uint8  `datastore:"-" json:"-"`
-	HighBid     uint8    `datastore:"-"`
-	HighPlayer  uint8    `datastore:"-"`
-	Trump       Suit     `datastore:"-"`
-	State       string
-	Next        uint8     `datastore:"-"`
-	Hands       []Hand    `datastore:"-" json:"-"`
-	HandsPlayed uint8     `datastore:"-" json:"-"`
-	Updated     time.Time `json:"-"`
+	Id                 int64    `datastore:"-" goon:"id"`
+	Trick              Trick    `datastore:"-" json:"-"`
+	Players            []Player `datastore:"-"`
+	Dealer             uint8    `datastore:"-" json:"-"`
+	Score              []int16  `datastore:"-"`
+	Meld               []uint8  `datastore:"-"`
+	CountMeld          []bool   `datastore:"-" json:"-"`
+	Counters           []uint8  `datastore:"-" json:"-"`
+	HighBid            uint8    `datastore:"-"`
+	HighPlayer         uint8    `datastore:"-"`
+	Trump              Suit     `datastore:"-"`
+	State              string
+	Next               uint8     `datastore:"-"`
+	Hands              []Hand    `datastore:"-" json:"-"`
+	HandsPlayed        uint8     `datastore:"-" json:"-"`
+	Updated            time.Time `json:"-"`
+	WinningPartnership uint8
 }
 
 func NewGame(players int) *Game {
 	game := new(Game)
 	game.Players = make([]Player, players)
 	for x := range game.Players {
-		game.Players[x] = createAI()
+		game.Players[x] = CreateAI()
 	}
 	game.Score = make([]int16, players/2)
 	game.Meld = make([]uint8, players/2)
@@ -1129,19 +1147,17 @@ func (game *Game) NextHand() (*Game, error) {
 	deck.Shuffle()
 	hands := deck.Deal()
 	for x := uint8(0); x < uint8(len(game.Players)); x++ {
-		game.Next = game.inc()
+		game.Next = game.Inc()
 		sort.Sort(hands[x])
 		game.Players[game.Next].SetHand(hands[x], game.Dealer, game.Next)
 		//Log(4, "Dealing player %d hand %s", game.Next, game.Players[game.Next].Hand())
 	}
-	game.Next = game.inc() // increment so that Dealer + 1 is asked to bid first
-	return game.processAction(game.Players[game.Next].Tell(CreateBid(0, game.Next)))
-	// processAction will write the game to the datastore when it's done processing the action(s)
+	game.Next = game.Inc() // increment so that Dealer + 1 is asked to bid first
+	return game.ProcessAction(game.Players[game.Next].Tell(CreateBid(0, game.Next)))
+	// ProcessAction will write the game to the datastore when it's done processing the action(s)
 }
 
-func (game *Game) inc() uint8 {
-	log.Printf("game.Next == %d", game.Next)
-	log.Printf("game.Players = %d", len(game.Players))
+func (game *Game) Inc() uint8 {
 	return (game.Next + 1) % uint8(len(game.Players))
 }
 
@@ -1177,17 +1193,19 @@ func (game *Game) retell() {
 				x = (x + 1) % uint8(len(game.Trick.Played))
 			}
 		}
-		game.Players[game.Next].Tell(CreatePlayRequest(game.Trick.winningCard(), game.Trick.leadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
+		game.Players[game.Next].Tell(CreatePlayRequest(game.Trick.WinningCard(), game.Trick.LeadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
 	}
 }
 
 // client parameter only required for actions that modify the client, like sitting at a table, setting your name, etc
-func (game *Game) processAction(action *Action) (*Game, error) {
+func (game *Game) ProcessAction(action *Action) (*Game, error) {
 	for {
-		if game == nil {
-			log.Printf("processAction on %s", action)
-		} else {
-			log.Printf("processAction on %s with game.Id = %d", action, game.Id)
+		if debugLog {
+			if game == nil {
+				log.Printf("ProcessAction on %s", action)
+			} else {
+				log.Printf("ProcessAction on %s with game.Id = %d", action, game.Id)
+			}
 		}
 		if action == nil {
 			// waiting on a human, exit
@@ -1221,7 +1239,7 @@ func (game *Game) processAction(action *Action) (*Game, error) {
 			//			}
 			//			for x := range game.Players {
 			//				if game.Players[x] == nil {
-			//					game.Players[x] = createAI()
+			//					game.Players[x] = CreateAI()
 			//				}
 			//			}
 			//			return game.NextHand(g, c)
@@ -1285,9 +1303,9 @@ func (game *Game) processAction(action *Action) (*Game, error) {
 				game.HighBid = action.Bid
 				game.HighPlayer = game.Next
 			}
-			if game.HighPlayer == game.Dealer && game.inc() == game.Dealer { // dealer was stuck, tell everyone
+			if game.HighPlayer == game.Dealer && game.Inc() == game.Dealer { // dealer was stuck, tell everyone
 				game.Broadcast(CreateBid(game.HighBid, game.Dealer), game.Dealer)
-				game.Next = game.inc()
+				game.Next = game.Inc()
 			}
 			if game.Next == game.Dealer { // the bidding is done
 				game.State = StateTrump
@@ -1295,7 +1313,7 @@ func (game *Game) processAction(action *Action) (*Game, error) {
 				action = game.Players[game.HighPlayer].Tell(CreateTrump(NASuit, game.HighPlayer))
 				continue
 			}
-			game.Next = game.inc()
+			game.Next = game.Inc()
 			action = game.Players[game.Next].Tell(CreateBid(0, game.Next))
 			continue
 		case game.State == StateTrump:
@@ -1322,27 +1340,29 @@ func (game *Game) processAction(action *Action) (*Game, error) {
 				game.Next = game.HighPlayer
 				game.Counters = make([]uint8, 2)
 				game.State = StatePlay
-				action = game.Players[game.Next].Tell(CreatePlayRequest(game.Trick.winningCard(), game.Trick.leadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
+				action = game.Players[game.Next].Tell(CreatePlayRequest(game.Trick.WinningCard(), game.Trick.LeadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
 				continue
 			}
 		case game.State == StatePlay:
 			// TODO: check for throw in
-			if ValidPlay(action.PlayedCard, game.Trick.winningCard(), game.Trick.leadSuit(), game.Players[game.Next].Hand(), game.Trump) &&
+			if ValidPlay(action.PlayedCard, game.Trick.WinningCard(), game.Trick.LeadSuit(), game.Players[game.Next].Hand(), game.Trump) &&
 				game.Players[game.Next].Hand().Remove(action.PlayedCard) {
 				game.Broadcast(action, game.Next)
 				game.Trick.Next = game.Next
 				game.Trick.PlayCard(action.PlayedCard, game.Trump)
 			} else {
-				action = game.Players[game.Next].Tell(CreatePlayRequest(game.Trick.winningCard(), game.Trick.leadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
+				action = game.Players[game.Next].Tell(CreatePlayRequest(game.Trick.WinningCard(), game.Trick.LeadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
 				continue
 			}
 			if game.Trick.Plays == uint8(len(game.Players)) {
 				game.Counters[game.Trick.WinningPlayer%2] += game.Trick.counters()
 				game.CountMeld[game.Trick.WinningPlayer%2] = true
 				game.Next = game.Trick.WinningPlayer
-				game.BroadcastAll(CreateMessage(fmt.Sprintf("Player %d wins trick with %s", game.Trick.WinningPlayer, game.Trick.winningCard())))
+				game.BroadcastAll(CreateMessage(fmt.Sprintf("Player %d wins trick with %s", game.Trick.WinningPlayer, game.Trick.WinningCard())))
 				game.BroadcastAll(CreateTrick(game.Trick.WinningPlayer))
-				log.Printf("Player %d wins trick with %s", game.Trick.WinningPlayer, game.Trick.winningCard())
+				if debugLog {
+					log.Printf("Player %d wins trick with %s", game.Trick.WinningPlayer, game.Trick.WinningCard())
+				}
 				if len(*game.Players[0].Hand()) == 0 {
 					game.Counters[game.Trick.WinningPlayer%2]++ // last trick
 					// end of hand
@@ -1363,9 +1383,11 @@ func (game *Game) processAction(action *Action) (*Game, error) {
 					gameOver := false
 					if game.Score[game.HighPlayer%2] >= 120 {
 						win[game.HighPlayer%2] = true
+						game.WinningPartnership = game.HighPlayer % 2
 						gameOver = true
 					} else if game.Score[(game.HighPlayer+1)%2] >= 120 {
 						win[(game.HighPlayer+1)%2] = true
+						game.WinningPartnership = (game.HighPlayer + 1) % 2
 						gameOver = true
 					}
 					for x := 0; x < len(game.Players); x++ {
@@ -1390,11 +1412,11 @@ func (game *Game) processAction(action *Action) (*Game, error) {
 					return game.NextHand()
 				}
 				game.Trick.reset()
-				action = game.Players[game.Next].Tell(CreatePlayRequest(game.Trick.winningCard(), game.Trick.leadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
+				action = game.Players[game.Next].Tell(CreatePlayRequest(game.Trick.WinningCard(), game.Trick.LeadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
 				continue
 			}
-			game.Next = game.inc()
-			action = game.Players[game.Next].Tell(CreatePlayRequest(game.Trick.winningCard(), game.Trick.leadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
+			game.Next = game.Inc()
+			action = game.Players[game.Next].Tell(CreatePlayRequest(game.Trick.WinningCard(), game.Trick.LeadSuit(), game.Trump, game.Next, game.Players[game.Next].Hand()))
 			continue
 		}
 	}
@@ -1448,16 +1470,16 @@ func (h *Human) createGame(option int, cp *ConnectionPool) {
 	case 1:
 		// Option 1 - Play against three AI players and start immediately
 		for x := 1; x < 4; x++ {
-			game.Players[x] = createAI()
+			game.Players[x] = CreateAI()
 		}
 	case 2:
 		// Option 2 - Play with a human partner against two AI players
-		game.Players[1] = createAI()
+		game.Players[1] = CreateAI()
 		game.Players[2] = cp.Pop()
-		game.Players[3] = createAI()
+		game.Players[3] = CreateAI()
 	case 3:
 		// Option 3 - Play with a human partner against one AI players and 1 Human
-		game.Players[1] = createAI()
+		game.Players[1] = CreateAI()
 		game.Players[2] = cp.Pop()
 		game.Players[3] = cp.Pop()
 
@@ -1469,8 +1491,8 @@ func (h *Human) createGame(option int, cp *ConnectionPool) {
 	case 5:
 		// Option 5 - Play against a human with AI partners
 		game.Players[1] = cp.Pop()
-		game.Players[2] = createAI()
-		game.Players[3] = createAI()
+		game.Players[2] = CreateAI()
+		game.Players[3] = CreateAI()
 	}
 	var err error
 	game, err = game.NextHand()
