@@ -204,7 +204,6 @@ func (a *AI) reset() {
 			panic("not going to run out of memory here right?!")
 		}
 	}
-	a.name = ""
 	a.HT.reset(a.Playerid)
 }
 
@@ -538,7 +537,7 @@ largeLoop:
 }
 
 func PlayHandWithCard(ht *HandTracker, trump Suit) Card {
-	var start = time.Now()
+	//	var start = time.Now()
 	count := uint(0)
 	tierSlice := make([][]*PlayWalker, 48-ht.PlayCount+2)
 	length := int(ht.calculateHand(ht.Owner))
@@ -578,8 +577,8 @@ tierLoop:
 			}
 			if tier == 0 && len(decisionMap) == 1 {
 				// no need to continue any further, this was the only legal play
-				Log(ht.Owner, "Returning the only legal play of %s", decisionMap[0])
-				log.Printf("Logged %d unique paths in %s", 0, time.Now().Sub(start))
+				//				Log(ht.Owner, "Returning the only legal play of %s", decisionMap[0])
+				//				log.Printf("Logged %d unique paths in %s", 0, time.Now().Sub(start))
 				return decisionMap[0]
 			}
 			pw.Children = make([]*PlayWalker, len(decisionMap))
@@ -664,11 +663,11 @@ tierLoop:
 	}
 	//Log(ht.Owner, "bestChild = %d", bestChild)
 	//Log(ht.Owner, "len(tierSlice[0]) = %d", len(tierSlice[0]))
-	Log(ht.Owner, "Returning best play #%d %s with worth %d for the following path(s):", bestChild, tierSlice[0][0].Children[bestChild].Card, aggregateScore[bestChild])
+	//	Log(ht.Owner, "Returning best play #%d %s with worth %d for the following path(s):", bestChild, tierSlice[0][0].Children[bestChild].Card, aggregateScore[bestChild])
 	//for _, pw := range tierSlice[0] {
 	//Log(ht.Owner, pw.Best.PlayTrail())
 	//}
-	log.Printf("Logged %d unique paths in %s", count, time.Now().Sub(start))
+	//	log.Printf("Logged %d unique paths in %s", count, time.Now().Sub(start))
 	return tierSlice[0][0].Children[bestChild].Card
 }
 
@@ -917,7 +916,7 @@ func (game *Game) NextHand() (*Game, error) {
 	game.HighPlayer = game.Dealer
 	game.State = StateBid
 	game.Next = game.Dealer
-	Log(4, "Dealer is %d", game.Dealer)
+	//	Log(4, "Dealer is %d", game.Dealer)
 	deck := CreateDeck()
 	deck.Shuffle()
 	hands := deck.Deal()
@@ -1147,7 +1146,7 @@ func (game *Game) ProcessAction(action *Action) (*Game, error) {
 						game.Score[(game.HighPlayer+1)%2] += int16(game.Meld[(game.HighPlayer+1)%2] + game.Counters[(game.HighPlayer+1)%2])
 					}
 					// check the score for a winner
-					log.Printf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)
+					//					log.Printf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)
 					game.BroadcastAll(CreateMessage(fmt.Sprintf("Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)))
 					//Log(4, "Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)
 					win := make([]bool, 2)
@@ -1161,10 +1160,13 @@ func (game *Game) ProcessAction(action *Action) (*Game, error) {
 						game.WinningPartnership = (game.HighPlayer + 1) % 2
 						gameOver = true
 					}
+					if game.HandsPlayed > 50 {
+						return nil, nil // no winner, just exit
+					}
 					for x := 0; x < len(game.Players); x++ {
 						game.Players[x].Tell(CreateScore(game.Score, gameOver, win[x%2]))
 					}
-					log.Printf("Score = %v, GameOver=%t, win=%v", game.Score, gameOver, win)
+					//					log.Printf("Score = %v, GameOver=%t, win=%v", game.Score, gameOver, win)
 					if gameOver {
 						for _, player := range game.Players {
 							if _, ok := player.(*Human); ok {

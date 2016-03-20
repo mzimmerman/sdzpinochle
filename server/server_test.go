@@ -2,6 +2,7 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -772,6 +773,9 @@ func TestGame(t *testing.T) {
 		return
 	}
 	game := NewGame(4)
+	for x := 0; x < 4; x++ {
+		game.Players[x] = CreateAI(biddingStrategies[constMattBid], playingStrategies[constMattSimulation], fmt.Sprintf("AI%d", x))
+	}
 	var err error
 	game, err = game.NextHand()
 	if err != nil {

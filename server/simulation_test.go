@@ -22,6 +22,10 @@ type Pairing struct {
 	PlayingKey string
 }
 
+func (p Pairing) Name() string {
+	return fmt.Sprintf("%s-%s", p.BiddingKey, p.PlayingKey)
+}
+
 func BenchmarkSimulation(b *testing.B) {
 	wins := make(map[string]int)
 	played := make(map[string]int)
@@ -37,17 +41,25 @@ func BenchmarkSimulation(b *testing.B) {
 		}
 	}
 	var wg sync.WaitGroup
-	wg.Add(runtime.NumCPU() + 1) // add one for finishedGames goroutine
+	wg.Add(runtime.NumCPU())
 	for x := 0; x < runtime.NumCPU(); x++ {
 		go func() {
 			defer wg.Done()
 			for g := range gamesToPlay {
 				g.NextHand()
+				if g.Score[0] >= 120 || g.Score[1] >= 120 {
+					finishedGames <- g
+				} else {
+					log.Printf("Did not finish game between %s and %s", g.Players[0].Name(), g.Players[1].Name())
+				}
+
 			}
 		}()
 	}
+	var gamesCalculatedWG sync.WaitGroup
+	gamesCalculatedWG.Add(1)
 	go func() {
-		defer wg.Done()
+		defer gamesCalculatedWG.Done()
 		for game := range finishedGames {
 			played[game.Players[0].Name()]++
 			played[game.Players[1].Name()]++
@@ -55,16 +67,27 @@ func BenchmarkSimulation(b *testing.B) {
 		}
 	}()
 	for x := 0; x < b.N; x++ {
-		for _, pairing := range pairings {
-			game := NewGame(4)
-			for x := 0; x < 4; x++ {
-				game.Players[x] = CreateAI(biddingStrategies[pairing.BiddingKey], playingStrategies[pairing.PlayingKey], fmt.Sprintf("%s-%s", pairing.BiddingKey, pairing.PlayingKey))
+		for y, incumbent := range pairings {
+			for z, challenger := range pairings {
+				if y == z {
+					continue // don't play ourselves!
+				}
+				game := NewGame(4)
+				for x := 0; x < 4; x++ {
+					if x%2 == 0 {
+						game.Players[x] = CreateAI(biddingStrategies[incumbent.BiddingKey], playingStrategies[incumbent.PlayingKey], incumbent.Name())
+					} else {
+						game.Players[x] = CreateAI(biddingStrategies[challenger.BiddingKey], playingStrategies[challenger.PlayingKey], challenger.Name())
+					}
+				}
+				gamesToPlay <- game
 			}
-			gamesToPlay <- game
 		}
 	}
 	close(gamesToPlay)
 	wg.Wait() // wait for all queued games to be finished and calculated
+	close(finishedGames)
+	gamesCalculatedWG.Wait()
 	best := ""
 	for name, numPlayed := range played {
 		if wins[name] > wins[best] {

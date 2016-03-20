@@ -16,11 +16,11 @@ var biddingStrategies = map[string]BiddingStrategy{
 		// TODO: make this choose the best suit in case it gets stuck
 	},
 	"ChooseSuitWithMostMeld": chooseSuitWithMostMeld,
-	"MostMeldPlus16": func(h *sdz.Hand, b []uint8, score [2]uint8) (uint8, sdz.Suit) {
+	"MostMeldPlus10": func(h *sdz.Hand, b []uint8, score [2]uint8) (uint8, sdz.Suit) {
 		meld, suit := chooseSuitWithMostMeld(h, b, score)
-		return meld + 16, suit
+		return meld + 10, suit
 	},
-	"MattBid": func(realHand *sdz.Hand, prevBids []uint8, score [2]uint8) (amount uint8, trump sdz.Suit) {
+	constMattBid: func(realHand *sdz.Hand, prevBids []uint8, score [2]uint8) (amount uint8, trump sdz.Suit) {
 		bids := make(map[sdz.Suit]uint8)
 		for _, suit := range sdz.Suits {
 			bids[suit], _ = realHand.Meld(suit)
@@ -89,6 +89,7 @@ var playingStrategies = map[string]PlayingStrategy{
 		}
 		return (*hand)[0]
 	},
+	constMattSimulation: PlayHandWithCard,
 }
 
 func handFromHT(ht *HandTracker) *sdz.Hand {
