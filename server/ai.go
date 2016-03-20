@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
+	"time"
 
 	sdz "github.com/mzimmerman/sdzpinochle"
 )
@@ -17,9 +18,9 @@ var biddingStrategies = map[string]BiddingStrategy{
 		// TODO: make this choose the best suit in case it gets stuck
 	},
 	"ChooseSuitWithMostMeld": chooseSuitWithMostMeld,
-	"MostMeldPlus10": func(h *sdz.Hand, b []uint8, score [2]uint8) (uint8, sdz.Suit) {
+	"MostMeldPlus5": func(h *sdz.Hand, b []uint8, score [2]uint8) (uint8, sdz.Suit) {
 		meld, suit := chooseSuitWithMostMeld(h, b, score)
-		return meld + 10, suit
+		return meld + 5, suit
 	},
 	constMattBid: func(realHand *sdz.Hand, prevBids []uint8, score [2]uint8) (amount uint8, trump sdz.Suit) {
 		bids := make(map[sdz.Suit]uint8)
@@ -90,7 +91,8 @@ var playingStrategies = map[string]PlayingStrategy{
 		}
 		return (*hand)[0]
 	},
-	//constMattSimulation: PlayHandWithCardDuration(time.Second),
+	constMattSimulation: PlayHandWithCardDuration(time.Second),
+	//	"MattSimulation1Second": PlayHandWithCardDuration(time.Second * 1),
 }
 
 func handFromHT(ht *HandTracker) *sdz.Hand {

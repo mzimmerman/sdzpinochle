@@ -7,23 +7,14 @@ import (
 	"sort"
 	"sync"
 	"testing"
-
-	sdz "github.com/mzimmerman/sdzpinochle"
 )
 
-const (
-	winningScore       int  = 120
-	giveUpScore        int  = -500
-	numberOfTricks     int  = 12
-	simulateWithServer bool = true
-)
-
-type Pairing struct {
+type AIStrategy struct {
 	BiddingKey string
 	PlayingKey string
 }
 
-func (p Pairing) Name() string {
+func (p AIStrategy) Name() string {
 	return fmt.Sprintf("%s-%s", p.BiddingKey, p.PlayingKey)
 }
 
@@ -32,10 +23,10 @@ func BenchmarkSimulation(b *testing.B) {
 	played := make(map[string]int)
 	gamesToPlay := make(chan *Game)   // channel of created games to play
 	finishedGames := make(chan *Game) // channel of finished games to compute scores
-	pairings := make([]Pairing, 0)
+	pairings := make([]AIStrategy, 0)
 	for bsKey := range biddingStrategies {
 		for psKey := range playingStrategies {
-			pairings = append(pairings, Pairing{
+			pairings = append(pairings, AIStrategy{
 				BiddingKey: bsKey,
 				PlayingKey: psKey,
 			})
@@ -48,12 +39,7 @@ func BenchmarkSimulation(b *testing.B) {
 			defer wg.Done()
 			for g := range gamesToPlay {
 				g.NextHand()
-				if g.Score[0] >= 120 || g.Score[1] >= 120 {
-					finishedGames <- g
-				} else {
-					log.Printf("Did not finish game between %s and %s", g.Players[0].Name(), g.Players[1].Name())
-				}
-
+				finishedGames <- g
 			}
 		}()
 	}
@@ -125,7 +111,3 @@ func (spbp SortPlayersByPercent) Swap(i, j int) {
 	spbp[i], spbp[j] = spbp[j], spbp[i]
 }
 
-func PlayNone(hand *sdz.Hand, winningCard sdz.Card, leadSuit sdz.Suit, trump sdz.Suit) sdz.Card {
-	panic("This isn't a real playing strategy")
-	return sdz.AD
-}

@@ -14,14 +14,16 @@ import (
 )
 
 const (
-	StateNew   = "new"
-	StateBid   = "bid"
-	StateTrump = "trump"
-	StateMeld  = "meld"
-	StatePlay  = "play"
-	cookieName = "sdzpinochle"
-	debugLog   = false
-	Nothing    = iota
+	winningScore = 120
+	giveUpScore  = -500
+	StateNew     = "new"
+	StateBid     = "bid"
+	StateTrump   = "trump"
+	StateMeld    = "meld"
+	StatePlay    = "play"
+	cookieName   = "sdzpinochle"
+	debugLog     = false
+	Nothing      = iota
 	TrumpLose
 	TrumpWin
 	FollowLose
@@ -1147,15 +1149,16 @@ func (game *Game) ProcessAction(action *Action) (*Game, error) {
 					//Log(4, "Scores are now Team0 = %d to Team1 = %d, played %d hands", game.Score[0], game.Score[1], game.HandsPlayed)
 					win := make([]bool, 2)
 					gameOver := false
-					if game.Score[game.HighPlayer%2] >= 120 {
+					if game.Score[game.HighPlayer%2] >= 120 || game.Score[((game.HighPlayer+1)%2)] <= giveUpScore {
 						win[game.HighPlayer%2] = true
 						game.WinningPartnership = game.HighPlayer % 2
 						gameOver = true
-					} else if game.Score[(game.HighPlayer+1)%2] >= 120 {
+					} else if game.Score[(game.HighPlayer+1)%2] >= 120 || game.Score[((game.HighPlayer)%2)] <= giveUpScore {
 						win[(game.HighPlayer+1)%2] = true
 						game.WinningPartnership = (game.HighPlayer + 1) % 2
 						gameOver = true
 					}
+
 					if game.HandsPlayed > 50 {
 						return nil, nil // no winner, just exit
 					}
