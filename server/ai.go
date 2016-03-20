@@ -7,100 +7,98 @@ import (
 	sdz "github.com/mzimmerman/sdzpinochle"
 )
 
-type PlayingStrategy func(h *sdz.Hand, c sdz.Card, l sdz.Suit, t sdz.Suit) sdz.Card
-type BiddingStrategy func(h *sdz.Hand, bids []uint8) (uint8, sdz.Suit, sdz.Hand)
-type HTPlayingStrategy func(ht *HandTracker, t sdz.Suit) sdz.Card
+type BiddingStrategy func(h *sdz.Hand, bids []uint8, score [2]uint8) (uint8, sdz.Suit)
+type PlayingStrategy func(ht *HandTracker, t sdz.Suit) sdz.Card
 
-type Partnership struct {
-	MatchScore    int
-	DealScore     int
-	HasTakenTrick bool
-	Bid           uint8
+var biddingStrategies = map[string]BiddingStrategy{
+	"NeverBid": func(hand *sdz.Hand, bids []uint8, score [2]uint8) (uint8, sdz.Suit) {
+		return 20, sdz.Hearts
+		// TODO: make this choose the best suit in case it gets stuck
+	},
+	"ChooseSuitWithMostMeld": chooseSuitWithMostMeld,
+	"MostMeldPlus16": func(h *sdz.Hand, b []uint8, score [2]uint8) (uint8, sdz.Suit) {
+		meld, suit := chooseSuitWithMostMeld(h, b, score)
+		return meld + 16, suit
+	},
+	"MattBid": func(realHand *sdz.Hand, prevBids []uint8, score [2]uint8) (amount uint8, trump sdz.Suit) {
+		bids := make(map[sdz.Suit]uint8)
+		for _, suit := range sdz.Suits {
+			bids[suit], _ = realHand.Meld(suit)
+			bids[suit] = bids[suit] + powerBid(realHand, suit)
+			//		Log("Could bid %d in %s", bids[suit], suit)
+			if bids[trump] < bids[suit] {
+				trump = suit
+			} else if bids[trump] == bids[suit] {
+				//rand.Seed(time.Now().UnixNano())
+				if rand.Intn(2) == 0 { // returns one in the set of [0,2)
+					trump = suit
+				} // else - stay with trump as it was
+			}
+		}
+		//rand.Seed(time.Now().UnixNano())
+		bids[trump] += uint8(rand.Intn(3)) // adds 0, 1, or 2 for a little spontanaeity
+		return bids[trump], trump
+	},
 }
 
-func (p *Partnership) GetDealScore() int {
-	if p.HasTakenTrick && p.DealScore >= int(p.Bid) {
-		return p.DealScore
-	} else {
-		return -1 * int(p.Bid)
-	}
-}
-
-func (p *Partnership) SetDealScore() {
-	p.MatchScore += p.GetDealScore()
-}
-
-func (m *Match) SetMeld(trump sdz.Suit) {
-	p0, _ := m.Hands[0].Meld(trump)
-	p1, _ := m.Hands[1].Meld(trump)
-	p2, _ := m.Hands[2].Meld(trump)
-	p3, _ := m.Hands[3].Meld(trump)
-	m.Partnerships[0].DealScore = int(p0 + p2)
-	m.Partnerships[1].DealScore = int(p1 + p3)
-}
-
-func (m *Match) String() string {
-	return fmt.Sprintf("Score: %v - %v", m.Partnerships[0].MatchScore, m.Partnerships[1].MatchScore)
-}
-
-func NeverBid(hand *sdz.Hand, bids []uint8) (uint8, sdz.Suit, sdz.Hand) {
-	return 20, sdz.Hearts, *hand
-}
-
-func ChooseSuitWithMostMeld(hand *sdz.Hand, bids []uint8) (uint8, sdz.Suit, sdz.Hand) {
+func chooseSuitWithMostMeld(hand *sdz.Hand, bids []uint8, score [2]uint8) (uint8, sdz.Suit) {
 	var highestMeld uint8 = 0
 	var trump sdz.Suit
-	var showMeld sdz.Hand
 	for _, suit := range sdz.Suits {
-		meld, show := hand.Meld(suit)
+		meld, _ := hand.Meld(suit)
 		if meld > highestMeld {
 			highestMeld = meld
 			trump = suit
-			showMeld = show
 		}
 	}
 	if highestMeld < 20 {
 		highestMeld = 20
 	}
-	return highestMeld, trump, showMeld
+	return highestMeld, trump
 }
 
-func MostMeldPlusX(x uint8) BiddingStrategy {
-	return func(h *sdz.Hand, b []uint8) (uint8, sdz.Suit, sdz.Hand) {
-		meld, suit, show := ChooseSuitWithMostMeld(h, b)
-		return meld + x, suit, show
-	}
-}
-
-func PlayHighest(hand *sdz.Hand, winningCard sdz.Card, leadSuit sdz.Suit, trump sdz.Suit) sdz.Card {
-	for _, face := range [6]sdz.Face{sdz.Ace, sdz.Ten, sdz.King, sdz.Queen, sdz.Jack, sdz.Nine} {
-		for _, card := range *hand {
-			if card.Face() == face && sdz.ValidPlay(card, winningCard, leadSuit, hand, trump) {
-				return card
+var playingStrategies = map[string]PlayingStrategy{
+	"PlayHighest": func(ht *HandTracker, t sdz.Suit) sdz.Card {
+		hand := handFromHT(ht)
+		for _, face := range sdz.Faces {
+			for _, card := range *hand {
+				if card.Face() == face && sdz.ValidPlay(card, ht.Trick.WinningCard(), ht.Trick.LeadSuit(), hand, t) {
+					return card
+				}
 			}
 		}
-	}
-	return (*hand)[0]
-}
-
-func PlayLowest(hand *sdz.Hand, winningCard sdz.Card, leadSuit sdz.Suit, trump sdz.Suit) sdz.Card {
-	for _, face := range [6]sdz.Face{sdz.Nine, sdz.Jack, sdz.Queen, sdz.King, sdz.Ten, sdz.Ace} {
-		for _, card := range *hand {
-			if card.Face() == face && sdz.ValidPlay(card, winningCard, leadSuit, hand, trump) {
-				return card
+		return (*hand)[0]
+	},
+	"PlayLowest": func(ht *HandTracker, t sdz.Suit) sdz.Card {
+		hand := handFromHT(ht)
+		for _, face := range [6]sdz.Face{sdz.Nine, sdz.Jack, sdz.Queen, sdz.King, sdz.Ten, sdz.Ace} {
+			for _, card := range *hand {
+				if card.Face() == face && sdz.ValidPlay(card, ht.Trick.WinningCard(), ht.Trick.LeadSuit(), hand, t) {
+					return card
+				}
 			}
 		}
-	}
-	return (*hand)[0]
+		return (*hand)[0]
+	},
+	"PlayRandom": func(ht *HandTracker, t sdz.Suit) sdz.Card {
+		hand := handFromHT(ht)
+		for _, v := range rand.Perm(len(*hand)) {
+			if sdz.ValidPlay((*hand)[v], ht.Trick.WinningCard(), ht.Trick.LeadSuit(), hand, t) {
+				return (*hand)[v]
+			}
+		}
+		return (*hand)[0]
+	},
 }
 
-func PlayRandom(hand *sdz.Hand, winningCard sdz.Card, leadSuit sdz.Suit, trump sdz.Suit) sdz.Card {
-	for _, v := range rand.Perm(len(*hand)) {
-		if sdz.ValidPlay((*hand)[v], winningCard, leadSuit, hand, trump) {
-			return (*hand)[v]
+func handFromHT(ht *HandTracker) *sdz.Hand {
+	hand := make(sdz.Hand, 0)
+	for x := 1; x < 25; x++ {
+		if ht.Cards[ht.Trick.Next][x] > 0 {
+			hand = append(hand, sdz.Card(x))
 		}
 	}
-	return (*hand)[0]
+	return &hand
 }
 
 func init() {

@@ -180,22 +180,20 @@ type AI struct {
 	RealHand        *Hand
 	Trump           Suit
 	BiddingStrategy BiddingStrategy
-	PlayingStrategy HTPlayingStrategy
+	PlayingStrategy PlayingStrategy
 	BidAmount       uint8
 	HighBid         uint8
 	HighBidder      uint8
 	NumBidders      uint8
 	Bids            []uint8
 	PlayerImpl
-	HT *HandTracker
+	HT    *HandTracker
+	name  string
+	score [2]uint8 // current score of the game
 }
 
 func (ai *AI) Name() string {
-	return fmt.Sprintf("AI%d", ai.PlayerImpl)
-}
-
-func (ai *AI) MarshalJSON() ([]byte, error) {
-	return json.Marshal("AI")
+	return ai.name
 }
 
 func (a *AI) reset() {
@@ -206,14 +204,16 @@ func (a *AI) reset() {
 			panic("not going to run out of memory here right?!")
 		}
 	}
+	a.name = ""
 	a.HT.reset(a.Playerid)
 }
 
-func CreateAI() (a *AI) {
+func CreateAI(bs BiddingStrategy, ps PlayingStrategy, name string) (a *AI) {
 	a = new(AI)
 	a.reset()
-	a.BiddingStrategy = MattBid
-	a.PlayingStrategy = PlayHandWithCard
+	a.BiddingStrategy = bs
+	a.PlayingStrategy = ps
+	a.name = name
 	return a
 }
 
@@ -254,28 +254,8 @@ func powerBid(realHand *Hand, suit Suit) (count uint8) {
 	return
 }
 
-func (ai AI) calculateBid() (amount uint8, trump Suit, show Hand) {
-	return ai.BiddingStrategy(ai.RealHand, ai.Bids)
-}
-
-func MattBid(realHand *Hand, prevBids []uint8) (amount uint8, trump Suit, show Hand) {
-	bids := make(map[Suit]uint8)
-	for _, suit := range Suits {
-		bids[suit], show = realHand.Meld(suit)
-		bids[suit] = bids[suit] + powerBid(realHand, suit)
-		//		Log("Could bid %d in %s", bids[suit], suit)
-		if bids[trump] < bids[suit] {
-			trump = suit
-		} else if bids[trump] == bids[suit] {
-			//rand.Seed(time.Now().UnixNano())
-			if rand.Intn(2) == 0 { // returns one in the set of [0,2)
-				trump = suit
-			} // else - stay with trump as it was
-		}
-	}
-	//rand.Seed(time.Now().UnixNano())
-	bids[trump] += uint8(rand.Intn(3)) // adds 0, 1, or 2 for a little spontanaeity
-	return bids[trump], trump, show
+func (ai AI) calculateBid() (amount uint8, trump Suit) {
+	return ai.BiddingStrategy(ai.RealHand, ai.Bids, ai.score)
 }
 
 func max(a, b uint8) uint8 {
@@ -767,7 +747,7 @@ func (ai *AI) Tell(action *Action) *Action {
 	case "Bid":
 		if action.Playerid == ai.Playerid {
 			//Log(ai.Playerid, "------------------Player %d asked to bid against player %d", ai.Playerid, ai.HighBidder)
-			ai.BidAmount, ai.Trump, _ = ai.calculateBid()
+			ai.BidAmount, ai.Trump = ai.calculateBid()
 			if ai.NumBidders == 1 && ai.IsPartner(ai.HighBidder) && ai.BidAmount < 21 && ai.BidAmount+5 > 20 {
 				// save our parter
 				//Log(ai.Playerid, "Saving our partner with a recommended bid of %d", ai.BidAmount)
@@ -898,7 +878,6 @@ func (a *Human) SetHand(h Hand, dealer, playerid uint8) {
 }
 
 type Game struct {
-	Id                 int64    `datastore:"-" goon:"id"`
 	Trick              Trick    `datastore:"-" json:"-"`
 	Players            []Player `datastore:"-"`
 	Dealer             uint8    `datastore:"-" json:"-"`
@@ -910,19 +889,18 @@ type Game struct {
 	HighPlayer         uint8    `datastore:"-"`
 	Trump              Suit     `datastore:"-"`
 	State              string
-	Next               uint8     `datastore:"-"`
-	Hands              []Hand    `datastore:"-" json:"-"`
-	HandsPlayed        uint8     `datastore:"-" json:"-"`
-	Updated            time.Time `json:"-"`
+	Next               uint8  `datastore:"-"`
+	Hands              []Hand `datastore:"-" json:"-"`
+	HandsPlayed        uint8  `datastore:"-" json:"-"`
 	WinningPartnership uint8
 }
 
 func NewGame(players int) *Game {
 	game := new(Game)
 	game.Players = make([]Player, players)
-	for x := range game.Players {
-		game.Players[x] = CreateAI()
-	}
+	//	for x := range game.Players {
+	//		game.Players[x] = CreateAI()
+	//	}
 	game.Score = make([]int16, players/2)
 	game.Meld = make([]uint8, players/2)
 	game.State = StateNew
@@ -998,11 +976,7 @@ func (game *Game) retell() {
 func (game *Game) ProcessAction(action *Action) (*Game, error) {
 	for {
 		if debugLog {
-			if game == nil {
-				log.Printf("ProcessAction on %s", action)
-			} else {
-				log.Printf("ProcessAction on %s with game.Id = %d", action, game.Id)
-			}
+			log.Printf("ProcessAction on %s", action)
 		}
 		if action == nil {
 			// waiting on a human, exit
@@ -1258,6 +1232,11 @@ func (h *Human) Listen() (action *Action, open bool) {
 
 }
 
+const (
+	constMattBid        = "MattBid"
+	constMattSimulation = "MattSimulation"
+)
+
 func (h *Human) createGame(option int, cp *ConnectionPool) {
 	game := new(Game)
 	game.Players = make([]Player, 4)
@@ -1267,16 +1246,16 @@ func (h *Human) createGame(option int, cp *ConnectionPool) {
 	case 1:
 		// Option 1 - Play against three AI players and start immediately
 		for x := 1; x < 4; x++ {
-			game.Players[x] = CreateAI()
+			game.Players[x] = CreateAI(biddingStrategies[constMattBid], playingStrategies[constMattSimulation], fmt.Sprintf("AI%d", x))
 		}
 	case 2:
 		// Option 2 - Play with a human partner against two AI players
-		game.Players[1] = CreateAI()
+		game.Players[1] = CreateAI(biddingStrategies[constMattBid], playingStrategies[constMattSimulation], fmt.Sprintf("AI%d", 1))
 		game.Players[2] = cp.Pop()
-		game.Players[3] = CreateAI()
+		game.Players[3] = CreateAI(biddingStrategies[constMattBid], playingStrategies[constMattSimulation], fmt.Sprintf("AI%d", 3))
 	case 3:
 		// Option 3 - Play with a human partner against one AI players and 1 Human
-		game.Players[1] = CreateAI()
+		game.Players[1] = CreateAI(biddingStrategies[constMattBid], playingStrategies[constMattSimulation], fmt.Sprintf("AI%d", 1))
 		game.Players[2] = cp.Pop()
 		game.Players[3] = cp.Pop()
 
@@ -1288,8 +1267,8 @@ func (h *Human) createGame(option int, cp *ConnectionPool) {
 	case 5:
 		// Option 5 - Play against a human with AI partners
 		game.Players[1] = cp.Pop()
-		game.Players[2] = CreateAI()
-		game.Players[3] = CreateAI()
+		game.Players[2] = CreateAI(biddingStrategies[constMattBid], playingStrategies[constMattSimulation], fmt.Sprintf("AI%d", 2))
+		game.Players[3] = CreateAI(biddingStrategies[constMattBid], playingStrategies[constMattSimulation], fmt.Sprintf("AI%d", 3))
 	}
 	var err error
 	game, err = game.NextHand()
