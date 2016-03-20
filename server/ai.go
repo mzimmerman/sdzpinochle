@@ -89,7 +89,7 @@ var playingStrategies = map[string]PlayingStrategy{
 		}
 		return (*hand)[0]
 	},
-	constMattSimulation: PlayHandWithCard,
+	//constMattSimulation: PlayHandWithCardDuration(time.Second),
 }
 
 func handFromHT(ht *HandTracker) *sdz.Hand {

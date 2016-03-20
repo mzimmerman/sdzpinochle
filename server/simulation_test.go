@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"runtime"
+	"sort"
 	"sync"
 	"testing"
 
@@ -88,14 +89,40 @@ func BenchmarkSimulation(b *testing.B) {
 	wg.Wait() // wait for all queued games to be finished and calculated
 	close(finishedGames)
 	gamesCalculatedWG.Wait()
-	best := ""
+	results := make(SortPlayersByPercent, len(pairings))
+	x := 0
 	for name, numPlayed := range played {
-		if wins[name] > wins[best] {
-			best = name
-		}
-		log.Printf("%s won %d out of %d", name, wins[name], numPlayed)
+		results[x].Name = name
+		results[x].Percent = float32(wins[name]) / float32(numPlayed) * 100
+		results[x].Wins = wins[name]
+		results[x].Played = numPlayed
+		x++
 	}
-	log.Printf("%s wins the most!", best)
+	sort.Sort(SortPlayersByPercent(results))
+	for _, res := range results {
+		log.Printf("%2.02f%% wins (%d/%d) %s", res.Percent, res.Wins, res.Played, res.Name)
+	}
+}
+
+type GameResult struct {
+	Name    string
+	Percent float32
+	Wins    int
+	Played  int
+}
+
+type SortPlayersByPercent []GameResult
+
+func (spbp SortPlayersByPercent) Len() int {
+	return len(spbp)
+}
+
+func (spbp SortPlayersByPercent) Less(i, j int) bool {
+	return spbp[i].Percent < spbp[j].Percent
+}
+
+func (spbp SortPlayersByPercent) Swap(i, j int) {
+	spbp[i], spbp[j] = spbp[j], spbp[i]
 }
 
 func PlayNone(hand *sdz.Hand, winningCard sdz.Card, leadSuit sdz.Suit, trump sdz.Suit) sdz.Card {
