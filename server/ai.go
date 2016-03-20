@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"sync"
 
 	sdz "github.com/mzimmerman/sdzpinochle"
 )
@@ -102,13 +103,6 @@ func handFromHT(ht *HandTracker) *sdz.Hand {
 	return &hand
 }
 
-func init() {
-	hts := make(HTStack, 0, 1000)
-	htstack = &hts
-}
-
-var htstack *HTStack
-
 func (ht *HandTracker) reset(owner uint8) {
 	ht.Owner = owner
 	for x := 0; x < len(ht.PlayedCards); x++ {
@@ -126,25 +120,12 @@ func (ht *HandTracker) reset(owner uint8) {
 	ht.Trick.reset()
 }
 
-type HTStack []*HandTracker
-
-func (hts *HTStack) Push(ht *HandTracker) {
-	*hts = append(*hts, ht)
-}
-
-func (hts *HTStack) Pop() (ht *HandTracker, err error) {
-	//x, a = a[len(a)-1], a[:len(a)-1]
-	l := len(*hts) - 1
-	if l < 0 {
-		//memstats := new(runtime.MemStats)
-		//runtime.ReadMemStats(memstats)
-		//Log(4, "MemStats = %#v", memstats)
-		ht = new(HandTracker)
-		ht.Trick = new(Trick)
-		return
-	}
-	ht, *hts = (*hts)[l], (*hts)[:l]
-	return
+var HTStack = sync.Pool{
+	New: func() interface{} {
+		return &HandTracker{
+			Trick: &Trick{},
+		}
+	},
 }
 
 type HandTracker struct {
@@ -175,13 +156,14 @@ func (ht *HandTracker) sum(cardIndex sdz.Card) (sum uint8) {
 }
 
 func (oldht *HandTracker) Copy() (newht *HandTracker, err error) {
-	newht, err = getHT(oldht.Owner)
+	newht = getHT()
 	for x := uint8(0); x < uint8(len(oldht.Cards)); x++ {
 		newht.Cards[x] = oldht.Cards[x]
 	}
 	newht.PlayedCards = oldht.PlayedCards
 	newht.PlayCount = oldht.PlayCount
 	*newht.Trick = *oldht.Trick
+	newht.Owner = oldht.Owner
 	return
 }
 

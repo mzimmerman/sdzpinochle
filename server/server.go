@@ -7,7 +7,6 @@ import (
 	"log"
 	"math/rand"
 	"net"
-	"runtime"
 	"sort"
 	"time"
 
@@ -52,8 +51,8 @@ func getHand() Hand {
 	return h
 }
 
-func getHT(owner uint8) (*HandTracker, error) {
-	return htstack.Pop()
+func getHT() *HandTracker {
+	return HTStack.Get().(*HandTracker)
 }
 
 func (ai *AI) populate() {
@@ -197,12 +196,8 @@ func (ai *AI) Name() string {
 }
 
 func (a *AI) reset() {
-	var err error
 	if a.HT == nil {
-		a.HT, err = getHT(a.Playerid)
-		if err != nil {
-			panic("not going to run out of memory here right?!")
-		}
+		a.HT = getHT()
 	}
 	a.HT.reset(a.Playerid)
 }
@@ -676,7 +671,6 @@ func PlayHandWithCardDuration(duration time.Duration) PlayingStrategy {
 func (ai *AI) findCardToPlay(action *Action) Card {
 	ai.HT.Trick.Next = action.Playerid
 	card := ai.PlayingStrategy(ai.HT, action.Trump)
-	runtime.GC() // since we created so much garbage, we need to have the GC mark it as unlinked/unused so next round it can be reused
 	//Log(ai.Playerid, "PlayHandWithCard returned %s for %d points.", card, points)
 	return card
 }
@@ -1177,7 +1171,7 @@ func (game *Game) ProcessAction(action *Action) (*Game, error) {
 								//								_, err := g.Put(human.Client)
 								//								logError(c, err)
 							} else {
-								htstack.Push(player.(*AI).HT)
+								HTStack.Put(player.(*AI).HT)
 							}
 						}
 						return nil, nil // game over
