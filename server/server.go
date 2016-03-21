@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"math/rand"
@@ -39,7 +40,7 @@ var Hands = make(chan Hand, 1000)
 var logBuffer bytes.Buffer
 
 func init() {
-	rand.Seed(0)
+	rand.Seed(time.Now().Unix())
 }
 
 func getHand() Hand {
@@ -1340,7 +1341,15 @@ func setupGame(net *net.Conn, cp *ConnectionPool) {
 	}
 }
 
+var duration = flag.Duration("duration", 0, "specify a duration to do an ai comparison")
+
 func main() {
+	flag.Parse()
+	if *duration != 0 {
+		compareAI(*duration)
+		return
+	}
+	log.Printf("Server listening on TCP 1201")
 	cp := ConnectionPool{make(chan *Human, 100)}
 	tcpAddr, err := net.ResolveTCPAddr("tcp", ":1201")
 	if err != nil {

@@ -6,7 +6,7 @@ import (
 	"runtime"
 	"sort"
 	"sync"
-	"testing"
+	"time"
 )
 
 type AIStrategy struct {
@@ -18,18 +18,21 @@ func (p AIStrategy) Name() string {
 	return fmt.Sprintf("%s-%s", p.BiddingKey, p.PlayingKey)
 }
 
-func BenchmarkSimulation(b *testing.B) {
+func compareAI(duration time.Duration) {
+	end := time.Now().Add(duration)
+	log.Printf("Starting AI comparison, will end no earlier than %s", end.Format(time.ANSIC))
 	wins := make(map[string]int)
 	played := make(map[string]int)
 	gamesToPlay := make(chan *Game)   // channel of created games to play
 	finishedGames := make(chan *Game) // channel of finished games to compute scores
-	pairings := make([]AIStrategy, 0)
+	aistrategies := make([]AIStrategy, 0)
 	for bsKey := range biddingStrategies {
 		for psKey := range playingStrategies {
-			pairings = append(pairings, AIStrategy{
+			aistrategies = append(aistrategies, AIStrategy{
 				BiddingKey: bsKey,
 				PlayingKey: psKey,
 			})
+			log.Printf("Comparing %s", aistrategies[len(aistrategies)-1].Name())
 		}
 	}
 	var wg sync.WaitGroup
@@ -53,9 +56,13 @@ func BenchmarkSimulation(b *testing.B) {
 			wins[game.Players[game.WinningPartnership].Name()]++
 		}
 	}()
-	for x := 0; x < b.N; x++ {
-		for y, incumbent := range pairings {
-			for z, challenger := range pairings {
+
+	for {
+		if time.Since(end) > 0 {
+			break
+		}
+		for y, incumbent := range aistrategies {
+			for z, challenger := range aistrategies {
 				if y == z {
 					continue // don't play ourselves!
 				}
@@ -75,7 +82,7 @@ func BenchmarkSimulation(b *testing.B) {
 	wg.Wait() // wait for all queued games to be finished and calculated
 	close(finishedGames)
 	gamesCalculatedWG.Wait()
-	results := make(SortPlayersByPercent, len(pairings))
+	results := make(SortPlayersByPercent, len(aistrategies))
 	x := 0
 	for name, numPlayed := range played {
 		results[x].Name = name
@@ -110,4 +117,3 @@ func (spbp SortPlayersByPercent) Less(i, j int) bool {
 func (spbp SortPlayersByPercent) Swap(i, j int) {
 	spbp[i], spbp[j] = spbp[j], spbp[i]
 }
-
