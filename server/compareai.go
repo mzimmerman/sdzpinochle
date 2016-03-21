@@ -50,21 +50,31 @@ func compareAI(duration time.Duration) {
 	gamesCalculatedWG.Add(1)
 	go func() {
 		defer gamesCalculatedWG.Done()
-		for game := range finishedGames {
-			played[game.Players[0].Name()]++
-			played[game.Players[1].Name()]++
-			wins[game.Players[game.WinningPartnership].Name()]++
+		interval := time.Tick(time.Minute)
+		for {
+			select {
+			case <-interval:
+				printResults(wins, played)
+			case game, done := <-finishedGames:
+				if !done {
+					printResults(wins, played)
+					return
+				}
+				played[game.Players[0].Name()]++
+				played[game.Players[1].Name()]++
+				wins[game.Players[game.WinningPartnership].Name()]++
+			}
 		}
 	}()
-
+CreateGames:
 	for {
-		if time.Since(end) > 0 {
-			break
-		}
 		for y, incumbent := range aistrategies {
 			for z, challenger := range aistrategies {
 				if y == z {
 					continue // don't play ourselves!
+				}
+				if time.Since(end) > 0 {
+					break CreateGames
 				}
 				game := NewGame(4)
 				for x := 0; x < 4; x++ {
@@ -82,7 +92,10 @@ func compareAI(duration time.Duration) {
 	wg.Wait() // wait for all queued games to be finished and calculated
 	close(finishedGames)
 	gamesCalculatedWG.Wait()
-	results := make(SortPlayersByPercent, len(aistrategies))
+}
+
+func printResults(wins, played map[string]int) {
+	results := make(SortPlayersByPercent, len(played))
 	x := 0
 	for name, numPlayed := range played {
 		results[x].Name = name
@@ -92,6 +105,7 @@ func compareAI(duration time.Duration) {
 		x++
 	}
 	sort.Sort(SortPlayersByPercent(results))
+	log.Printf("---------------------------")
 	for _, res := range results {
 		log.Printf("%2.02f%% wins (%d/%d) %s", res.Percent, res.Wins, res.Played, res.Name)
 	}

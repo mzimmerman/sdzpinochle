@@ -91,7 +91,9 @@ var playingStrategies = map[string]PlayingStrategy{
 		}
 		return (*hand)[0]
 	},
-	constMattSimulation: PlayHandWithCardDuration(time.Second),
+	constMattSimulation: PlayHandWithCardDuration(time.Second * 5),
+	//	"Simulation2":       PlayHandWithCardDuration(time.Second * 2),
+	//	"Simulation5":       PlayHandWithCardDuration(time.Second * 5),
 	//	"MattSimulation1Second": PlayHandWithCardDuration(time.Second * 1),
 }
 
