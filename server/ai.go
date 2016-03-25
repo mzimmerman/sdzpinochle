@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
-	"time"
+	//	"time"
 
 	sdz "github.com/mzimmerman/sdzpinochle"
 )
@@ -18,9 +18,14 @@ var biddingStrategies = map[string]BiddingStrategy{
 		// TODO: make this choose the best suit in case it gets stuck
 	},
 	"ChooseSuitWithMostMeld": chooseSuitWithMostMeld,
-	"MostMeldPlus5": func(h *sdz.Hand, b []uint8, score [2]uint8) (uint8, sdz.Suit) {
+	"BasicBid":               basicBid,
+	"MostMeldPlus7": func(h *sdz.Hand, b []uint8, score [2]uint8) (uint8, sdz.Suit) {
 		meld, suit := chooseSuitWithMostMeld(h, b, score)
-		return meld + 5, suit
+		bid := meld + 7
+		if bid < 20 {
+			bid = 20
+		}
+		return bid, suit
 	},
 	constMattBid: func(realHand *sdz.Hand, prevBids []uint8, score [2]uint8) (amount uint8, trump sdz.Suit) {
 		bids := make(map[sdz.Suit]uint8)
@@ -41,6 +46,66 @@ var biddingStrategies = map[string]BiddingStrategy{
 		bids[trump] += uint8(rand.Intn(3)) // adds 0, 1, or 2 for a little spontanaeity
 		return bids[trump], trump
 	},
+}
+
+func countSuit(hand *sdz.Hand, suit sdz.Suit) uint8 {
+	var count uint8 = 0
+	for _, card := range *hand {
+		if card.Suit() == suit {
+			count++
+		}
+	}
+	return count
+}
+
+func countAces(hand *sdz.Hand) uint8 {
+	var count uint8 = 0
+	for _, card := range *hand {
+		if card.Face() == sdz.Ace {
+			count++
+		}
+	}
+	return count
+}
+
+func maximum(nums []uint8) uint8 {
+	var largest uint8 = 0
+	for _, num := range nums {
+		if num > largest {
+			largest = num
+		}
+	}
+	return largest
+}
+
+func dontOverbid(bid uint8, bids []uint8, trump sdz.Suit) (uint8, sdz.Suit) {
+	var highestBid uint8 = bid
+	maxBid := maximum(bids)
+	if len(bids) == 3 && maxBid >= 20 && highestBid > maxBid {
+		highestBid = maxBid + 1
+	}
+	return highestBid, trump
+}
+
+func basicBid(hand *sdz.Hand, bids []uint8, score [2]uint8) (uint8, sdz.Suit) {
+	estimatedCounters := func(hand *sdz.Hand, s sdz.Suit) uint8 {
+		return countSuit(hand, s) + countAces(hand)
+	}
+	var highestBid, partnerHelp uint8 = 0, 4
+	var trump sdz.Suit
+	for _, suit := range sdz.Suits {
+		meld, _ := hand.Meld(suit)
+		bid := meld + estimatedCounters(hand, suit) + partnerHelp
+		if bid > highestBid {
+			highestBid = bid
+			trump = suit
+		}
+	}
+	if highestBid < 20 && len(bids) == 3 {
+		// Be a little more aggressive if we're stuck
+		highestBid = highestBid + 3
+	}
+	return dontOverbid(highestBid, bids, trump)
 }
 
 func chooseSuitWithMostMeld(hand *sdz.Hand, bids []uint8, score [2]uint8) (uint8, sdz.Suit) {
@@ -91,7 +156,7 @@ var playingStrategies = map[string]PlayingStrategy{
 		}
 		return (*hand)[0]
 	},
-	constMattSimulation: PlayHandWithCardDuration(time.Second * 5),
+	//constMattSimulation: PlayHandWithCardDuration(time.Second * 5),
 	//	"Simulation2":       PlayHandWithCardDuration(time.Second * 2),
 	//	"Simulation5":       PlayHandWithCardDuration(time.Second * 5),
 	//	"MattSimulation1Second": PlayHandWithCardDuration(time.Second * 1),
