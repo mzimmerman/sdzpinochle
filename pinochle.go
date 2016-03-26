@@ -198,6 +198,16 @@ func (c Card) Counter() bool {
 	return c.Face() == Ace || c.Face() == Ten || c.Face() == King
 }
 
+func (h Hand) Counters() int {
+	var count int
+	for _, card := range h {
+		if card.Counter() {
+			count++
+		}
+	}
+	return count
+}
+
 func (c Card) Suit() Suit {
 	if c == NACard {
 		return NASuit
