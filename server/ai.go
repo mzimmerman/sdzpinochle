@@ -13,15 +13,22 @@ type BiddingStrategy func(h *sdz.Hand, bids []uint8, score [2]uint8) (uint8, sdz
 type PlayingStrategy func(ht *HandTracker, t sdz.Suit) sdz.Card
 
 var biddingStrategies = map[string]BiddingStrategy{
-	"NeverBid": func(hand *sdz.Hand, bids []uint8, score [2]uint8) (uint8, sdz.Suit) {
-		return 20, sdz.Hearts
-		// TODO: make this choose the best suit in case it gets stuck
-	},
+	/*
+		"NeverBid": func(hand *sdz.Hand, bids []uint8, score [2]uint8) (uint8, sdz.Suit) {
+			return 20, sdz.Hearts
+			// TODO: make this choose the best suit in case it gets stuck
+		},
+		"MostMeldPlus7": func(h *sdz.Hand, b []uint8, score [2]uint8) (uint8, sdz.Suit) {
+			meld, suit := chooseSuitWithMostMeld(h, b, score)
+			bid := meld + 7
+			if bid < 20 {
+				bid = 20
+			}
+			return bid, suit
+		},
+	*/
 	"ChooseSuitWithMostMeld": chooseSuitWithMostMeld,
-	"MostMeldPlus5": func(h *sdz.Hand, b []uint8, score [2]uint8) (uint8, sdz.Suit) {
-		meld, suit := chooseSuitWithMostMeld(h, b, score)
-		return meld + 5, suit
-	},
+	"BasicBid":               basicBid,
 	constMattBid: func(realHand *sdz.Hand, prevBids []uint8, score [2]uint8) (amount uint8, trump sdz.Suit) {
 		bids := make(map[sdz.Suit]uint8)
 		for _, suit := range sdz.Suits {
@@ -43,6 +50,66 @@ var biddingStrategies = map[string]BiddingStrategy{
 	},
 }
 
+func countSuit(hand *sdz.Hand, suit sdz.Suit) uint8 {
+	var count uint8 = 0
+	for _, card := range *hand {
+		if card.Suit() == suit {
+			count++
+		}
+	}
+	return count
+}
+
+func countAces(hand *sdz.Hand) uint8 {
+	var count uint8 = 0
+	for _, card := range *hand {
+		if card.Face() == sdz.Ace {
+			count++
+		}
+	}
+	return count
+}
+
+func maximum(nums []uint8) uint8 {
+	var largest uint8 = 0
+	for _, num := range nums {
+		if num > largest {
+			largest = num
+		}
+	}
+	return largest
+}
+
+func dontOverbid(bid uint8, bids []uint8, trump sdz.Suit) (uint8, sdz.Suit) {
+	var highestBid uint8 = bid
+	maxBid := maximum(bids)
+	if len(bids) == 3 && maxBid >= 20 && highestBid > maxBid {
+		highestBid = maxBid + 1
+	}
+	return highestBid, trump
+}
+
+func basicBid(hand *sdz.Hand, bids []uint8, score [2]uint8) (uint8, sdz.Suit) {
+	estimatedCounters := func(hand *sdz.Hand, s sdz.Suit) uint8 {
+		return countSuit(hand, s) + countAces(hand)
+	}
+	var highestBid, partnerHelp uint8 = 0, 4
+	var trump sdz.Suit
+	for _, suit := range sdz.Suits {
+		meld, _ := hand.Meld(suit)
+		bid := meld + estimatedCounters(hand, suit) + partnerHelp
+		if bid > highestBid {
+			highestBid = bid
+			trump = suit
+		}
+	}
+	if highestBid < 20 && len(bids) == 3 {
+		// Be a little more aggressive if we're stuck
+		highestBid = highestBid + 3
+	}
+	return dontOverbid(highestBid, bids, trump)
+}
+
 func chooseSuitWithMostMeld(hand *sdz.Hand, bids []uint8, score [2]uint8) (uint8, sdz.Suit) {
 	var highestMeld uint8 = 0
 	var trump sdz.Suit
@@ -60,41 +127,110 @@ func chooseSuitWithMostMeld(hand *sdz.Hand, bids []uint8, score [2]uint8) (uint8
 }
 
 var playingStrategies = map[string]PlayingStrategy{
-	"PlayHighest": func(ht *HandTracker, t sdz.Suit) sdz.Card {
-		hand := handFromHT(ht)
-		for _, face := range sdz.Faces {
-			for _, card := range *hand {
-				if card.Face() == face && sdz.ValidPlay(card, ht.Trick.WinningCard(), ht.Trick.LeadSuit(), hand, t) {
-					return card
+	/*
+		"PlayHighest": func(ht *HandTracker, t sdz.Suit) sdz.Card {
+			hand := handFromHT(ht)
+			for _, face := range sdz.Faces {
+				for _, card := range *hand {
+					if card.Face() == face && sdz.ValidPlay(card, ht.Trick.WinningCard(), ht.Trick.LeadSuit(), hand, t) {
+						return card
+					}
 				}
 			}
-		}
-		return (*hand)[0]
-	},
-	"PlayLowest": func(ht *HandTracker, t sdz.Suit) sdz.Card {
-		hand := handFromHT(ht)
-		for _, face := range [6]sdz.Face{sdz.Nine, sdz.Jack, sdz.Queen, sdz.King, sdz.Ten, sdz.Ace} {
-			for _, card := range *hand {
-				if card.Face() == face && sdz.ValidPlay(card, ht.Trick.WinningCard(), ht.Trick.LeadSuit(), hand, t) {
-					return card
+			return (*hand)[0]
+		},
+		"PlayLowest": func(ht *HandTracker, t sdz.Suit) sdz.Card {
+			hand := handFromHT(ht)
+			for _, face := range [6]sdz.Face{sdz.Nine, sdz.Jack, sdz.Queen, sdz.King, sdz.Ten, sdz.Ace} {
+				for _, card := range *hand {
+					if card.Face() == face && sdz.ValidPlay(card, ht.Trick.WinningCard(), ht.Trick.LeadSuit(), hand, t) {
+						return card
+					}
 				}
 			}
-		}
-		return (*hand)[0]
-	},
-	"PlayRandom": func(ht *HandTracker, t sdz.Suit) sdz.Card {
-		hand := handFromHT(ht)
-		for _, v := range rand.Perm(len(*hand)) {
-			if sdz.ValidPlay((*hand)[v], ht.Trick.WinningCard(), ht.Trick.LeadSuit(), hand, t) {
-				return (*hand)[v]
+			return (*hand)[0]
+		},
+		"PlayRandom": func(ht *HandTracker, t sdz.Suit) sdz.Card {
+			hand := handFromHT(ht)
+			for _, v := range rand.Perm(len(*hand)) {
+				if sdz.ValidPlay((*hand)[v], ht.Trick.WinningCard(), ht.Trick.LeadSuit(), hand, t) {
+					return (*hand)[v]
+				}
 			}
-		}
-		return (*hand)[0]
-	},
-	constMattSimulation: PlayHandWithCardDuration(time.Second * 5),
+			return (*hand)[0]
+		},
+	*/
+	"BasicPlay": basicPlay,
+	//constMattSimulation: PlayHandWithCardDuration(time.Second * 5),
 	//	"Simulation2":       PlayHandWithCardDuration(time.Second * 2),
 	//	"Simulation5":       PlayHandWithCardDuration(time.Second * 5),
-	//	"MattSimulation1Second": PlayHandWithCardDuration(time.Second * 1),
+	"MattSimulation1Second": PlayHandWithCardDuration(time.Second * 1),
+}
+
+func findBareAce(hand *sdz.Hand) sdz.Card {
+	for _, suit := range sdz.Suits {
+		if countSuit(hand, suit) == 1 {
+			for _, card := range *hand {
+				if card.Suit() == suit && card.Face() == sdz.Ace {
+					return card
+				}
+			}
+		}
+	}
+	return sdz.NACard
+}
+
+func basicPlay(ht *HandTracker, trump sdz.Suit) sdz.Card {
+	hand := handFromHT(ht)
+	findPartner := map[uint8]uint8{0: 2, 1: 3, 2: 0, 3: 1}
+	// We're first to play
+	if ht.Trick.Plays == 0 {
+		// Play bare aces first
+		card := findBareAce(hand)
+		if card != sdz.NACard {
+			return card
+		}
+		// Play aces first and counters last
+		for _, face := range [6]sdz.Face{sdz.Ace, sdz.Queen, sdz.Nine, sdz.Jack, sdz.King, sdz.Ten} {
+			for _, card := range *hand {
+				if card.Face() == face && card.Suit() != trump {
+					return card
+				}
+			}
+		}
+	} else if ht.Trick.Plays > 1 && // Our partner has played
+		ht.Trick.WinningPlayer == findPartner[ht.Trick.Next] && // and is winning
+		(ht.Trick.Played[ht.Trick.Plays-2].Face() == sdz.Ace || // with an Ace
+			(ht.Trick.Played[ht.Trick.Plays-2].Suit() == trump &&
+				ht.Trick.Played[0].Suit() != trump)) { // Or has trumped in
+		// Play counters first and aces last
+		for _, face := range [6]sdz.Face{sdz.King, sdz.Ten, sdz.Nine, sdz.Jack, sdz.Queen, sdz.Ace} {
+			for _, card := range *hand {
+				if card.Face() == face && sdz.ValidPlay(card, ht.Trick.WinningCard(), ht.Trick.LeadSuit(), hand, trump) {
+					return card
+				}
+			}
+		}
+
+	}
+	// Play aces if we can win with them
+	for _, card := range *hand {
+		if card.Face() == sdz.Ace &&
+			sdz.ValidPlay(card, ht.Trick.WinningCard(), ht.Trick.LeadSuit(), hand, trump) &&
+			card.Beats(ht.Trick.WinningCard(), trump) &&
+			card.Suit() != trump {
+			return card
+		}
+	}
+	// We can't play an Ace so play the lowest thing we can
+	for _, face := range [6]sdz.Face{sdz.Nine, sdz.Jack, sdz.Queen, sdz.King, sdz.Ten, sdz.Ace} {
+		for _, card := range *hand {
+			if card.Face() == face && sdz.ValidPlay(card, ht.Trick.WinningCard(), ht.Trick.LeadSuit(), hand, trump) {
+				return card
+			}
+		}
+	}
+	return sdz.NACard
 }
 
 func handFromHT(ht *HandTracker) *sdz.Hand {

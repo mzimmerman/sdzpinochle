@@ -3,8 +3,35 @@ package main
 
 import (
 	"fmt"
+	. "github.com/mzimmerman/sdzpinochle"
+	"sort"
 	"testing"
 )
+
+var ZeroZero = [2]uint8{0, 0}
+
+func TestConservativeBid(t *testing.T) {
+	deck := CreateDeck()
+	deck.Shuffle()
+	hands := []Hand{
+		Hand{AH, TS, JS, TD, AD, AS, QD, AS, KD, AC, QS, TS},
+		Hand{JD, JS, AC, KS, KH, NC, TC, TC, QC, QC, JC, KC},
+		Hand{KC, JH, AH, TH, KS, NC, ND, QH, NS, NH, KH, AD},
+		Hand{JH, JC, TD, QD, ND, TH, QS, NS, NH, QH, KD, JD},
+	}
+	expectedBids := [4]uint8{27, 29, 28, 20}
+	bids := make([]uint8, 0)
+	for x, hand := range hands {
+		sort.Sort(hand)
+		bid, trump := basicBid(&hand, bids, ZeroZero)
+		bids = append(bids, bid)
+		if bid != expectedBids[x] {
+			meld, _ := hand.Meld(trump)
+			t.Log(x, " ", hand, " Bid: ", bid, " Trump: ", trump, " Meld: ", meld)
+			t.Errorf("Expected bid of %v got bid of %v", expectedBids[x], bid)
+		}
+	}
+}
 
 //func TestFoo(t *testing.T) {
 //	pt.RunWithFormatter(
